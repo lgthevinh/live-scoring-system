@@ -163,7 +163,7 @@ distributions {
     main {
         contents {
             from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
-            from('bin') { into 'bin' }   // includes bin/MatchMaker.exe
+            from('binary') { into 'binary' }   // includes bin/MatchMaker.exe
             from('data') { into 'data' } // includes data/match_schedule.txt
             from('scripts') { into '' }  // run.bat / run.sh (optional)
             from('README-en.md') { into '' }
