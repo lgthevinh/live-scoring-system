@@ -37,12 +37,7 @@ public class ScoringService extends Service {
     private static MatchHandler matchHandler;
     private static RankingHandler rankingHandler;
     private static BroadcastHandler broadcastHandler;
-
     private static LiveScoreHandler liveScoreHandler;
-
-    public ScoringService() {
-
-    }
 
     @Override
     protected void onServiceInit() {
@@ -92,15 +87,7 @@ public class ScoringService extends Service {
             }
         });
 
-        String ipAddress;
-        try {
-            ipAddress = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            ipAddress = "localhost";
-        }
-
         ILog.i(SERVICE_NAME, "ScoringService initialized.");
-        ILog.i(SERVICE_NAME, "Running on URL: http://" + ipAddress);
         ILog.i(SERVICE_NAME, "Database initialized at: " + appDir + "/scoring_system.db");
         ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
     }

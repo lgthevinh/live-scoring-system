@@ -62,3 +62,4 @@ src/main/resources/static/*.ico
 .clinerules/
 build.gradle
 files/
+/*.db
