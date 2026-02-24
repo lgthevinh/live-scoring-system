@@ -167,13 +167,22 @@ distributions {
             from('data') { into 'data' } // includes data/match_schedule.txt
             from('scripts') { into '' }  // run.bat / run.sh (optional)
             from('README-en.md') { into '' }
+
+            // detect os and include jre if needed
+            def osName = System.getProperty('os.name').toLowerCase()
+            if (osName.contains('win')) {
+                from('jre/windows') { into 'jre' }
+            } else if (osName.contains('mac')) {
+                from('jre/macos') { into 'jre' }
+            } else if (osName.contains('nux') || osName.contains('nix')) {
+                from('jre/linux') { into 'jre' }
+            }
         }
     }
 }
 
 
 tasks.named('distZip') { dependsOn 'bootJar' }
-
 
 import com.github.gradle.node.npm.task.NpmInstallTask
 import com.github.gradle.node.npm.task.NpmTask
