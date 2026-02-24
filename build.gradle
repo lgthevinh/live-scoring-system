@@ -86,17 +86,87 @@ tasks.register('desktopJar', Jar) {
 distributions {
     main {
         contents {
+            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
-            // scripts already included by your existing config
+            from('binary') { into 'binary' }
+            from('data') { into 'data' }
+            from('scripts') { into '' }
+            from('README-en.md') { into '' }
+        }
+    }
+    windows {
+        contents {
+            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
+            from('binary') { into 'binary' }
+            from('data') { into 'data' }
+            from('scripts') { into '' }
+            from('README-en.md') { into '' }
+            from('jre/windows') { into 'jre' }
+        }
+    }
+    mac {
+        contents {
+            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
+            from('binary') { into 'binary' }
+            from('data') { into 'data' }
+            from('scripts') { into '' }
+            from('README-en.md') { into '' }
+            from('jre/macos') { into 'jre' }
+        }
+    }
+    linux {
+        contents {
+            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
+            from('binary') { into 'binary' }
+            from('data') { into 'data' }
+            from('scripts') { into '' }
+            from('README-en.md') { into '' }
+            from('jre/linux') { into 'jre' }
         }
     }
 }
 
-tasks.named('distZip') { dependsOn 'bootJar', 'desktopJar' }
-tasks.register('packageAll') {
+['distZip', 'windowsDistZip', 'macDistZip', 'linuxDistZip'].each { zipTask ->
+    tasks.named(zipTask) { dependsOn 'bootJar', 'desktopJar' }
+}
+
+tasks.named('distZip') {
     group = 'distribution'
-    description = 'Build boot jar and dist zip'
-    dependsOn tasks.named('bootJar'), tasks.named('distZip')
+    description = 'Build generic distribution zip without bundled JRE'
+    dependsOn('bootJar', 'desktopJar')
+}
+
+tasks.named('windowsDistZip') {
+    group = 'distribution'
+    description = 'Build Windows distribution zip with bundled JRE'
+    dependsOn('bootJar', 'desktopJar')
+}
+
+tasks.named('macDistZip') {
+    group = 'distribution'
+    description = 'Build macOS distribution zip with bundled JRE'
+    dependsOn('bootJar', 'desktopJar')
+}
+
+tasks.register('packageWindows') {
+    group = 'distribution'
+    description = 'Build Windows distribution zip with bundled JRE'
+    dependsOn tasks.named('windowsDistZip')
+}
+
+tasks.register('packageMac') {
+    group = 'distribution'
+    description = 'Build macOS distribution zip with bundled JRE'
+    dependsOn tasks.named('macDistZip')
+}
+
+tasks.register('packageLinux') {
+    group = 'distribution'
+    description = 'Build Linux distribution zip with bundled JRE'
+    dependsOn tasks.named('linuxDistZip')
 }
 
 /* ==== Frontend build config ==== */
@@ -159,31 +229,6 @@ tasks.named('bootJar') {
 }
 
 /* ==== Distribution ZIP (jar + bin + data + scripts) ==== */
-distributions {
-    main {
-        contents {
-            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
-            from('binary') { into 'binary' }   // includes bin/MatchMaker.exe
-            from('data') { into 'data' } // includes data/match_schedule.txt
-            from('scripts') { into '' }  // run.bat / run.sh (optional)
-            from('README-en.md') { into '' }
-
-            // detect os and include jre if needed
-            def osName = System.getProperty('os.name').toLowerCase()
-            if (osName.contains('win')) {
-                from('jre/windows') { into 'jre' }
-            } else if (osName.contains('mac')) {
-                from('jre/macos') { into 'jre' }
-            } else if (osName.contains('nux') || osName.contains('nix')) {
-                from('jre/linux') { into 'jre' }
-            }
-        }
-    }
-}
-
-
-tasks.named('distZip') { dependsOn 'bootJar' }
-
 import com.github.gradle.node.npm.task.NpmInstallTask
 import com.github.gradle.node.npm.task.NpmTask
 import proguard.gradle.ProGuardTask
