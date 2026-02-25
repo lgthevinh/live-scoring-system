@@ -1,7 +1,10 @@
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.base.dao.Dao;
 import org.thingai.base.dao.DaoSqlite;
+import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.config.AuthData;
 import org.thingai.app.scoringservice.handler.entityhandler.AuthHandler;
 
@@ -14,7 +17,8 @@ public class TestAuthHandler {
         String url = "src/test/resources/test.db";
         Dao dao = new DaoSqlite(url);
         dao.initDao(new Class[] {
-            AuthData.class
+                AuthData.class,
+                AccountRole.class
         }); // Ensure the DAO is ready for use
         authHandler = new AuthHandler(dao);
     }
@@ -171,6 +175,39 @@ public class TestAuthHandler {
             @Override
             public void onFailure(String errorMessage) {
                 System.err.println("Refreshed token validation failed: " + errorMessage);
+            }
+        });
+    }
+
+    @Test
+    public void testGetAllUsers() {
+        // First, ensure at least one user exists
+        authHandler.handleCreateAuth("listUser", "listPassword", 2, new AuthHandler.AuthHandlerCallback() {
+            @Override
+            public void onSuccess(String token, String successMessage) {
+                System.out.println("Setup user created: " + successMessage);
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                // User may already exist from a previous run, that is fine
+                System.out.println("Setup user note: " + errorMessage);
+            }
+        });
+
+        // Now retrieve all users
+        authHandler.handleGetAllUsers(new RequestCallback<UserDto[]>() {
+            @Override
+            public void onSuccess(UserDto[] users, String message) {
+                System.out.println("Get all users success: " + message);
+                for (UserDto user : users) {
+                    System.out.println("  username=" + user.getUsername() + ", role=" + user.getRole());
+                }
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                System.err.println("Get all users failed [" + errorCode + "]: " + errorMessage);
             }
         });
     }

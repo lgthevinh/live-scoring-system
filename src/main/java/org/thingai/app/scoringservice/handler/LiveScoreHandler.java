@@ -498,10 +498,13 @@ public class LiveScoreHandler {
 
     public void getCurrentMatchField(int fieldNumber, RequestCallback<MatchDetailDto> callback) {
         try {
-            if (currentMatch != null) {
-                currentMatch.setBlueScore(currentBlueScoreHolder);
-                currentMatch.setRedScore(currentRedScoreHolder);
+            if (currentMatch == null) {
+                callback.onFailure(ErrorCode.NOT_FOUND, "No active or upcoming match found");
+                return;
             }
+
+            currentMatch.setBlueScore(currentBlueScoreHolder);
+            currentMatch.setRedScore(currentRedScoreHolder);
             if (fieldNumber == 0) {
                 if (currentMatch != null) {
                     callback.onSuccess(currentMatch, "Current match field retrieved successfully");
@@ -510,15 +513,13 @@ public class LiveScoreHandler {
                 }
                 return;
             }
-            if (currentMatch != null && currentMatch.getMatch().getFieldNumber() == fieldNumber) {
+            if (currentMatch.getMatch().getFieldNumber() == fieldNumber) {
                 callback.onSuccess(currentMatch, "Current match field retrieved successfully");
-            } else if (nextMatch != null && nextMatch.getMatch().getFieldNumber() == fieldNumber) {
-                callback.onSuccess(nextMatch, "Next match field retrieved successfully");
             } else {
                 callback.onFailure(ErrorCode.NOT_FOUND, "No match found for field number: " + fieldNumber);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            ILog.d(TAG, "Failed to get current match field: " + e.getMessage());
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to get current match field: " + e.getMessage());
         }
     }
