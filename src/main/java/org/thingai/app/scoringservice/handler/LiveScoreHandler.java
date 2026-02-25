@@ -362,6 +362,7 @@ public class LiveScoreHandler {
                     
                     // Now update rankings
                     updateRankingsForOverride(matchId, targetScore, otherScore, callback);
+                    callback.onSuccess(true, "Score override successful and rankings updated");
                 }
 
                 @Override
