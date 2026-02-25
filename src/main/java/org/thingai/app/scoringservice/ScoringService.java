@@ -18,9 +18,6 @@ import org.thingai.app.scoringservice.entity.config.AuthData;
 import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;
-
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 
 public class ScoringService extends Service {
@@ -58,27 +55,14 @@ public class ScoringService extends Service {
         eventHandler = new EventHandler(dao, new EventHandler.EventCallback() {
             @Override
             public void onSetEvent(Dao eventDao, DaoFile eventDaoFile) {
-
-                teamHandler = new TeamHandler(eventDao, teamCache);
-                matchHandler = new MatchHandler(eventDao, matchCache, allianceTeamCache, teamCache);
-                scoreHandler = new ScoreHandler(eventDao, eventDaoFile);
-                rankingHandler = new RankingHandler(eventDao, matchHandler);
-
-                liveScoreHandler = new LiveScoreHandler(matchHandler, scoreHandler, rankingHandler);
-                liveScoreHandler.setBroadcastHandler(broadcastHandler);
+                ILog.i(SERVICE_NAME, "Event is set. Injecting handlers with new event data.");
+                injectHandler(eventDao, eventDaoFile);
             }
 
             @Override
             public void isCurrentEventSet(Event currentEvent, Dao eventDao, DaoFile eventDaoFile) {
                 ILog.i(SERVICE_NAME, "Current event is set to: ", currentEvent.getEventCode());
-
-                teamHandler = new TeamHandler(eventDao, teamCache);
-                matchHandler = new MatchHandler(eventDao, matchCache, allianceTeamCache, teamCache);
-                scoreHandler = new ScoreHandler(eventDao, eventDaoFile);
-                rankingHandler = new RankingHandler(eventDao, matchHandler);
-
-                liveScoreHandler = new LiveScoreHandler(matchHandler, scoreHandler, rankingHandler);
-                liveScoreHandler.setBroadcastHandler(broadcastHandler);
+                injectHandler(eventDao, eventDaoFile);
             }
 
             @Override
@@ -131,5 +115,16 @@ public class ScoringService extends Service {
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {
         ScoreHandler.setScoreClass(scoreClass);
+    }
+
+    private void injectHandler(Dao dao, DaoFile daoFile) {
+        teamHandler = new TeamHandler(dao, teamCache);
+        matchHandler = new MatchHandler(dao, matchCache, allianceTeamCache, teamCache);
+        scoreHandler = new ScoreHandler(dao, daoFile);
+        rankingHandler = new RankingHandler(dao, matchHandler);
+
+        liveScoreHandler = new LiveScoreHandler(matchHandler, scoreHandler, rankingHandler);
+        liveScoreHandler.setBroadcastHandler(broadcastHandler);
+
     }
 }
