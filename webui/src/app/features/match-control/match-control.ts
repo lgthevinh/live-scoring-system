@@ -13,6 +13,7 @@ import { MatchDetailDto } from '../../core/models/match.model';
 import { ScorekeeperService } from '../../core/services/scorekeeper.service';
 import { BroadcastService } from '../../core/services/broadcast.service';
 import { SyncService } from '../../core/services/sync.service';
+import { RankService } from '../../core/services/rank.service';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
 
 type TabKey =
@@ -63,11 +64,12 @@ export class MatchControl implements OnInit {
   // View Control
   viewMatchType: number = 1; // Default to Qualification
 
-  // Editing
+// Editing
   editingMatch = signal<MatchDetailDto | null>(null);
   isSaving = signal<boolean>(false);
   redScoreData: any = {};
   blueScoreData: any = {};
+  isRecalculatingRanking = signal<boolean>(false);
 
   // Playoff Generation
   playoffType: number = 3; // Default to Elimination Bracket
@@ -83,11 +85,12 @@ export class MatchControl implements OnInit {
   manualRedTeams: string = '';
   manualBlueTeams: string = '';
 
-  constructor(
+constructor(
     private matchService: MatchService,
     private scorekeeper: ScorekeeperService,
     private broadcastService: BroadcastService,
-    private syncService: SyncService
+    private syncService: SyncService,
+    private rankService: RankService
   ) { }
 
   ngOnInit(): void {
@@ -245,9 +248,34 @@ export class MatchControl implements OnInit {
     });
   }
 
-  cancelEdit() {
+cancelEdit() {
     this.editingMatch.set(null);
     this.setTab('schedule');
+  }
+
+  recalculateRankings() {
+    if (this.isRecalculatingRanking()) {
+      return;
+    }
+    this.isRecalculatingRanking.set(true);
+    this.rankService.recalculateRankings().subscribe({
+      next: (success) => {
+        if (success) {
+          console.log('Rankings recalculated successfully');
+          alert('Rankings recalculated successfully');
+        } else {
+          console.warn('Rankings recalculation returned false');
+          alert('Failed to recalculate rankings');
+        }
+      },
+      error: (err) => {
+        console.error('Error recalculating rankings', err);
+        alert('Error recalculating rankings: ' + (err.message || 'Unknown error'));
+      },
+      complete: () => {
+        this.isRecalculatingRanking.set(false);
+      }
+    });
   }
 
   onRedScoreChange(data: any) {
