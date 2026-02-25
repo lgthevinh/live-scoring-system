@@ -26,7 +26,7 @@ public class AuthController {
         String username = request.get("username");
         String password = request.get("password");
 
-        // --- LOCAL LOGIN IMPLEMENTATION ---
+        // Local login implementation
         String remoteAddr = servletRequest.getRemoteAddr();
         boolean isLocalhost;
         try {
@@ -38,12 +38,9 @@ public class AuthController {
         }
 
         if ("local".equalsIgnoreCase(username) && isLocalhost) {
-            // Bypass normal authentication for local development.
-            // This is a convenient backdoor for testing on a local machine.
             String token = ScoringService.authHandler().generateTokenForLocalUser();
             return ResponseEntity.ok(Map.of("token", token, "message", "Local login successful."));
         }
-        // --- END LOCAL LOGIN IMPLEMENTATION ---
 
         // Standard authentication flow, now made thread-safe.
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
