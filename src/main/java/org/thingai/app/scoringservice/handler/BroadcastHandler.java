@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.thingai.app.scoringservice.dto.BroadcastMessageDto;
+import org.thingai.base.log.ILog;
 
 @Service
 public class BroadcastHandler {
@@ -23,7 +24,7 @@ public class BroadcastHandler {
      * @param message The message payload.
      */
     public void broadcast(String topic, Object message, String messageType) {
-        ILog.d(TAG, topic, messageType)
+        ILog.d(TAG, topic, messageType);
         BroadcastMessageDto broadcastMessage = new BroadcastMessageDto(messageType, message);
         messagingTemplate.convertAndSend(topic, broadcastMessage);
     }
