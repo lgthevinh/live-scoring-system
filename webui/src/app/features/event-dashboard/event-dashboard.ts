@@ -139,9 +139,20 @@ setActiveTab(tab: string) {
 
   deleteEvent(event: GameEvent) {
     if (confirm(`Are you sure you want to delete event "${event.name}"?`)) {
-      this.eventService.deleteEvent(event.eventCode).subscribe(() => {
-        this.loadEvents();
-      }, err => alert('Failed to delete event: ' + err.message));
+      this.eventService.deleteEvent(event.eventCode).subscribe({
+        next: () => {
+          this.loadEvents();
+        },
+        error: (err) => {
+          // Check if it's the "active event" error - show helpful message
+          const errorMsg = err.error?.error || err.message || '';
+          if (errorMsg.includes('current active event')) {
+            alert('Cannot delete the current active event. Please click "Clear Active Event" first, then try deleting again.');
+          } else {
+            alert('Failed to delete event: ' + errorMsg);
+          }
+        }
+      });
     }
   }
 
@@ -151,5 +162,22 @@ setActiveTab(tab: string) {
         alert(`Current event set to ${event.name}`);
       }, err => alert('Failed to set system event: ' + err.message));
     }
+  }
+
+  clearCurrentEvent() {
+    this.eventService.clearCurrentEvent().subscribe({
+      next: (response) => {
+        alert(response.message || 'Current event cleared. You can now delete the event.');
+        this.loadEvents();
+      },
+      error: (err) => {
+        // Check if it's just "no current event" - show as info, not error
+        if (err.error?.message?.includes('No current event')) {
+          alert('No active event to clear.');
+        } else {
+          alert('Failed to clear current event: ' + (err.error?.error || err.message));
+        }
+      }
+    });
   }
 }

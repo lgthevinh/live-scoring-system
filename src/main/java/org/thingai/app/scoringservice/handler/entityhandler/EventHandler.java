@@ -87,7 +87,7 @@ public class EventHandler {
 
     public void deleteEventByCode(String eventCode, boolean cleanDelete, RequestCallback<Void> callback) {
         try {
-            if (currentEvent.getEventCode().equals(eventCode)) {
+            if (currentEvent != null && currentEvent.getEventCode().equals(eventCode)) {
                 callback.onFailure(ErrorCode.DELETE_FAILED, "Cannot delete the current active event.");
                 return;
             }
@@ -182,6 +182,31 @@ public class EventHandler {
             callback.onSuccess(this.currentEvent, "Current event set successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error setting current event: " + e.getMessage());
+        }
+    }
+
+    public void clearCurrentEvent(RequestCallback<Void> callback) {
+        try {
+            if (this.currentEvent == null) {
+                callback.onSuccess(null, "No current event to clear.");
+                return;
+            }
+            
+            this.currentEvent = null;
+            this.eventDao = null;
+            this.eventDaoFile = null;
+            
+            // Delete persisted current event entry (can't set to null due to NOT NULL constraint)
+            DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event");
+            if (mapEntities.length > 0) {
+                systemDao.delete(mapEntities[0]);
+            }
+            
+            eventCallback.isNotCurrentEventSet();
+            
+            callback.onSuccess(null, "Current event cleared successfully.");
+        } catch (Exception e) {
+            callback.onFailure(ErrorCode.UPDATE_FAILED, "Error clearing current event: " + e.getMessage());
         }
     }
 

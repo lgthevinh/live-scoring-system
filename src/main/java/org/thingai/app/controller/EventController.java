@@ -103,17 +103,17 @@ public class EventController {
         ScoringService.eventHandler().deleteEventByCode(eventCode, cleanDelete, new RequestCallback<Void>() {
             @Override
             public void onSuccess(Void responseObject, String message) {
-                future.complete(ResponseEntity.ok().body("Event deleted successfully."));
+                future.complete(ResponseEntity.ok().body(Map.of("message", "Event deleted successfully.")));
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
                 switch (errorCode) {
                     case ErrorCode.DELETE_FAILED:
-                        future.complete(ResponseEntity.status(400).body("Failed to delete event: " + errorMessage));
+                        future.complete(ResponseEntity.status(400).body(Map.of("error", "Failed to delete event: " + errorMessage)));
                         break;
                     default:
-                        future.complete(ResponseEntity.status(500).body("Error deleting event: " + errorMessage));
+                        future.complete(ResponseEntity.status(500).body(Map.of("error", "Error deleting event: " + errorMessage)));
                 }
             }
         });
@@ -137,6 +137,23 @@ public class EventController {
             }
         });
 
+        return ResponseEntityUtil.getObjectResponse(future);
+    }
+
+    @PostMapping("/clear-current")
+    public ResponseEntity<Object> clearCurrentEvent() {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+        ScoringService.eventHandler().clearCurrentEvent(new RequestCallback<Void>() {
+            @Override
+            public void onSuccess(Void responseObject, String message) {
+                future.complete(ResponseEntity.ok().body(Map.of("message", message)));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(500).body(Map.of("error", "Error clearing current event: " + errorMessage)));
+            }
+        });
         return ResponseEntityUtil.getObjectResponse(future);
     }
 

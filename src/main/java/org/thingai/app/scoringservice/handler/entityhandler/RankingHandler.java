@@ -226,21 +226,16 @@ public class RankingHandler {
 
         @Override
         public RankingEntry[] sortRankingEntries(RankingEntry[] entries) {
-            // Official FRC ranking sort order:
-            // 1. Ranking Points (descending)
-            // 2. Total Qualification Score (descending)
-            // 3. Penalty Points (ascending - fewer penalties rank higher)
+            // Simple score-based ranking:
+            // 1. Total Score (descending)
+            // 2. Highest Score (descending)
             Arrays.sort(entries, (teamA, teamB) -> {
-                // Primary sort: ranking points
-                if (teamB.getRankingPoints() != teamA.getRankingPoints()) {
-                    return Integer.compare(teamB.getRankingPoints(), teamA.getRankingPoints());
-                }
-                // Secondary sort: total score across all matches
+                // Primary sort: total score
                 if (teamB.getTotalScore() != teamA.getTotalScore()) {
                     return Integer.compare(teamB.getTotalScore(), teamA.getTotalScore());
                 }
-                // Tertiary sort: fewer penalties rank higher
-                return Integer.compare(teamA.getTotalPenalties(), teamB.getTotalPenalties());
+                // Secondary sort: highest single match score
+                return Integer.compare(teamB.getHighestScore(), teamA.getHighestScore());
             });
             return entries;
         }

@@ -9,4 +9,5 @@ public class BroadcastMessageType {
     public static final String SHOW_TIMER = "SHOW_TIMER";
     public static final String SHOW_UPNEXT = "SHOW_UPNEXT";
     public static final String SHOW_MATCH = "SHOW_MATCH";
+    public static final String PLAY_SOUND = "PLAY_SOUND";
 }

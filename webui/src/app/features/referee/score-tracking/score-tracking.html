@@ -101,31 +101,27 @@
             <i class="bi bi-barrier me-2"></i>Barriers & Movement
           </div>
 
-          <div class="interactive-counter">
-            <div class="counter-header">
-              <span class="counter-label">
-                <div class="counter-icon">🚧</div>
-                Barriers Pushed (10 pts each)
-              </span>
-            </div>
-            <div class="counter-controls">
-              <button (click)="dec('barriersPushed')"
+          <!-- Barrier Push Toggle Button -->
+          <div class="barrier-push-section">
+            <div class="d-flex justify-content-center mt-3">
+              <button (click)="toggleBarrierPush()"
+                      [class.active]="barriersPushed()"
                       [disabled]="submitting()"
-                      class="btn-counter btn-counter-minus"
-                      title="Decrease">
-                <i class="bi bi-dash-lg"></i>
-              </button>
-              <div class="counter-display">
-                <span class="counter-value">{{ counters.barriersPushed() }}</span>
-                <span class="counter-total">{{ counters.barriersPushed() * 10 }}</span>
-              </div>
-              <button (click)="inc('barriersPushed')"
-                      [disabled]="!canIncrement('barriersPushed') || submitting()"
-                      class="btn-counter btn-counter-plus"
-                      title="Increase">
-                <i class="bi bi-plus-lg"></i>
+                      class="btn btn-lg barrier-push-button">
+                <div class="barrier-push-content">
+                  <div class="barrier-push-icon-large">🚧</div>
+                  <div class="barrier-push-text">
+                    <div class="barrier-push-title">{{ barriersPushed() ? 'Barrier Pushed' : 'Push Barrier' }}</div>
+                    <div class="barrier-push-subtitle">+10 points if pushed, -0.2 balance if not</div>
+                  </div>
+                </div>
               </button>
             </div>
+            @if (!barriersPushed()) {
+              <div class="alert alert-warning mt-3 text-center small">
+                ⚠️ No barrier pushed - 0.2 penalty will be applied to balance coefficient
+              </div>
+            }
           </div>
         </div>
       </div>

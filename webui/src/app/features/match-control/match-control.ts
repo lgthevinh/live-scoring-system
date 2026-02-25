@@ -115,7 +115,30 @@ constructor(
       next: (msg) => {
         console.log("Received timer update:", msg);
         if (msg.payload && msg.payload.remainingSeconds !== undefined) {
-          this.activeMatchTimer.set(msg.payload.remainingSeconds);
+          const newValue = msg.payload.remainingSeconds;
+
+          // Debug logging for timer values
+          console.log(`Timer: previous=${this.previousTimerValue}, new=${newValue}`);
+
+          // Only play match end sound when the match timer (not countdown) reaches 0
+          // The match timer starts at 180+ seconds, countdown is 3 seconds
+          const wasCountdown = this.previousTimerValue !== null && this.previousTimerValue <= 3;
+          const isMatchTime = newValue > 3;
+
+          console.log(`Timer check: wasCountdown=${wasCountdown}, isMatchTime=${isMatchTime}`);
+
+          // If transitioning from countdown (0) to match time (180+), don't play sound
+          // Only play match end sound when actual match time reaches 0
+          if (this.previousTimerValue !== null &&
+              this.previousTimerValue > 0 &&
+              newValue === 0 &&
+              !wasCountdown) {
+            console.log("Triggering match end sound!");
+            this.playMatchEndSound();
+          }
+
+          this.previousTimerValue = newValue;
+          this.activeMatchTimer.set(newValue);
         }
       },
       error: (e) => console.error("Failed to subscribe to timer updates:", e)
@@ -325,6 +348,87 @@ cancelEdit() {
     });
   }
 
+  // Timer tracking for sound
+  private previousTimerValue: number | null = null;
+
+  // ---- Sound playback ----
+  private audioContext: AudioContext | null = null;
+
+  private playMatchStartSound(): void {
+    // Initialize AudioContext on user interaction
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    // Resume audio context if suspended (browser autoplay policy)
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
+    fetch('/assets/MatchSoundEffect.m4a')
+      .then(response => response.arrayBuffer())
+      .then(arrayBuffer => {
+        this.audioContext?.decodeAudioData(arrayBuffer, (audioBuffer) => {
+          const source = this.audioContext!.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(this.audioContext!.destination);
+          source.start(0);
+        }, (err) => {
+          console.error('Failed to decode audio:', err);
+        });
+      })
+      .catch(err => {
+        console.warn('Failed to load match start sound:', err);
+      });
+  }
+
+  private playMatchEndSound(): void {
+    console.log("playMatchEndSound called");
+
+    // Initialize AudioContext on user interaction
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log("Created new AudioContext");
+    }
+
+    // Resume audio context if suspended (browser autoplay policy)
+    if (this.audioContext.state === 'suspended') {
+      console.log("AudioContext is suspended, resuming...");
+      this.audioContext.resume().then(() => {
+        console.log("AudioContext resumed successfully");
+      }).catch(err => {
+        console.error("Failed to resume AudioContext:", err);
+      });
+    } else {
+      console.log("AudioContext state:", this.audioContext.state);
+    }
+
+    console.log("Fetching /assets/match_end.m4a...");
+    fetch('/assets/match_end.m4a')
+      .then(response => {
+        console.log("Fetch response status:", response.status);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => {
+        console.log("Audio file loaded, decoding...");
+        this.audioContext?.decodeAudioData(arrayBuffer, (audioBuffer) => {
+          console.log("Audio decoded successfully, playing...");
+          const source = this.audioContext!.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(this.audioContext!.destination);
+          source.start(0);
+        }, (err) => {
+          console.error('Failed to decode audio:', err);
+        });
+      })
+      .catch(err => {
+        console.warn('Failed to load match end sound:', err);
+      });
+  }
+
   // ---- Top buttons (Active section) ----
   activateMatch() {
     const toActivate = this.loaded();
@@ -349,8 +453,18 @@ cancelEdit() {
       console.warn('No active match to start.');
       return;
     }
+
+    // Initialize AudioContext during user interaction to unlock it for later sound playback
+    this.initializeAudioContext();
+
+    // Sound disabled - display scoring only
+    // this.playMatchStartSound();
+
     this.scorekeeper.startCurrentMatch().subscribe({
       next: () => {
+        // Match is already active, no need to set again
+        this.loaded.set(null); // Clear loaded match after starting
+        this.previousTimerValue = null; // Reset timer tracking
         console.debug('Match timer started for active match');
       },
       error: (e) => {
@@ -361,19 +475,46 @@ cancelEdit() {
 
   }
 
+  private initializeAudioContext(): void {
+    // Initialize AudioContext on user interaction to unlock it for later playback
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log('AudioContext initialized during user interaction');
+    }
+
+    // Resume audio context if suspended (browser autoplay policy)
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume().then(() => {
+        console.log('AudioContext resumed successfully during user interaction');
+      }).catch(err => {
+        console.error('Failed to resume AudioContext:', err);
+      });
+    }
+  }
+
   abortMatch() {
-    if (!this.active()) {
+    const toAbort = this.active();
+    if (!toAbort) {
       console.warn('No active match to abort.');
       return;
     }
+
+    if (!confirm(`Abort match ${toAbort.match.matchCode}? The match will be moved back to loaded state.`)) {
+      return;
+    }
+
     this.scorekeeper.abortCurrentMatch().subscribe({
       next: () => {
-        console.debug('Match aborted successfully');
+        // Move match from active back to loaded
+        this.loaded.set(toAbort);
+        this.active.set(null);
         this.activeMatchTimer.set(null);
+        this.previousTimerValue = null; // Reset timer tracking
+        console.debug('Match aborted successfully');
       },
       error: (e) => {
         console.error('Failed to abort match', e);
-        alert('Failed to abort match');
+        alert('Failed to abort match: ' + e.message);
       }
     });
   }

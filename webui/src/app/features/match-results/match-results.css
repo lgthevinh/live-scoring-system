@@ -43,6 +43,11 @@
     height: 100%;
 }
 
+/* Tie result background */
+.bg-warning {
+    background-color: #ffc107 !important;
+}
+
 /* Condensed mode reduces paddings */
 .condensed .results-table thead th {
     padding: 1px;
@@ -69,6 +74,7 @@
 
     .print-keep-bg .bg-danger,
     .print-keep-bg .bg-primary,
+    .print-keep-bg .bg-warning,
     .print-keep-bg .results-table thead th,
     .print-keep-bg .results-table .group-alt td {
         -webkit-print-color-adjust: exact;

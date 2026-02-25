@@ -64,7 +64,7 @@
         </td>
 
         <td class="text-center" [attr.rowspan]="teamRowCount(match)" [class.bg-danger]="winner(match) === 'red'"
-          [class.bg-primary]="winner(match) === 'blue'">
+          [class.bg-primary]="winner(match) === 'blue'" [class.bg-warning]="isTie(match)">
           @if (isUnplayed(match)) {
           <span class="text-muted">Unplayed</span>
           } @else {

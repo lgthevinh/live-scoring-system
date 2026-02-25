@@ -16,6 +16,8 @@ import org.thingai.base.log.ILog;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class LiveScoreHandler {
     private static final String TAG = "ScorekeeperHandler";
@@ -33,6 +35,7 @@ public class LiveScoreHandler {
     private Score currentRedScoreHolder;
     private Score currentBlueScoreHolder;
 
+    private int typicalMatchDuration = 180; // seconds
     /* Flags */
     private boolean isRedCommitable = false;
     private boolean isBlueCommitable = false;
@@ -103,7 +106,30 @@ public class LiveScoreHandler {
 
             currentMatch.getMatch().setActualStartTime(currentTime.format(timeFormatter));
 
-            matchTimerHandler.startTimer(currentMatch.getMatch().getId(), fieldNumber, MATCH_DURATION_SECONDS);
+            // Start 3-second countdown before main timer
+            final int countdownSeconds = 3;
+            final int[] countdown = {countdownSeconds};
+            ScheduledExecutorService countdownScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+            countdownScheduler.scheduleAtFixedRate(() -> {
+                if (countdown[0] > 0) {
+                    // Broadcast countdown value
+                    MatchTimeStatusDto countdownDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), countdown[0]);
+                    broadcastHandler.broadcast(rootTopic + "/timer", countdownDto, BroadcastMessageType.MATCH_STATUS);
+                    
+                    // When countdown reaches 3 (first countdown tick), broadcast PLAY_SOUND for synchronized playback
+                    if (countdown[0] == countdownSeconds) {
+                        broadcastHandler.broadcast(rootTopic + "/sound", countdownDto, BroadcastMessageType.PLAY_SOUND);
+                    }
+                    
+                    countdown[0]--;
+                } else {
+                    // Countdown finished, start main timer at full 3:00 (180 seconds)
+                    countdownScheduler.shutdown();
+                    matchTimerHandler.startTimer(currentMatch.getMatch().getId(), fieldNumber, typicalMatchDuration);
+                    MatchTimeStatusDto initialTimerDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), typicalMatchDuration);
+                    broadcastHandler.broadcast(rootTopic + "/timer", initialTimerDto, BroadcastMessageType.MATCH_STATUS);
+                }
+            }, 0, 1, TimeUnit.SECONDS);
 
             broadcastHandler.broadcast(rootTopic + "/command", currentMatch, BroadcastMessageType.SHOW_TIMER);
             broadcastHandler.broadcast(rootTopic + "/score/red", currentRedScoreHolder, BroadcastMessageType.SCORE_UPDATE);
@@ -236,7 +262,7 @@ public class LiveScoreHandler {
         currentBlueScoreHolder.calculateTotalScore();
 
         final Score[] result = new Score[2];
-        scoreHandler.submitScore(currentRedScoreHolder, true, new RequestCallback<Score>() {;
+        scoreHandler.submitScore(currentRedScoreHolder, true, new RequestCallback<Score>() {
             @Override
             public void onSuccess(Score responseObject, String message) {
                 ILog.d(TAG, "Red alliance score submitted: " + message);
@@ -295,6 +321,32 @@ public class LiveScoreHandler {
      */
     public void overrideScore(String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
         ILog.d(TAG, "Override score request received for alliance " + allianceId + ": " + jsonScoreData);
+        
+        // Extract matchId from allianceId (e.g., "Q1_R" -> "Q1")
+        String matchId = allianceId.contains("_") ? allianceId.substring(0, allianceId.lastIndexOf("_")) : allianceId;
+        String otherAllianceId = allianceId.endsWith("_R") ? matchId + "_B" : matchId + "_R";
+        
+        // Fetch the other alliance's score first
+        scoreHandler.getScoreByAllianceId(otherAllianceId, new RequestCallback<Score>() {
+            @Override
+            public void onSuccess(Score otherScore, String message) {
+                // Now process the override for the target alliance
+                processScoreOverride(allianceId, jsonScoreData, matchId, otherScore, callback);
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                // If other alliance score not found, proceed anyway (might be a new match)
+                ILog.d(TAG, "Other alliance score not found: " + errorMessage);
+                processScoreOverride(allianceId, jsonScoreData, matchId, null, callback);
+            }
+        });
+    }
+
+    /**
+     * Process the score override and update rankings
+     */
+    private void processScoreOverride(String allianceId, String jsonScoreData, String matchId, Score otherScore, RequestCallback<Boolean> callback) {
         Score targetScore = ScoreHandler.factoryScore();
         try {
             targetScore.setAllianceId(allianceId);
@@ -307,7 +359,10 @@ public class LiveScoreHandler {
                 @Override
                 public void onSuccess(Score responseObject, String message) {
                     ILog.d(TAG, "Score override submitted for alliance " + allianceId + ": " + message);
-                    callback.onSuccess(true, "Score override successful");
+                    
+                    // Now update rankings
+                    updateRankingsForOverride(matchId, targetScore, otherScore, callback);
+                    callback.onSuccess(true, "Score override successful and rankings updated");
                 }
 
                 @Override
@@ -322,9 +377,115 @@ public class LiveScoreHandler {
         }
     }
 
+    /**
+     * Update rankings after a score override
+     */
+    private void updateRankingsForOverride(String matchId, Score updatedScore, Score otherScore, RequestCallback<Boolean> callback) {
+        // Fetch the match details
+        matchHandler.getMatchDetail(matchId, new RequestCallback<MatchDetailDto>() {
+            @Override
+            public void onSuccess(MatchDetailDto matchDetail, String message) {
+                // Determine which score is red and which is blue
+                final Score redScore;
+                final Score blueScore;
+                
+                if (updatedScore.getAllianceId().endsWith("_R")) {
+                    redScore = updatedScore;
+                    blueScore = otherScore;
+                } else {
+                    blueScore = updatedScore;
+                    redScore = otherScore;
+                }
+                
+                // Handle case where otherScore is null - fetch it
+                if (redScore == null) {
+                    // Try to fetch red score
+                    final Score finalBlueScore = blueScore;
+                    scoreHandler.getScoreByAllianceId(matchId + "_R", new RequestCallback<Score>() {
+                        @Override
+                        public void onSuccess(Score rScore, String message) {
+                            Score finalRedScore = rScore;
+                            Score finalBlue = finalBlueScore != null ? finalBlueScore : rScore;
+                            rankingHandler.updateRankingEntry(matchDetail, finalBlue, finalRedScore);
+                            callback.onSuccess(true, "Score override and rankings updated successfully");
+                        }
+
+                        @Override
+                        public void onFailure(int errorCode, String errorMessage) {
+                            // Use updatedScore as fallback
+                            Score finalRed = updatedScore;
+                            Score finalBlue = otherScore;
+                            rankingHandler.updateRankingEntry(matchDetail, finalBlue, finalRed);
+                            callback.onSuccess(true, "Score override completed with fallback rankings");
+                        }
+                    });
+                    return;
+                }
+                
+                if (blueScore == null) {
+                    // Try to fetch blue score
+                    final Score finalRedScore = redScore;
+                    scoreHandler.getScoreByAllianceId(matchId + "_B", new RequestCallback<Score>() {
+                        @Override
+                        public void onSuccess(Score bScore, String message) {
+                            Score finalBlueScore = bScore;
+                            Score finalRed = updatedScore.getAllianceId().endsWith("_R") ? updatedScore : finalRedScore;
+                            rankingHandler.updateRankingEntry(matchDetail, finalBlueScore, finalRed);
+                            callback.onSuccess(true, "Score override and rankings updated successfully");
+                        }
+
+                        @Override
+                        public void onFailure(int errorCode, String errorMessage) {
+                            // Use updatedScore as fallback
+                            Score finalBlue = updatedScore;
+                            rankingHandler.updateRankingEntry(matchDetail, finalBlue, finalRedScore);
+                            callback.onSuccess(true, "Score override completed with fallback rankings");
+                        }
+                    });
+                    return;
+                }
+                
+                // Update rankings with both scores
+                rankingHandler.updateRankingEntry(matchDetail, blueScore, redScore);
+                callback.onSuccess(true, "Score override and rankings updated successfully");
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                ILog.d(TAG, "Failed to fetch match details for ranking update: " + errorMessage);
+                // Still report success for the score override
+                callback.onSuccess(true, "Score override completed, but ranking update failed");
+            }
+        });
+    }
+
     public void abortCurrentMatch(RequestCallback<Boolean> callback) {
-        matchTimerHandler.resetTimer();
-        callback.onSuccess(true, "Match aborted");
+        if (currentMatch == null) {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "No active match to abort");
+            return;
+        }
+
+        // Stop the timer
+        matchTimerHandler.stopTimer();
+
+        // Broadcast abort state to all displays
+        int fieldNumber = currentMatch.getMatch().getFieldNumber();
+        String rootTopic = "/topic/display/field/" + fieldNumber;
+        MatchTimeStatusDto abortDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), -1); // -1 indicates aborted
+        broadcastHandler.broadcast(rootTopic + "/timer", abortDto, BroadcastMessageType.MATCH_STATUS);
+
+        // Move current match back to loaded state (can be restarted)
+        MatchDetailDto abortedMatch = currentMatch;
+        currentMatch = null;
+        nextMatch = abortedMatch;
+
+        // Reset score holders
+        currentRedScoreHolder = null;
+        currentBlueScoreHolder = null;
+
+        ILog.d(TAG, "Match aborted: " + abortedMatch.getMatch().getMatchCode());
+
+        callback.onSuccess(true, "Match aborted successfully");
     }
 
     public void getCurrentPlayingMatches(RequestCallback<MatchDetailDto[]> callback) {
@@ -346,7 +507,11 @@ public class LiveScoreHandler {
             currentMatch.setBlueScore(currentBlueScoreHolder);
             currentMatch.setRedScore(currentRedScoreHolder);
             if (fieldNumber == 0) {
-                callback.onSuccess(currentMatch, "Current match field retrieved successfully");
+                if (currentMatch != null) {
+                    callback.onSuccess(currentMatch, "Current match field retrieved successfully");
+                } else {
+                    callback.onFailure(ErrorCode.NOT_FOUND, "No current match loaded");
+                }
                 return;
             }
             if (currentMatch.getMatch().getFieldNumber() == fieldNumber) {

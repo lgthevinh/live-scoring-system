@@ -52,6 +52,8 @@ export class FanrocScoringCalculator {
 
   /**
    * Get the balancing coefficient based on imbalance category
+   * @param imbalanceCategory - The imbalance category (0=balanced, 1=medium, 2=large)
+   * @param barriersPushed - 1 if barrier was pushed, 0 if not (reduces coefficient by 0.2 if 0)
    */
   static getBalancingCoefficient(imbalanceCategory: number, barriersPushed: number = 0): number {
     let baseCoeff: number;
