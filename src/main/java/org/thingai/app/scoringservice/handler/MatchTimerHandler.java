@@ -1,8 +1,5 @@
 package org.thingai.app.scoringservice.handler;
 
-import org.thingai.app.scoringservice.define.BroadcastMessageType;
-import org.thingai.app.scoringservice.dto.MatchTimeStatusDto;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;

@@ -58,8 +58,6 @@ public class MatchHandler {
             this.matchMakerHandler.setBinPath(Paths.get("binary").toAbsolutePath() + "/MatchMaker");
         }
 
-
-
         Path dataDir = Paths.get("data");
         if (!Files.exists(dataDir)) {
             try {
