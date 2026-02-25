@@ -1,9 +1,15 @@
 import {Component, OnInit, signal, WritableSignal} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { EventService } from '../../core/services/event.service';
+import { AuthService } from '../../core/services/auth.service';
 import { Event as GameEvent } from '../../core/models/event.model';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+
+interface UserAccount {
+  username: string;
+  role: number;
+}
 
 @Component({
   selector: 'app-event-dashboard',
@@ -13,13 +19,14 @@ import { RouterModule } from '@angular/router';
   styleUrl: './event-dashboard.css'
 })
 export class EventDashboard implements OnInit {
-  tabs: string[] = ['All Events', 'Event Tools'];
+  tabs: string[] = ['All Events', 'Event Tools', 'Account Management'];
   activeTab: string = 'All Events';
 
-  events: WritableSignal<GameEvent[]> = signal([]);
+events: WritableSignal<GameEvent[]> = signal([]);
   isEditing: WritableSignal<boolean> = signal(false);
   currentEditEvent: WritableSignal<GameEvent | null> = signal(null);
   showForm: WritableSignal<boolean> = signal(false);
+  users: WritableSignal<UserAccount[]> = signal([]);
 
   // Form model
   formEvent: GameEvent = {
@@ -34,10 +41,34 @@ export class EventDashboard implements OnInit {
     organizer: ''
   };
 
-  constructor(private eventService: EventService) { }
+constructor(
+    private eventService: EventService,
+    private authService: AuthService
+  ) { }
 
   ngOnInit() {
     this.loadEvents();
+  }
+
+  loadUsers() {
+    this.authService.getAllUsers().subscribe({
+      next: (users) => this.users.set(users),
+      error: (err) => {
+        console.error('Failed to load users', err);
+        alert('Failed to load users: ' + err.message);
+      }
+    });
+  }
+
+  getRoleName(role: number): string {
+    switch (role) {
+      case 1: return 'Event Admin';
+      case 10: return 'Scorekeeper';
+      case 20: return 'Head Referee';
+      case 21: return 'Referee';
+      case 30: return 'GA/EMCEE';
+      default: return 'Unknown';
+    }
   }
 
   loadEvents() {
@@ -46,8 +77,11 @@ export class EventDashboard implements OnInit {
     });
   }
 
-  setActiveTab(tab: string) {
+setActiveTab(tab: string) {
     this.activeTab = tab;
+    if (tab === 'Account Management') {
+      this.loadUsers();
+    }
   }
 
   openCreateForm() {

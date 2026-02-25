@@ -37,8 +37,12 @@ export class AuthService {
     return this.isAuthenticatedSubject.asObservable();
   }
 
-  createAccount(credentials: { username: string; password: string, role: number }): Observable<any> {
+createAccount(credentials: { username: string; password: string, role: number }): Observable<any> {
     return this.http.post(`${this.apiUrl}/create-account`, credentials);
+  }
+
+  getAllUsers(): Observable<{ username: string; role: number }[]> {
+    return this.http.get<{ username: string; role: number }[]>(`${this.apiUrl}/users`);
   }
 
   getLocalIp(): Observable<string> {
