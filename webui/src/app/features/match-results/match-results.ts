@@ -115,6 +115,14 @@ export class MatchResults implements OnInit {
     return null; // tie or equal
   }
 
+  // Check if match is a tie
+  isTie(match: MatchDetailDto): boolean {
+    if (this.isUnplayed(match)) return false;
+    const redScore = match?.redScore?.totalScore ?? 0;
+    const blueScore = match?.blueScore?.totalScore ?? 0;
+    return redScore === blueScore;
+  }
+
   // Helper to render team IDs list elsewhere if needed
   getTeamIds(teamList: any[]): string {
     return (teamList || []).map(team => team.teamId).join(', ');

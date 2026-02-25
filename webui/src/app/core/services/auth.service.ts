@@ -41,6 +41,18 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/create-account`, credentials);
   }
 
+  getAllAccounts(): Observable<{ accounts: { username: string; role: number }[] }> {
+    return this.http.get<{ accounts: { username: string; role: number }[] }>(`${this.apiUrl}/accounts`);
+  }
+
+  updateAccount(username: string, credentials: { password?: string, role: number }): Observable<any> {
+    return this.http.put(`${this.apiUrl}/accounts/${username}`, credentials);
+  }
+
+  deleteAccount(username: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/accounts/${username}`);
+  }
+
   getLocalIp(): Observable<string> {
     return this.http.get<string>(`${this.apiUrl}/local-ip`).pipe(map((response: any) => response.localIp));
   }

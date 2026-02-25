@@ -87,7 +87,7 @@ public class EventHandler {
 
     public void deleteEventByCode(String eventCode, boolean cleanDelete, RequestCallback<Void> callback) {
         try {
-            if (currentEvent.getEventCode().equals(eventCode)) {
+            if (currentEvent != null && currentEvent.getEventCode().equals(eventCode)) {
                 callback.onFailure(ErrorCode.DELETE_FAILED, "Cannot delete the current active event.");
                 return;
             }

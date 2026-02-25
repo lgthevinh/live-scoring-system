@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Score } from '../../../../../core/models/score.model';
 import { Team } from '../../../../../core/models/team.model';
-import { ScoresheetConfig } from '../scoresheet.config';
+import { ScoresheetConfig, FieldConfig } from '../scoresheet.config';
 import { RefereeService } from '../../../../../core/services/referee.service';
 
 @Component({
@@ -57,14 +57,25 @@ import { RefereeService } from '../../../../../core/services/referee.service';
                         <ng-container *ngSwitchCase="'barriersPushed'">🚧</ng-container>
                         <ng-container *ngSwitchCase="'partialParking'">📍</ng-container>
                         <ng-container *ngSwitchCase="'fullParking'">🏁</ng-container>
+                        <ng-container *ngSwitchCase="'imbalanceCategory'">⚖️</ng-container>
                         <ng-container *ngSwitchDefault>🎯</ng-container>
                       </ng-container>
                     </div>
                     {{ field.label }}
                   </span>
                 </div>
+                <!-- Dropdown for enum fields (imbalanceCategory) -->
+                <div class="enum-controls" *ngIf="editable && field.type === 'enum'">
+                  <select class="form-select enum-dropdown"
+                          [ngModel]="getValue(scoreData, field.key)"
+                          (ngModelChange)="setValue(field.key, $event)">
+                    <option *ngFor="let opt of field.options" [value]="opt.value">
+                      {{ opt.label }} - {{ opt.description }}
+                    </option>
+                  </select>
+                </div>
                 <!-- Counter controls for number fields -->
-                <div class="counter-controls" *ngIf="editable && field.type !== 'boolean'">
+                <div class="counter-controls" *ngIf="editable && field.type === 'number'">
                   <button class="btn-counter btn-counter-minus"
                           (click)="decrementValue(field.key)"
                           type="button">
@@ -88,14 +99,25 @@ import { RefereeService } from '../../../../../core/services/referee.service';
                     <i class="bi bi-plus-lg"></i>
                   </button>
                 </div>
-                <!-- Checkbox for boolean fields -->
-                <div class="form-check d-flex justify-content-center" *ngIf="editable && field.type === 'boolean'">
-                  <input class="form-check-input" type="checkbox"
-                         [checked]="getValue(scoreData, field.key) || false"
-                         (change)="setValue(field.key, $any($event.target).checked)">
+                <!-- Toggle button for boolean fields (barriersPushed, redCard) -->
+                <div class="toggle-controls" *ngIf="editable && field.type === 'boolean'">
+                  <button (click)="toggleBooleanValue(field.key)"
+                          [class.active]="getValue(scoreData, field.key)"
+                          class="btn btn-lg boolean-toggle-button">
+                    <div class="boolean-toggle-content">
+                      <span class="boolean-toggle-icon">{{ getValue(scoreData, field.key) ? '✓' : '○' }}</span>
+                      <span class="boolean-toggle-label">{{ getValue(scoreData, field.key) ? field.label + ' Active' : 'Issue ' + field.label }}</span>
+                    </div>
+                  </button>
+                </div>
+                <!-- Readonly display for enum fields -->
+                <div class="text-center" *ngIf="!editable && field.type === 'enum'">
+                  <div class="counter-display">
+                    <span class="counter-value">{{ getEnumLabel(field, getValue(scoreData, field.key)) }}</span>
+                  </div>
                 </div>
                 <!-- Readonly display for number fields -->
-                <div class="text-center" *ngIf="!editable && field.type !== 'boolean'">
+                <div class="text-center" *ngIf="!editable && field.type === 'number'">
                   <div class="counter-display">
                     <span class="counter-value">{{ getValue(scoreData, field.key) || 0 }}</span>
                     <span class="counter-total" *ngIf="field.key.includes('Ball') && (getValue(scoreData, field.key) || 0) > 0">
@@ -215,6 +237,20 @@ import { RefereeService } from '../../../../../core/services/referee.service';
     .red-card-subtitle{font-size:.85rem;opacity:.9}
     .penalties-section{background:#fef2f2;border-color:#fca5a5}
 
+    /* Boolean Toggle Button Styles */
+    .toggle-controls{display:flex;justify-content:center;width:100%}
+    .boolean-toggle-button{width:100%;max-width:320px;height:60px;border-radius:.75rem;border:2px solid #f59e0b;background:#fbbf24;color:#fff;font-weight:600;font-size:1rem;display:flex;align-items:center;justify-content:center;padding:0;transition:all .2s ease}
+    .boolean-toggle-button:hover{background:#f59e0b;border-color:#d97706}
+    .boolean-toggle-button.active{background:#22c55e;border-color:#16a34a}
+    .boolean-toggle-button.active:hover{background:#16a34a;border-color:#15803d}
+    .boolean-toggle-content{display:flex;align-items:center;gap:.5rem}
+    .boolean-toggle-icon{font-size:1.25rem;font-weight:700}
+    .boolean-toggle-label{text-align:left}
+
+    /* Enum Dropdown Styles */
+    .enum-controls{display:flex;justify-content:center;width:100%}
+    .enum-dropdown{width:100%;max-width:400px;padding:.75rem 1rem;border-radius:8px;border:2px solid #cbd5e1;background:#fff;font-weight:500;color:#374151;font-size:.95rem}
+
     /* Alliance-specific styles */
     .alliance-header h3 { font-weight: bold; }
     .match-info { font-size: 1.1rem; }
@@ -298,7 +334,27 @@ export class AllianceScoresheetComponent implements OnChanges {
 
   incrementValue(key: string) {
     const current = this.getValue(this.scoreData, key) || 0;
-    this.setValue(key, current + 1);
+    const max = this.getMax(key);
+    if (max !== undefined) {
+      this.setValue(key, Math.min(max, current + 1));
+    } else {
+      this.setValue(key, current + 1);
+    }
+  }
+
+  toggleBooleanValue(key: string) {
+    const current = this.getValue(this.scoreData, key) || false;
+    this.setValue(key, !current);
+  }
+
+  private getMax(key: string): number | undefined {
+    const section = this.config?.periods[0]?.sections.find(s => s.type === 'fields');
+    return section?.fields?.find(f => f.key === key)?.max;
+  }
+
+  getEnumLabel(field: FieldConfig, value: number): string {
+    const option = field.options?.find(opt => opt.value === value);
+    return option ? option.label : String(value);
   }
 
   decrementTeamValue(teamId: string, key: string) {

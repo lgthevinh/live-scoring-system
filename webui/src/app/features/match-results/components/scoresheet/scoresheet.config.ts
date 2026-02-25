@@ -19,9 +19,10 @@ export interface SectionConfig {
 export interface FieldConfig {
     key: string; // Path in JSON, e.g., "auto.samples.highBasket"
     label: string;
-    type: 'number' | 'boolean' | 'text';
+    type: 'number' | 'boolean' | 'text' | 'enum';
     min?: number;
     max?: number;
+    options?: { value: number; label: string; description: string }[];
 }
 
 export interface ColumnConfig {
@@ -42,8 +43,8 @@ export const CUSTOM_SEASON_CONFIG: ScoresheetConfig = {
                     title: 'Ball Scoring',
                     type: 'fields',
                     fields: [
-                        { key: 'whiteBallsScored', label: 'White Balls Scored by Human', type: 'number', min: 0, max: 50 },
-                        { key: 'goldenBallsScored', label: 'Golden Balls Scored by Robot', type: 'number', min: 0, max: 50 }
+                        { key: 'whiteBallsScored', label: 'White Balls Scored by Human', type: 'number', min: 0, max: 100 },
+                        { key: 'goldenBallsScored', label: 'Golden Balls Scored by Robot', type: 'number', min: 0, max: 100 }
                     ]
                 },
                 {
@@ -51,7 +52,7 @@ export const CUSTOM_SEASON_CONFIG: ScoresheetConfig = {
                     title: 'Barriers & Movement',
                     type: 'fields',
                     fields: [
-                        { key: 'barriersPushed', label: 'Barriers Pushed Away', type: 'number', min: 0, max: 2 }
+                        { key: 'barriersPushed', label: 'Barrier Pushed Away', type: 'boolean' }
                     ]
                 },
                 {
@@ -68,7 +69,16 @@ export const CUSTOM_SEASON_CONFIG: ScoresheetConfig = {
                     title: 'Imbalance & Penalties',
                     type: 'fields',
                     fields: [
-                        { key: 'imbalanceCategory', label: 'Ball Imbalance Category', type: 'number' },
+                        {
+                            key: 'imbalanceCategory',
+                            label: 'Ball Imbalance Category',
+                            type: 'enum',
+                            options: [
+                                { value: 0, label: 'Balanced', description: '2.0x bonus - 0-1 ball difference' },
+                                { value: 1, label: 'Medium', description: '1.5x bonus - 2-3 balls difference' },
+                                { value: 2, label: 'Large', description: '1.3x bonus - 4+ balls difference' }
+                            ]
+                        },
                         { key: 'penaltyCount', label: 'Minor Penalty Violations', type: 'number', min: 0 },
                         { key: 'yellowCardCount', label: 'Yellow Card Violations', type: 'number', min: 0 },
                         { key: 'redCard', label: 'Red Card', type: 'boolean' }

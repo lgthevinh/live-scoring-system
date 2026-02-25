@@ -5,7 +5,7 @@ import org.thingai.base.dao.annotations.DaoTable;
 
 @DaoTable(name = "account_role")
 public class AccountRole {
-    @DaoColumn()
+    @DaoColumn(name = "username", primaryKey = true)
     private String username;
 
     @DaoColumn()

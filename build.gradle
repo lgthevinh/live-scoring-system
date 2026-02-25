@@ -171,9 +171,9 @@ tasks.register('packageLinux') {
 
 /* ==== Frontend build config ==== */
 def webUiDir = "${projectDir}/webui"
-def webUiDistDir = "${webUiDir}/dist"      // adjust if Angular outputs dist/<app>/browser
+def webUiDistDir = "${webUiDir}/dist/webui/browser"      // Angular application builder outputs to dist/<app>/browser
 def hasWebUi = file("${webUiDir}/package.json").exists()
-def skipWebuiBuild = project.findProperty('skipWebuiBuild') == 'false'
+def skipWebuiBuild = project.findProperty('skipWebuiBuild') == 'true'
 
 // Download/use local Node so we don't depend on PATH or NVM
 node {
@@ -221,6 +221,15 @@ tasks.named('processResources') {
 /* ==== Boot Jar ==== */
 tasks.named('bootJar') {
     archiveFileName = 'scoring-system.jar'
+    if (hasWebUi && !skipWebuiBuild) {
+        dependsOn 'copyWebUi'
+    } else if (hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()) {
+        dependsOn 'copyWebUiIfPresent'
+    }
+}
+
+// Ensure bootRun also copies the webui files
+tasks.named('bootRun') {
     if (hasWebUi && !skipWebuiBuild) {
         dependsOn 'copyWebUi'
     } else if (hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()) {

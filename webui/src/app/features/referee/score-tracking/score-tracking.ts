@@ -9,67 +9,68 @@ import { BroadcastService } from '../../../core/services/broadcast.service';
 import { RefereeService } from '../../../core/services/referee.service';
 
 type CounterKey =
-| 'whiteBallsScored'
-| 'goldenBallsScored'
-| 'barriersPushed'
-| 'partialParking'
-| 'fullParking'
-| 'penaltyCount'
-| 'yellowCardCount';
+  | 'whiteBallsScored'
+  | 'goldenBallsScored'
+  | 'partialParking'
+  | 'fullParking'
+  | 'penaltyCount'
+  | 'yellowCardCount';
 
 type UpdateReason = 'inc' | 'dec' | 'reset' | 'init';
 
 // Imbalance options for dropdown
 interface ImbalanceOption {
-value: number;
-label: string;
-description: string;
-icon: string;
+  value: number;
+  label: string;
+  description: string;
+  icon: string;
 }
 
 @Component({
-selector: 'app-score-tracking',
-standalone: true,
-imports: [CommonModule, FormsModule, RouterModule],
-templateUrl: './score-tracking.html',
-styleUrl: './score-tracking.css'
+  selector: 'app-score-tracking',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './score-tracking.html',
+  styleUrl: './score-tracking.css'
 })
 export class ScoreTracking implements OnInit, OnDestroy {
-color: 'red' | 'blue' = 'red';
-matchId = '';
-allianceId = '';
+  color: 'red' | 'blue' = 'red';
+  matchId = '';
+  allianceId = '';
 
-loading: WritableSignal<boolean> = signal(true);
-error: WritableSignal<string | null> = signal(null);
-match: WritableSignal<MatchDetailDto | null> = signal(null);
+  loading: WritableSignal<boolean> = signal(true);
+  error: WritableSignal<string | null> = signal(null);
+  match: WritableSignal<MatchDetailDto | null> = signal(null);
 
-// Submission state
-submitting: WritableSignal<boolean> = signal(false);
-submitMessage: WritableSignal<string> = signal('');
+  // Submission state
+  submitting: WritableSignal<boolean> = signal(false);
+  submitMessage: WritableSignal<string> = signal('');
 
-// Versioning + source for robust live updates
-private version: WritableSignal<number> = signal(0);
-private readonly sourceId: string = this.initSourceId();
+  // Versioning + source for robust live updates
+  private version: WritableSignal<number> = signal(0);
+  private readonly sourceId: string = this.initSourceId();
 
-// Fanroc scoring counters
-counters: Record<CounterKey, WritableSignal<number>> = {
-whiteBallsScored: signal(0),
-  goldenBallsScored: signal(0),
-  barriersPushed: signal(0),
-  partialParking: signal(0),
-  fullParking: signal(0),
-  penaltyCount: signal(0),
-  yellowCardCount: signal(0)
-};
+  // Fanroc scoring counters (barriersPushed moved to separate boolean signal)
+  counters: Record<CounterKey, WritableSignal<number>> = {
+    whiteBallsScored: signal(0),
+    goldenBallsScored: signal(0),
+    partialParking: signal(0),
+    fullParking: signal(0),
+    penaltyCount: signal(0),
+    yellowCardCount: signal(0)
+  };
 
-// Red card flag
-redCard: WritableSignal<boolean> = signal(false);
+  // Barrier push as boolean (toggle like red card)
+  barriersPushed: WritableSignal<boolean> = signal(false);
 
-imbalanceOptions: ImbalanceOption[] = [
-  { value: 0, label: 'Balanced', description: '2.0x bonus - 0-1 ball difference', icon: '⚖️' },
-  { value: 1, label: 'Medium', description: '1.5x bonus - 2-3 balls difference', icon: '⚖️' },
-  { value: 2, label: 'Large', description: '1.3x bonus - 4+ balls difference', icon: '⚖️' }
-];
+  // Red card flag
+  redCard: WritableSignal<boolean> = signal(false);
+
+  imbalanceOptions: ImbalanceOption[] = [
+    { value: 0, label: 'Balanced', description: '2.0x bonus - 0-1 ball difference', icon: '⚖️' },
+    { value: 1, label: 'Medium', description: '1.5x bonus - 2-3 balls difference', icon: '⚖️' },
+    { value: 2, label: 'Large', description: '1.3x bonus - 4+ balls difference', icon: '⚖️' }
+  ];
 
   // Selected imbalance category
   selectedImbalance: WritableSignal<number> = signal(2);
@@ -140,6 +141,11 @@ imbalanceOptions: ImbalanceOption[] = [
     this.onScoreUpdate('reset', 'whiteBallsScored', this.counters.whiteBallsScored()); // Trigger update
   }
 
+  toggleBarrierPush() {
+    this.barriersPushed.set(!this.barriersPushed());
+    this.onScoreUpdate('reset', 'whiteBallsScored', this.counters.whiteBallsScored()); // Trigger update
+  }
+
   setImbalance(imbalanceCategory: number) {
     this.selectedImbalance.set(imbalanceCategory);
     // Trigger update for the imbalance category
@@ -153,6 +159,7 @@ imbalanceOptions: ImbalanceOption[] = [
     });
     this.selectedImbalance.set(2); // Reset to default
     this.redCard.set(false);
+    this.barriersPushed.set(false);
   }
 
   canDecrease(key: CounterKey): boolean {
@@ -165,8 +172,6 @@ imbalanceOptions: ImbalanceOption[] = [
       case 'whiteBallsScored':
       case 'goldenBallsScored':
         return currentValue < 50; // Max 50 balls each
-      case 'barriersPushed':
-        return currentValue < 2; // Max 2 barriers
       case 'partialParking':
       case 'fullParking':
         // Total parking cannot exceed 2 (since there are 2 robots)
@@ -188,10 +193,6 @@ imbalanceOptions: ImbalanceOption[] = [
 
   get goldenBallsIncrementDisabled(): boolean {
     return !this.canIncrement('goldenBallsScored') || this.submitting();
-  }
-
-  get barriersIncrementDisabled(): boolean {
-    return !this.canIncrement('barriersPushed') || this.submitting();
   }
 
   get partialParkingIncrementDisabled(): boolean {
@@ -271,7 +272,7 @@ imbalanceOptions: ImbalanceOption[] = [
         state: {
           whiteBallsScored: this.counters.whiteBallsScored(),
           goldenBallsScored: this.counters.goldenBallsScored(),
-          barriersPushed: this.counters.barriersPushed(),
+          barriersPushed: this.barriersPushed() ? 1 : 0,
           partialParking: this.counters.partialParking(),
           fullParking: this.counters.fullParking(),
           imbalanceCategory: this.selectedImbalance(),
@@ -288,7 +289,7 @@ imbalanceOptions: ImbalanceOption[] = [
     return {
       whiteBallsScored: this.counters.whiteBallsScored(),
       goldenBallsScored: this.counters.goldenBallsScored(),
-      barriersPushed: this.counters.barriersPushed(),
+      barriersPushed: this.barriersPushed() ? 1 : 0,
       partialParking: this.counters.partialParking(),
       fullParking: this.counters.fullParking(),
       imbalanceCategory: this.selectedImbalance(),

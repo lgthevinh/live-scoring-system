@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.thingai.app.scoringservice.ScoringService;
+import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.event.Event;
 import org.thingai.app.scoringservice.handler.entityhandler.AuthHandler;
 import org.thingai.base.log.ILog;
@@ -112,6 +113,68 @@ public class AuthController {
             @Override
             public void onSuccess(String token, String successMessage) {
                 future.complete(ResponseEntity.ok(Map.of("token", token, "message", successMessage)));
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
+    }
+
+    @GetMapping("/accounts")
+    public ResponseEntity<Object> getAllAccounts() {
+        try {
+            AccountRole[] accounts = ScoringService.authHandler().getAllAccounts();
+            return ResponseEntity.ok(Map.of("accounts", accounts));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to retrieve accounts: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/accounts/{username}")
+    public ResponseEntity<Object> updateAccount(@PathVariable String username, @RequestBody Map<String, String> request) {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        String password = request.get("password");
+        String roleStr = request.get("role");
+        
+        if (roleStr == null || roleStr.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Role is required"));
+        }
+        
+        int role;
+        try {
+            role = Integer.parseInt(roleStr);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid role format"));
+        }
+
+        ScoringService.authHandler().handleUpdateAccount(username, password, role, new AuthHandler.AuthHandlerCallback() {
+            @Override
+            public void onSuccess(String token, String successMessage) {
+                future.complete(ResponseEntity.ok(Map.of("message", successMessage)));
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
+    }
+
+    @DeleteMapping("/accounts/{username}")
+    public ResponseEntity<Object> deleteAccount(@PathVariable String username) {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.authHandler().handleDeleteAccount(username, new AuthHandler.AuthHandlerCallback() {
+            @Override
+            public void onSuccess(String token, String successMessage) {
+                future.complete(ResponseEntity.ok(Map.of("message", successMessage)));
             }
 
             @Override

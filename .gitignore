@@ -58,8 +58,12 @@ src/main/resources/static/*.ico
 !src/main/resources/static/favicon.ico
 !src/main/resources/static/index.html
 
-### For me only =)) ###
-.clinerules/
 build.gradle
 files/
 /*.db
+
+### MCP/AI Tool Config (sensitive) ###
+.mcp.json
+
+### Backup files ###
+*.bak

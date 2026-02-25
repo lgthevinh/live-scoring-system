@@ -19,6 +19,9 @@
             <div class="board">
                 <!-- Timer panel -->
                 <div class="timer-panel">
+                    <div class="logo-panel">
+                        <img src="../../../assets/fanroc-logo.png" alt="FANROC" class="fanroc-logo">
+                    </div>
                     <div class="timer-text">{{ mmss() }}</div>
                 </div>
 
@@ -26,7 +29,11 @@
                 <div class="dock">
                     <div class="dock-cell dock-red-list">
                         @for (team of redTeams(); track team.teamId) {
-                            <div class="team" >{{ team.teamId }}</div>
+                            <div class="team">
+                                <span class="team-number">{{ team.teamId }}</span>
+                                <span class="team-separator">•</span>
+                                <span class="team-name">{{ team.teamName }}</span>
+                            </div>
                         }
                     </div>
                     <div class="dock-cell dock-red-score">
@@ -37,7 +44,11 @@
                     </div>
                     <div class="dock-cell dock-blue-list">
                         @for (team of blueTeams(); track team.teamId) {
-                            <div class="team" >{{ team.teamId }}</div>
+                            <div class="team">
+                                <span class="team-name">{{ team.teamName }}</span>
+                                <span class="team-separator">•</span>
+                                <span class="team-number">{{ team.teamId }}</span>
+                            </div>
                         }
                     </div>
                 </div>
@@ -95,6 +106,25 @@
     </div>
 </div>
 
+<!-- Sound Permission Popup -->
+<div class="modal fade" id="soundPermissionModal" tabindex="-1" aria-labelledby="soundPermissionLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content fd-modal">
+            <div class="modal-header">
+                <h5 class="modal-title" id="soundPermissionLabel">Enable Sound?</h5>
+            </div>
+            <div class="modal-body">
+                <p>Would you like to enable sound for match start alerts?</p>
+                <p class="text-muted small">This is required because browsers block automatic audio playback. Your choice will be remembered for this session.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" (click)="onSoundPermissionResponse(false)">No, Thanks</button>
+                <button type="button" class="btn btn-primary" (click)="onSoundPermissionResponse(true)">Enable Sound</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Config Modal -->
 <div class="modal fade" id="fdConfigModal" tabindex="-1" aria-labelledby="fdConfigLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -122,15 +152,30 @@
                              aria-labelledby="headingAudio" data-bs-parent="#fdAccordion">
                             <div class="accordion-body">
                                 <div class="d-flex gap-2 flex-wrap">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm">Play Test Tone</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm">Stop Test Tone</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" (click)="playMatchSound()">
+                                        <i class="bi bi-play-circle"></i>
+                                        <span>Play Match Sound</span>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" (click)="enableSound()">
+                                        @if (!soundEnabled()) {
+                                            <i class="bi bi-volume-mute"></i>
+                                        } @else {
+                                            <i class="bi bi-volume-up"></i>
+                                        }
+                                        <span>@if (!soundEnabled()) { Enable Sound } @else { Sound Enabled }</span>
+                                    </button>
                                     <div class="ms-auto d-flex align-items-center gap-2">
                                         <label class="form-label mb-0 small">Output Device</label>
-                                        <select class="form-select form-select-sm" style="min-width: 220px;">
-                                            <option>System Default</option>
-                                            <option>HDMI Output</option>
-                                            <option>External Speaker</option>
-                                        </select>
+                                        <div class="d-flex gap-2">
+                                            <select class="form-select form-select-sm" style="min-width: 180px;" [(ngModel)]="outputDeviceId" (change)="onOutputDeviceChange($event)">
+                                                @for (device of availableAudioDevices(); track device.deviceId) {
+                                                    <option [value]="device.deviceId">{{ device.label }}</option>
+                                                }
+                                            </select>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshAudioDevices()" title="Refresh audio devices">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

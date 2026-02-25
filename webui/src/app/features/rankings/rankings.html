@@ -13,8 +13,6 @@
                         <tr>
                             <th class="ps-4">Rank</th>
                             <th>Team</th>
-                            <th class="text-center">Ranking Points</th>
-                            <th class="text-center">Wins</th>
                             <th class="text-center">Total Score</th>
                             <th class="text-center">High Score</th>
                             <th class="text-center">Matches</th>
@@ -26,16 +24,14 @@
                             <tr>
                               <td class="ps-4 fw-bold">{{ i + 1 }}</td>
                               <td >{{ rank.teamId }}</td>
-                              <td class="text-center fw-bold text-primary">{{ rank.rankingPoints }}</td>
-                              <td class="text-center">{{ rank.wins }}</td>
-                              <td class="text-center">{{ rank.totalScore }}</td>
+                              <td class="text-center fw-bold text-primary">{{ rank.totalScore }}</td>
                               <td class="text-center">{{ rank.highestScore }}</td>
                               <td class="text-center">{{ rank.matchesPlayed }}</td>
                             </tr>
                         }
                         @if (rankings().length === 0 && isLoading()) {
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="5" class="text-center py-5 text-muted">
                                     No rankings available yet.
                                 </td>
                             </tr>
