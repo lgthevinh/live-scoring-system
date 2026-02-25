@@ -5,7 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.thingai.app.scoringservice.ScoringService;
-import org.thingai.app.scoringservice.entity.event.Event;
+import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.app.scoringservice.handler.entityhandler.AuthHandler;
 import org.thingai.base.log.ILog;
 
@@ -68,10 +69,12 @@ public class AuthController {
         String authHeader = requestHeaders.get("authorization"); // Headers are converted to lowercase
 
         // Expecting the format "Bearer <token>"
-        String token = (authHeader != null && authHeader.toLowerCase().startsWith("bearer ")) ? authHeader.substring(7) : null;
+        String token = (authHeader != null && authHeader.toLowerCase().startsWith("bearer ")) ? authHeader.substring(7)
+                : null;
 
         if (token == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Authorization header is missing or malformed."));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authorization header is missing or malformed."));
         }
 
         ScoringService.authHandler().handleRefreshToken(token, new AuthHandler.AuthHandlerCallback() {
@@ -96,7 +99,8 @@ public class AuthController {
             String localIp = localHost.getHostAddress();
             return ResponseEntity.ok(Map.of("localIp", localIp));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Unable to retrieve local IP address."));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Unable to retrieve local IP address."));
         }
     }
 
@@ -116,7 +120,27 @@ public class AuthController {
 
             @Override
             public void onFailure(String errorMessage) {
-                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+                future.complete(
+                        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<Object> getAllUsers() {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.authHandler().handleGetAllUsers(new RequestCallback<UserDto[]>() {
+            @Override
+            public void onSuccess(UserDto[] users, String message) {
+                future.complete(ResponseEntity.ok(users));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(errorCode).body(Map.of("error", errorMessage)));
             }
         });
 

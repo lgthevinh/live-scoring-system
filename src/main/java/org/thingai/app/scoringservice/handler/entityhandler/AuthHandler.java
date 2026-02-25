@@ -1,5 +1,7 @@
 package org.thingai.app.scoringservice.handler.entityhandler;
 
+import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.base.dao.Dao;
 import org.thingai.app.scoringservice.entity.config.AuthData;
@@ -20,18 +22,19 @@ public class AuthHandler {
 
     private Dao dao;
 
-    public AuthHandler(Dao dao ) {
+    public AuthHandler(Dao dao) {
         this.dao = dao;
     }
 
     public interface AuthHandlerCallback {
         void onSuccess(String token, String successMessage);
+
         void onFailure(String errorMessage);
     }
 
     public void handleAuthenticate(String username, String password, AuthHandlerCallback callback) {
         try {
-            AuthData[] authDataList = dao.query(AuthData.class, new String[]{"username"}, new String[]{username});
+            AuthData[] authDataList = dao.query(AuthData.class, new String[] { "username" }, new String[] { username });
 
             if (authDataList.length == 0) {
                 callback.onFailure("Authentication failed: User not found.");
@@ -61,7 +64,7 @@ public class AuthHandler {
 
     public void handleCreateAuth(String username, String password, int role, AuthHandlerCallback callback) {
         // Check if the user already exists
-        AuthData[] existingUsers = dao.query(AuthData.class, new String[]{"username"}, new String[] {username});
+        AuthData[] existingUsers = dao.query(AuthData.class, new String[] { "username" }, new String[] { username });
         if (!(existingUsers.length == 0)) {
             callback.onFailure("User already exists.");
             return;
@@ -144,7 +147,8 @@ public class AuthHandler {
             if (parts.length != 3) {
                 return false;
             }
-            // String username = parts[0]; // Not used in validation, but could be used for logging or further checks
+            // String username = parts[0]; // Not used in validation, but could be used for
+            // logging or further checks
             long timestamp = Long.parseLong(parts[1]);
             String secretKey = parts[2];
 
@@ -157,6 +161,30 @@ public class AuthHandler {
             return SECRET_KEY.equals(secretKey);
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    public void handleGetAllUsers(RequestCallback<UserDto[]> callback) {
+        try {
+            AuthData[] authDataList = dao.query(AuthData.class, new String[] {}, new String[] {});
+
+            UserDto[] users = new UserDto[authDataList.length];
+            for (int i = 0; i < authDataList.length; i++) {
+                String username = authDataList[i].getUsername();
+                int role = 0;
+
+                AccountRole[] roles = dao.query(AccountRole.class, new String[] { "username" },
+                        new String[] { username });
+                if (roles.length > 0) {
+                    role = roles[0].getRole();
+                }
+
+                users[i] = new UserDto(username, role);
+            }
+
+            callback.onSuccess(users, "Users retrieved successfully.");
+        } catch (Exception e) {
+            callback.onFailure(500, "Failed to retrieve users: " + e.getMessage());
         }
     }
 
