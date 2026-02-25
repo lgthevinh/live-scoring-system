@@ -206,10 +206,6 @@ public class AuthHandler {
         }
     }
 
-    public void setDao(Dao dao) {
-        this.dao = dao;
-    }
-
     public AccountRole[] getAllAccounts() {
         // First try to get accounts from AccountRole table
         AccountRole[] accountRoles = dao.readAll(AccountRole.class);

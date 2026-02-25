@@ -20,6 +20,9 @@
           </set>
         </option>
       </GradleProjectSettings>
+      <GradleProjectSettings>
+        <option name="externalProjectPath" value="$PROJECT_DIR$/../../thingai-app-sdk/applicationbase/desktopplatform" />
+      </GradleProjectSettings>
     </option>
   </component>
 </project>
