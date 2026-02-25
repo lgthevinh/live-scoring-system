@@ -185,6 +185,31 @@ public class EventHandler {
         }
     }
 
+    public void clearCurrentEvent(RequestCallback<Void> callback) {
+        try {
+            if (this.currentEvent == null) {
+                callback.onSuccess(null, "No current event to clear.");
+                return;
+            }
+            
+            this.currentEvent = null;
+            this.eventDao = null;
+            this.eventDaoFile = null;
+            
+            // Delete persisted current event entry (can't set to null due to NOT NULL constraint)
+            DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event");
+            if (mapEntities.length > 0) {
+                systemDao.delete(mapEntities[0]);
+            }
+            
+            eventCallback.isNotCurrentEventSet();
+            
+            callback.onSuccess(null, "Current event cleared successfully.");
+        } catch (Exception e) {
+            callback.onFailure(ErrorCode.UPDATE_FAILED, "Error clearing current event: " + e.getMessage());
+        }
+    }
+
     public boolean isCurrentEventSet() {
         DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event"); // this get event code
         if (mapEntities.length > 0) {

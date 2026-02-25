@@ -59,4 +59,10 @@ export class EventService {
             tap(event => this.currentEventSubject.next(event))
         );
     }
+
+    clearCurrentEvent(): Observable<{ message: string }> {
+        return this.http.post<{ message: string }>(`${this.apiUrl}/clear-current`, {}).pipe(
+            tap(() => this.currentEventSubject.next(null))
+        );
+    }
 }
