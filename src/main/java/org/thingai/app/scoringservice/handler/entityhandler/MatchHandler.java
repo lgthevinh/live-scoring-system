@@ -26,6 +26,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MatchHandler {
+    private static final String TAG = "MatchHandler";
+
     private Dao dao;
 
     private final MatchMakerHandler matchMakerHandler = new MatchMakerHandler();
@@ -37,8 +39,6 @@ public class MatchHandler {
 
     // Flag to indicate if the cache is stale and needs to be refreshed from the database.
     private boolean matchUpdateFlag = true; // Start as true to force initial loads.
-
-    private int currentEventMatchType;
 
     public MatchHandler(Dao dao, LRUCache<String, Match> matchCache, LRUCache<String, AllianceTeam[]> allianceTeamCache, LRUCache<String, Team> teamCache) {
         this.dao = dao;
@@ -109,6 +109,7 @@ public class MatchHandler {
     // Methods use outside system implementation
     public void createMatch(int matchType, int matchNumber, String matchStartTime, String[] redTeamIds, String[] blueTeamIds, RequestCallback<Match> callback) {
         try {
+            ILog.d(TAG, "manual match creation");
             // Handle duplicate team IDs
             Set<String> uniqueReds = new HashSet<>(Arrays.asList(redTeamIds));
             Set<String> uniqueBlues = new HashSet<>(Arrays.asList(blueTeamIds));
@@ -160,12 +161,14 @@ public class MatchHandler {
             blueScore.setAllianceId(blueAllianceId);
 
             dao.insertOrUpdate(match);
-            dao.insertOrUpdate(redScore);
-            dao.insertOrUpdate(blueScore);
+            dao.insertOrUpdate(Score.class, redScore);
+            dao.insertOrUpdate(Score.class, blueScore);
 
-            setMatchUpdateFlag(true); // Invalidate cache
+            ILog.d(TAG, "created match: " + matchCode, Arrays.toString(redTeamIds), Arrays.toString(blueTeamIds));
             callback.onSuccess(match, "Match created successfully.");
+            setMatchUpdateFlag(true); // Invalidate cache
         } catch (Exception e) {
+            ILog.e(TAG, "Error creating match: " + e.getMessage());
             callback.onFailure(ErrorCode.CREATE_FAILED, "Failed to create match: " + e.getMessage());
         }
     }
