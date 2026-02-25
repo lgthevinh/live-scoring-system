@@ -20,7 +20,7 @@ public class AuthHandler {
     private static final String SECRET_KEY = "secret_key";
     private static final int TOKEN_EXPIRATION_TIME = 3600 * 1000 * 24; // 1 day in milliseconds
 
-    private Dao dao;
+    private final Dao dao;
 
     public AuthHandler(Dao dao) {
         this.dao = dao;
@@ -136,6 +136,48 @@ public class AuthHandler {
         return encoder.encodeToString(tokenData.getBytes(StandardCharsets.UTF_8));
     }
 
+    public void handleGetAllUsers(RequestCallback<UserDto[]> callback) {
+        try {
+            AuthData[] authDataList = dao.readAll(AuthData.class);
+
+            UserDto[] users = new UserDto[authDataList.length];
+            for (int i = 0; i < authDataList.length; i++) {
+                String username = authDataList[i].getUsername();
+                int role = 0;
+
+                AccountRole[] roles = dao.query(AccountRole.class, new String[] { "username" },
+                        new String[] { username });
+                if (roles.length > 0) {
+                    role = roles[0].getRole();
+                }
+
+                users[i] = new UserDto(username, role);
+            }
+
+            callback.onSuccess(users, "Users retrieved successfully.");
+        } catch (Exception e) {
+            callback.onFailure(500, "Failed to retrieve users: " + e.getMessage());
+        }
+    }
+
+    public void handleDeleteAccount(String username, RequestCallback<Void> callback) {
+        try {
+            AuthData[] existing = dao.query(AuthData.class, new String[] { "username" }, new String[] { username });
+            if (existing.length == 0) {
+                callback.onFailure(404, "User not found: " + username);
+                return;
+            }
+
+            // Delete role first, then credentials
+            dao.delete(AccountRole.class, username);
+            dao.delete(AuthData.class, username);
+
+            callback.onSuccess(null, "Account '" + username + "' deleted successfully.");
+        } catch (Exception e) {
+            callback.onFailure(500, "Failed to delete account: " + e.getMessage());
+        }
+    }
+
     private boolean validateToken(String token) {
         try {
             // Decode the token
@@ -162,33 +204,5 @@ public class AuthHandler {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    public void handleGetAllUsers(RequestCallback<UserDto[]> callback) {
-        try {
-            AuthData[] authDataList = dao.query(AuthData.class, new String[] {}, new String[] {});
-
-            UserDto[] users = new UserDto[authDataList.length];
-            for (int i = 0; i < authDataList.length; i++) {
-                String username = authDataList[i].getUsername();
-                int role = 0;
-
-                AccountRole[] roles = dao.query(AccountRole.class, new String[] { "username" },
-                        new String[] { username });
-                if (roles.length > 0) {
-                    role = roles[0].getRole();
-                }
-
-                users[i] = new UserDto(username, role);
-            }
-
-            callback.onSuccess(users, "Users retrieved successfully.");
-        } catch (Exception e) {
-            callback.onFailure(500, "Failed to retrieve users: " + e.getMessage());
-        }
-    }
-
-    public void setDao(Dao dao) {
-        this.dao = dao;
     }
 }

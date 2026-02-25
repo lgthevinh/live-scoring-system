@@ -23,6 +23,7 @@ public class BroadcastHandler {
      * @param message The message payload.
      */
     public void broadcast(String topic, Object message, String messageType) {
+        ILog.d(TAG, topic, messageType)
         BroadcastMessageDto broadcastMessage = new BroadcastMessageDto(messageType, message);
         messagingTemplate.convertAndSend(topic, broadcastMessage);
     }
