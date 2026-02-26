@@ -97,8 +97,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         // Preload sound file for mobile compatibility
         this.preloadSound();
 
-
-
         // Show sound permission popup automatically using vanilla JS (Bootstrap-compatible)
         setTimeout(() => {
             const modalElement = document.getElementById('soundPermissionModal');
