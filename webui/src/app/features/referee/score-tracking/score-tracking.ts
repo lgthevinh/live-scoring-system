@@ -50,7 +50,7 @@ export class ScoreTracking implements OnInit, OnDestroy {
   private version: WritableSignal<number> = signal(0);
   private readonly sourceId: string = this.initSourceId();
 
-  // Fanroc scoring counters (barriersPushed moved to separate boolean signal)
+  // Fanroc scoring counters (barriersPushed moved to separate boolean signals)
   counters: Record<CounterKey, WritableSignal<number>> = {
     whiteBallsScored: signal(0),
     goldenBallsScored: signal(0),
@@ -61,7 +61,8 @@ export class ScoreTracking implements OnInit, OnDestroy {
   };
 
   // Barrier push as boolean (toggle like red card)
-  barriersPushed: WritableSignal<boolean> = signal(false);
+  allianceBarrierPushed: WritableSignal<boolean> = signal(false);
+  opponentBarrierPushed: WritableSignal<boolean> = signal(false);
 
   // Red card flag
   redCard: WritableSignal<boolean> = signal(false);
@@ -141,8 +142,13 @@ export class ScoreTracking implements OnInit, OnDestroy {
     this.onScoreUpdate('reset', 'whiteBallsScored', this.counters.whiteBallsScored()); // Trigger update
   }
 
-  toggleBarrierPush() {
-    this.barriersPushed.set(!this.barriersPushed());
+  toggleAllianceBarrierPush() {
+    this.allianceBarrierPushed.set(!this.allianceBarrierPushed());
+    this.onScoreUpdate('reset', 'whiteBallsScored', this.counters.whiteBallsScored()); // Trigger update
+  }
+
+  toggleOpponentBarrierPush() {
+    this.opponentBarrierPushed.set(!this.opponentBarrierPushed());
     this.onScoreUpdate('reset', 'whiteBallsScored', this.counters.whiteBallsScored()); // Trigger update
   }
 
@@ -159,7 +165,8 @@ export class ScoreTracking implements OnInit, OnDestroy {
     });
     this.selectedImbalance.set(2); // Reset to default
     this.redCard.set(false);
-    this.barriersPushed.set(false);
+    this.allianceBarrierPushed.set(false);
+    this.opponentBarrierPushed.set(false);
   }
 
   canDecrease(key: CounterKey): boolean {
@@ -272,7 +279,8 @@ export class ScoreTracking implements OnInit, OnDestroy {
         state: {
           whiteBallsScored: this.counters.whiteBallsScored(),
           goldenBallsScored: this.counters.goldenBallsScored(),
-          barriersPushed: this.barriersPushed() ? 1 : 0,
+          allianceBarrierPushed: this.allianceBarrierPushed(),
+          opponentBarrierPushed: this.opponentBarrierPushed(),
           partialParking: this.counters.partialParking(),
           fullParking: this.counters.fullParking(),
           imbalanceCategory: this.selectedImbalance(),
@@ -289,7 +297,8 @@ export class ScoreTracking implements OnInit, OnDestroy {
     return {
       whiteBallsScored: this.counters.whiteBallsScored(),
       goldenBallsScored: this.counters.goldenBallsScored(),
-      barriersPushed: this.barriersPushed() ? 1 : 0,
+      allianceBarrierPushed: this.allianceBarrierPushed(),
+      opponentBarrierPushed: this.opponentBarrierPushed(),
       partialParking: this.counters.partialParking(),
       fullParking: this.counters.fullParking(),
       imbalanceCategory: this.selectedImbalance(),

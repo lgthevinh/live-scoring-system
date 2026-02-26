@@ -166,7 +166,8 @@ export class MockMatchService extends MatchService {
             rawScoreData: JSON.stringify({
               whiteBallsScored: 5,
               goldenBallsScored: 5,
-              barriersPushed: true,
+              allianceBarrierPushed: true,
+              opponentBarrierPushed: false,
               imbalanceCategory: 0,
               partialParking: 1,
               fullParking: 2,
@@ -182,7 +183,8 @@ export class MockMatchService extends MatchService {
             rawScoreData: JSON.stringify({
               whiteBallsScored: 3,
               goldenBallsScored: 2,
-              barriersPushed: false,
+              allianceBarrierPushed: false,
+              opponentBarrierPushed: true,
               imbalanceCategory: 1,
               partialParking: 1,
               fullParking: 1,
@@ -240,7 +242,8 @@ export class MockMatchService extends MatchService {
         rawScoreData: JSON.stringify({
           whiteBallsScored: RandomUtils.generateRandomNumber(0, 15),
           goldenBallsScored: RandomUtils.generateRandomNumber(0, 15),
-          barriersPushed: RandomUtils.generateRandomNumber(0, 1) === 1,
+          allianceBarrierPushed: RandomUtils.generateRandomNumber(0, 1) === 1,
+          opponentBarrierPushed: RandomUtils.generateRandomNumber(0, 1) === 1,
           imbalanceCategory: RandomUtils.generateRandomNumber(0, 2),
           partialParking: RandomUtils.generateRandomNumber(0, 2),
           fullParking: RandomUtils.generateRandomNumber(0, 2),

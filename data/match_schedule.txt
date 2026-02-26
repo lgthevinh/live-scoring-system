@@ -1,15 +1,15 @@
 Create schedule for 4 teams playing 3 rounds in 3 matches
 with a minimum match separation of 1 running 100000 iterations.
 
-   0:00   100.00% complete (1 updates), operation complete         balancing station appearances (Sykes method) used 0.000002 seconds.
+   0:00   100.00% complete (2 updates), operation complete         balancing station appearances (Sykes method) used 0.000005 seconds.
 
 Results for 4 teams playing 3 rounds in 3 matches
 
 Match Schedule
 --------------
-  1:    3     2     1     4 
-  2:    4     3     2     1 
-  3:    1     3     4     2 
+  1:    1     2     4     3 
+  2:    2     4     3     1 
+  3:    3     2     4     1 
 
 Schedule Statistics
 -------------------
@@ -29,9 +29,9 @@ Schedule Statistics
 
  team   #   d    part    opp    both    r/b <->   s1 s2 4+ repeats
  ----  --  --   -----   -----   -----   --- ---   -- -- ------------
-    1:  3   1 |  3  1 |  3  2 |  3  3 |  1b   1 |  2  1
-    2:  3   1 |  3  1 |  3  2 |  3  3 |  1b   1 |  1  2
-    3:  3   1 |  3  1 |  3  2 |  3  3 |  3r   0 |  1  2
+    1:  3   1 |  3  1 |  3  2 |  3  3 |  1b   1 |  1  2
+    2:  3   1 |  3  1 |  3  2 |  3  3 |  3r   0 |  1  2
+    3:  3   1 |  3  1 |  3  2 |  3  3 |  1b   1 |  2  1
     4:  3   1 |  3  1 |  3  2 |  3  3 |  1b   2 |  2  1
 ------------------------------------------------------------
  best:  3   1 |  3  1 |  3  2 |  3  3 |  1    0 |  2  2
@@ -48,5 +48,5 @@ alliance swap count histogram:
 1: 2
 0: 1
 
-elapsed time: 0.076643 seconds
+elapsed time: 0.076236 seconds
 
