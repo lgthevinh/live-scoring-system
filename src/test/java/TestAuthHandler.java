@@ -3,10 +3,10 @@ import org.junit.jupiter.api.Test;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoSqlite;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.config.AuthData;
 import org.thingai.app.scoringservice.handler.entityhandler.AuthHandler;
+import org.thingai.platform.dao.DaoSqlite;
 
 public class TestAuthHandler {
     private static AuthHandler authHandler;
