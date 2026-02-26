@@ -19,7 +19,7 @@ public class Main {
         ScoringService scoringService = new ScoringService();
         scoringService.name = "Scoring System";
         scoringService.appDirName = "scoring_system";
-        scoringService.version = "1.0.0";
+        scoringService.version = "1.5";
 
         ILog.ENABLE_LOGGING = true;
         ILog.logLevel = ILog.INFO;

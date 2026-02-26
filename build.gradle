@@ -16,8 +16,8 @@ plugins {
     id "com.github.node-gradle.node" version "7.0.2" // Gradle-managed Node/npm
 }
 
-group = 'org.thingai.vrc.scoringsystem'
-version = '' // set a version like '1.0.0' if you want
+group = 'org.thingai.app.scoringsystem'
+version = '1.5'
 description = 'Scoring System for Robotics Competitions'
 
 application {

@@ -73,7 +73,7 @@ public class ScoringService extends Service {
             }
         });
 
-        ILog.i(SERVICE_NAME, "ScoringService initialized.");
+        ILog.i(SERVICE_NAME, "ScoringService initialized. version: " + version);
         ILog.i(SERVICE_NAME, "Database initialized at: " + appDir + "/scoring_system.db");
         ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
     }
