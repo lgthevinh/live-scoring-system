@@ -15,10 +15,10 @@ import java.util.HashMap;
 public class ScoreHandler {
     private final ObjectMapper objectMapper = new ObjectMapper(); // For converting DTO to JSON
 
-    private static Class<? extends Score> scoreClass;
+    private final Dao dao;
+    private final DaoFile daoFile;
 
-    private Dao dao;
-    private DaoFile daoFile;
+    private static Class<? extends Score> scoreClass;
 
     public ScoreHandler(Dao dao, DaoFile daoFile) {
         this.dao = dao;
@@ -247,10 +247,5 @@ public class ScoreHandler {
 
     public static void setScoreClass(Class<? extends Score> scoreClass) {
         ScoreHandler.scoreClass = scoreClass;
-    }
-
-    public void setDao(Dao dao, DaoFile daoFile) {
-        this.dao = dao;
-        this.daoFile = daoFile;
     }
 }

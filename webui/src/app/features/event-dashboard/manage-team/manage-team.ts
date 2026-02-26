@@ -16,7 +16,6 @@ export class ManageTeam implements OnInit{
   newTeam: Team = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
   editTeam: Team = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
   fileToUpload: File | null = null;
-
   constructor(
     private teamService: TeamService
   ) {
@@ -24,9 +23,9 @@ export class ManageTeam implements OnInit{
 
   submitAddTeam() {
     if (this.newTeam.teamId && this.newTeam.teamName && this.newTeam.teamSchool && this.newTeam.teamRegion) {
-      this.teams.update(teams => [...teams, { ...this.newTeam }]);
       this.teamService.addTeam(this.newTeam).subscribe({
         next: () => {
+          this.teams.update(teams => [...teams, { ...this.newTeam }]);
           console.log('Team added successfully');
           alert('Team added successfully');
         },
