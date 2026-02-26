@@ -11,14 +11,15 @@ import org.thingai.app.scoringservice.handler.entityhandler.*;
 import org.thingai.base.Service;
 import org.thingai.base.cache.LRUCache;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoFile;
-import org.thingai.base.dao.DaoSqlite;
 import org.thingai.app.scoringservice.entity.event.Event;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.config.AuthData;
 import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;
+import org.thingai.platform.dao.DaoFile;
+import org.thingai.platform.dao.DaoSqlite;
+
 import java.util.HashMap;
 
 public class ScoringService extends Service {

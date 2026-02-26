@@ -5,8 +5,8 @@ import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.entityhandler.ScoreHandler;
 import org.thingai.app.fanroc.FanrocScore;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoFile;
-import org.thingai.base.dao.DaoSqlite;
+import org.thingai.platform.dao.DaoFile;
+import org.thingai.platform.dao.DaoSqlite;
 
 public class TestScoreHandler {
     private static ScoreHandler scoreHandler;
