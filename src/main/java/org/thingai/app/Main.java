@@ -35,6 +35,7 @@ public class Main {
         scoringService.init();
 
         scoringService.registerScoreClass(FanrocScore.class); // Register the scoring class for the season specific logic
+        scoringService.registerRankingStrategy(new FanrocRankingStrategy());
         ILog.i("Main", "Service running on URL:" + " http://" + getIpAddress() + ":" + getActualPort(context));
     }
 

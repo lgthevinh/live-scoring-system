@@ -3,6 +3,7 @@ package org.thingai.app.scoringservice;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.match.AllianceTeam;
+import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.BroadcastHandler;
 import org.thingai.app.scoringservice.handler.LiveScoreHandler;
@@ -115,6 +116,10 @@ public class ScoringService extends Service {
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {
         ScoreHandler.setScoreClass(scoreClass);
+    }
+
+    public void registerRankingStrategy(IRankingStrategy rankingStrategy) {
+        RankingHandler.setRankingStrategy(rankingStrategy);
     }
 
     private void injectHandler(Dao dao, DaoFile daoFile) {
