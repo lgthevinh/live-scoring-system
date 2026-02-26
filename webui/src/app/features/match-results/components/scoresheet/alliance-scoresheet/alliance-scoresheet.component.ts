@@ -54,7 +54,8 @@ import { RefereeService } from '../../../../../core/services/referee.service';
                       <ng-container [ngSwitch]="field.key">
                         <ng-container *ngSwitchCase="'whiteBallsScored'">⚪</ng-container>
                         <ng-container *ngSwitchCase="'goldenBallsScored'">🟡</ng-container>
-                        <ng-container *ngSwitchCase="'barriersPushed'">🚧</ng-container>
+                        <ng-container *ngSwitchCase="'allianceBarrierPushed'">🚧</ng-container>
+                        <ng-container *ngSwitchCase="'opponentBarrierPushed'">🎯</ng-container>
                         <ng-container *ngSwitchCase="'partialParking'">📍</ng-container>
                         <ng-container *ngSwitchCase="'fullParking'">🏁</ng-container>
                         <ng-container *ngSwitchCase="'imbalanceCategory'">⚖️</ng-container>
@@ -89,7 +90,10 @@ import { RefereeService } from '../../../../../core/services/referee.service';
                     <span class="counter-total" *ngIf="field.key.includes('Parking') && (getValue(scoreData, field.key) || 0) > 0">
                       {{ (getValue(scoreData, field.key) || 0) * 5 }}
                     </span>
-                    <span class="counter-total" *ngIf="field.key === 'barriersPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                    <span class="counter-total" *ngIf="field.key === 'allianceBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 10 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key === 'opponentBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
                       {{ (getValue(scoreData, field.key) || 0) * 10 }}
                     </span>
                   </div>
@@ -99,8 +103,8 @@ import { RefereeService } from '../../../../../core/services/referee.service';
                     <i class="bi bi-plus-lg"></i>
                   </button>
                 </div>
-                <!-- Toggle button for boolean fields (barriersPushed, redCard) -->
-                <div class="toggle-controls" *ngIf="editable && field.type === 'boolean'">
+                <!-- Toggle button for boolean fields (allianceBarrierPushed, opponentBarrierPushed, redCard) -->
+                <div [ngClass]="{'bg-danger': (field.key === 'allianceBarrierPushed' && alliance === 'red') || (field.key === 'opponentBarrierPushed' && alliance === 'blue'), 'bg-primary': (field.key === 'allianceBarrierPushed' && alliance === 'blue') || (field.key === 'opponentBarrierPushed' && alliance === 'red')}" class="toggle-controls rounded-3 p-3" *ngIf="editable && field.type === 'boolean'">
                   <button (click)="toggleBooleanValue(field.key)"
                           [class.active]="getValue(scoreData, field.key)"
                           class="btn btn-lg boolean-toggle-button">
@@ -126,7 +130,10 @@ import { RefereeService } from '../../../../../core/services/referee.service';
                     <span class="counter-total" *ngIf="field.key.includes('Parking') && (getValue(scoreData, field.key) || 0) > 0">
                       {{ (getValue(scoreData, field.key) || 0) * 5 }}
                     </span>
-                    <span class="counter-total" *ngIf="field.key === 'barriersPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                    <span class="counter-total" *ngIf="field.key === 'allianceBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 10 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key === 'opponentBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
                       {{ (getValue(scoreData, field.key) || 0) * 10 }}
                     </span>
                   </div>

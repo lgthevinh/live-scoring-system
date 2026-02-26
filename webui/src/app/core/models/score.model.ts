@@ -8,7 +8,8 @@ export interface Score {
   // Fanroc scoring system fields (from JSON)
   whiteBallsScored?: number;
   goldenBallsScored?: number;
-  barriersPushed?: number;
+  allianceBarrierPushed?: boolean;
+  opponentBarrierPushed?: boolean;
   imbalanceCategory?: number;
   partialParking?: number;
   fullParking?: number;
@@ -53,9 +54,9 @@ export class FanrocScoringCalculator {
   /**
    * Get the balancing coefficient based on imbalance category
    * @param imbalanceCategory - The imbalance category (0=balanced, 1=medium, 2=large)
-   * @param barriersPushed - 1 if barrier was pushed, 0 if not (reduces coefficient by 0.2 if 0)
+   * @param allianceBarrierPushed - true if alliance pushed their barrier, false if not (reduces coefficient by 0.2 if false)
    */
-  static getBalancingCoefficient(imbalanceCategory: number, barriersPushed: number = 0): number {
+  static getBalancingCoefficient(imbalanceCategory: number, allianceBarrierPushed: boolean = false): number {
     let baseCoeff: number;
     switch (imbalanceCategory) {
       case 0:
@@ -73,7 +74,7 @@ export class FanrocScoringCalculator {
     }
 
     // Subtract 0.2 if alliance didn't push their barrier (assuming 1 barrier per alliance)
-    if (barriersPushed === 0) {
+    if (!allianceBarrierPushed) {
       baseCoeff -= 0.2;
     }
 
@@ -94,7 +95,8 @@ export class FanrocScoringCalculator {
   static calculateTotalScore(
     whiteBallsScored: number = 0,
     goldenBallsScored: number = 0,
-    barriersPushed: number = 0,
+    allianceBarrierPushed: boolean = false,
+    opponentBarrierPushed: boolean = false,
     imbalanceCategory: number = 2,
     partialParking: number = 0,
     fullParking: number = 0,
@@ -108,7 +110,7 @@ export class FanrocScoringCalculator {
     }
 
     const biologicalPoints = this.calculateBiologicalPoints(goldenBallsScored, whiteBallsScored);
-    const barrierPoints = barriersPushed * 10;
+    const barrierPoints = (allianceBarrierPushed ? 10 : 0) + (opponentBarrierPushed ? 10 : 0);
 
     // End game points
     let endGamePoints = (partialParking * 5) + (fullParking * 10);
@@ -119,7 +121,7 @@ export class FanrocScoringCalculator {
     }
 
     // Adjusted balancing coefficient
-    const coeff = this.getBalancingCoefficient(imbalanceCategory, barriersPushed);
+    const coeff = this.getBalancingCoefficient(imbalanceCategory, allianceBarrierPushed);
 
     // Calculate base score
     const baseScore = (biologicalPoints + barrierPoints) * coeff;
@@ -137,7 +139,8 @@ export class FanrocScoringCalculator {
   static isFanrocScore(score: Score): boolean {
     return score.whiteBallsScored !== undefined ||
            score.goldenBallsScored !== undefined ||
-           score.barriersPushed !== undefined ||
+           score.allianceBarrierPushed !== undefined ||
+           score.opponentBarrierPushed !== undefined ||
            score.imbalanceCategory !== undefined ||
            score.partialParking !== undefined ||
            score.fullParking !== undefined ||
