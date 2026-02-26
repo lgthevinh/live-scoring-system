@@ -10,7 +10,6 @@ import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.time.TimeBlock;
 import org.thingai.app.scoringservice.handler.MatchMakerHandler;
-import org.thingai.base.cache.LRUCache;
 import org.thingai.base.dao.Dao;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;
@@ -32,30 +31,20 @@ public class MatchHandler {
 
     private final MatchMakerHandler matchMakerHandler = new MatchMakerHandler();
 
-    // Caches are now injected via the constructor for better management.
-    private LRUCache<String, Match> matchCache;
-    private final LRUCache<String, AllianceTeam[]> allianceTeamCache;
-    private final LRUCache<String, Team> teamCache;
-
-    // Flag to indicate if the cache is stale and needs to be refreshed from the database.
-    private boolean matchUpdateFlag = true; // Start as true to force initial loads.
-
-    public MatchHandler(Dao dao, LRUCache<String, Match> matchCache, LRUCache<String, AllianceTeam[]> allianceTeamCache, LRUCache<String, Team> teamCache) {
+    public MatchHandler(Dao dao) {
         this.dao = dao;
-        this.matchCache = matchCache;
-        this.allianceTeamCache = allianceTeamCache;
-        this.teamCache = teamCache;
 
         String osName = System.getProperty("os.name").toLowerCase();
+        Path binary = Paths.get("binary");
         if (osName.contains("win")) {
             ILog.d("MatchHandler", "Detected Windows OS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(Paths.get("binary").toAbsolutePath() + "/MatchMaker.exe");
+            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker.exe");
         } else if (osName.contains("mac")) {
             ILog.d("MatchHandler", "Detected macOS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(Paths.get("binary").toAbsolutePath() + "/MatchMaker_mac");
+            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker_mac");
         } else {
             ILog.d("MatchHandler", "Assuming Linux OS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(Paths.get("binary").toAbsolutePath() + "/MatchMaker");
+            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker");
         }
 
         Path dataDir = Paths.get("data");
@@ -164,7 +153,6 @@ public class MatchHandler {
 
             ILog.d(TAG, "created match: " + matchCode, Arrays.toString(redTeamIds), Arrays.toString(blueTeamIds));
             callback.onSuccess(match, "Match created successfully.");
-            setMatchUpdateFlag(true); // Invalidate cache
         } catch (Exception e) {
             ILog.e(TAG, "Error creating match: " + e.getMessage());
             callback.onFailure(ErrorCode.CREATE_FAILED, "Failed to create match: " + e.getMessage());
@@ -172,18 +160,9 @@ public class MatchHandler {
     }
 
     public void getMatch(String matchId, RequestCallback<Match> callback) {
-        if (isMatchUpdateFlag()) {
-            Match cachedMatch = matchCache.get(matchId);
-            if (cachedMatch != null) {
-                callback.onSuccess(cachedMatch, "Match retrieved successfully from cache.");
-                return;
-            }
-        }
-
         try {
             Match match = dao.query(Match.class, new String[]{"id"}, new String[]{matchId})[0];
             if (match != null) {
-                matchCache.put(matchId, match); // Add to cache
                 callback.onSuccess(match, "Match retrieved successfully.");
             } else {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Match not found.");
@@ -244,8 +223,6 @@ public class MatchHandler {
     public void updateMatch(Match match, RequestCallback<Match> callback) {
         try {
             dao.insertOrUpdate(match);
-            matchCache.put(match.getId(), match);
-            setMatchUpdateFlag(true);
             callback.onSuccess(match, "Match updated successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to update match: " + e.getMessage());
@@ -255,8 +232,6 @@ public class MatchHandler {
     public void deleteMatch(String matchId, RequestCallback<Void> callback) {
         try {
             dao.delete(Match.class, matchId);
-            matchCache.remove(matchId);
-            setMatchUpdateFlag(true);
             callback.onSuccess(null, "Match deleted successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete match: " + e.getMessage());
@@ -266,11 +241,6 @@ public class MatchHandler {
     public void listMatches(RequestCallback<Match[]> callback) {
         try {
             Match[] matches = dao.readAll(Match.class);
-            matchCache.clear();
-            for (Match match : matches) {
-                matchCache.put(match.getId(), match);
-            }
-            setMatchUpdateFlag(false);
             callback.onSuccess(matches, "Matches retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve matches: " + e.getMessage());
@@ -286,9 +256,6 @@ public class MatchHandler {
                 matches = dao.query(Match.class, new String[]{"matchType"}, new String[]{String.valueOf(matchType)});
             }
 
-            for (Match match : matches) {
-                matchCache.put(match.getId(), match);
-            }
             callback.onSuccess(matches, "Matches retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve matches: " + e.getMessage());
@@ -306,51 +273,32 @@ public class MatchHandler {
             List<MatchDetailDto> detailsList = new ArrayList<>();
 
             for (Match match : matches) {
-                matchCache.put(match.getId(), match);
-
                 String redAllianceId = match.getMatchCode() + "_R";
                 String blueAllianceId = match.getMatchCode() + "_B";
 
-                // Use cache for alliance teams
-                AllianceTeam[] redAllianceTeams = allianceTeamCache.get(redAllianceId);
-                if (redAllianceTeams == null) {
-                    redAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{redAllianceId});
-                    allianceTeamCache.put(redAllianceId, redAllianceTeams);
-                }
-
-                AllianceTeam[] blueAllianceTeams = allianceTeamCache.get(blueAllianceId);
-                if (blueAllianceTeams == null) {
-                    blueAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{blueAllianceId});
-                    allianceTeamCache.put(blueAllianceId, blueAllianceTeams);
-                }
+                AllianceTeam[] redAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{redAllianceId});
+                AllianceTeam[] blueAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{blueAllianceId});
 
                 HashMap<String, Boolean> surrogateMap = new HashMap<>();
 
-                // Use cache for individual teams
                 Team[] redTeams = Arrays.stream(redAllianceTeams)
                         .map(at -> {
-                            Team team = teamCache.get(at.getTeamId());
-                            if (team == null) {
-                                team = dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
-                                if (team != null) teamCache.put(at.getTeamId(), team);
+                            try {
+                                return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                            } catch (Exception e) {
+                                return null;
                             }
-
-                            surrogateMap.put(at.getTeamId(), at.isSurrogate());
-                            return team;
                         })
                         .filter(Objects::nonNull)
                         .toArray(Team[]::new);
 
                 Team[] blueTeams = Arrays.stream(blueAllianceTeams)
                         .map(at -> {
-                            Team team = teamCache.get(at.getTeamId());
-                            if (team == null) {
-                                team = dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
-                                if (team != null) teamCache.put(at.getTeamId(), team);
+                            try {
+                                return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                            } catch (Exception e) {
+                                return null;
                             }
-
-                            surrogateMap.put(at.getTeamId(), at.isSurrogate());
-                            return team;
                         })
                         .filter(Objects::nonNull)
                         .toArray(Team[]::new);
@@ -389,10 +337,6 @@ public class MatchHandler {
             dao.deleteAll(Match.class);
             dao.deleteAll(AllianceTeam.class);
             dao.deleteAll(Score.class);
-
-            matchCache.clear();
-            allianceTeamCache.clear();
-            teamCache.clear();
 
             if (allTeams == null || allTeams.length < 4) {
                 callback.onFailure(ErrorCode.CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
@@ -498,7 +442,6 @@ public class MatchHandler {
                 matchNumber++;
             }
 
-            setMatchUpdateFlag(true);
             callback.onSuccess(null, "Match schedule generated successfully by MatchMaker (shuffled mapping) and times assigned.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.CREATE_FAILED, "Failed to generate match schedule: " + e.getMessage());
@@ -649,24 +592,6 @@ public class MatchHandler {
         dao.insertOrUpdate(Score.class, blueScore);
     }
 
-    // Methods use inside system implementation
-    public Match getMatchSync(String matchId) throws Exception {
-        if (isMatchUpdateFlag()) {
-            Match cachedMatch = matchCache.get(matchId);
-            if (cachedMatch != null) {
-                return cachedMatch;
-            }
-        }
-
-        Match match = dao.query(Match.class, new String[]{"id"}, new String[]{matchId})[0];
-        if (match != null) {
-            matchCache.put(matchId, match); // Add to cache
-            return match;
-        } else {
-            throw new Exception("Match not found.");
-        }
-    }
-
     public MatchDetailDto getMatchDetailSync(String matchId) throws Exception {
         Match match = dao.query(Match.class, new String[]{"id"}, new String[]{matchId})[0];
         if (match == null) {
@@ -723,25 +648,7 @@ public class MatchHandler {
             array[i] = a;
         }
     }
-
-    private boolean isMatchUpdateFlag() {
-        return !matchUpdateFlag;
-    }
-
-    private void setMatchUpdateFlag(boolean matchUpdateFlag) {
-        this.matchUpdateFlag = matchUpdateFlag;
-        if (this.matchUpdateFlag) {
-            // If the flag is set to dirty, clear all caches to force reloads.
-            matchCache.clear();
-            allianceTeamCache.clear();
-            teamCache.clear();
-        }
-    }
-
-    public void setMatchCache(LRUCache<String, Match> matchCache) {
-        this.matchCache = matchCache;
-    }
-
+    
     public void setDao(Dao dao) {
         this.dao = dao;
     }

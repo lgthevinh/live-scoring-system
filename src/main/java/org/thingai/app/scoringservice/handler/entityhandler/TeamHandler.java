@@ -9,7 +9,7 @@ import org.thingai.base.dao.Dao;
 public class TeamHandler {
     private Dao dao;
     
-    public TeamHandler(Dao dao, LRUCache<String, Team> teamCache) {
+    public TeamHandler(Dao dao) {
         this.dao = dao;
     }
 
@@ -71,7 +71,7 @@ public class TeamHandler {
 
     public void updateTeam(Team team, RequestCallback<Team> callback) {
         try {
-            dao.update(team);
+            dao.insertOrUpdate(team);
             callback.onSuccess(team, "Team updated successfully");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, e.getMessage());

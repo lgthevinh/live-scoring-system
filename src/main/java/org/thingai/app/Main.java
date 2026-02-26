@@ -22,7 +22,7 @@ public class Main {
         scoringService.version = "1.0.0";
 
         ILog.ENABLE_LOGGING = true;
-        ILog.logLevel = ILog.INFO;
+        ILog.logLevel = ILog.DEBUG;
 
         // 1. Start Spring and get its application context
         ConfigurableApplicationContext context = SpringApplication.run(Main.class, args);

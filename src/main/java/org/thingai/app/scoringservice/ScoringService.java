@@ -124,8 +124,8 @@ public class ScoringService extends Service {
     }
 
     private void injectHandler(Dao dao, DaoFile daoFile) {
-        teamHandler = new TeamHandler(dao, teamCache);
-        matchHandler = new MatchHandler(dao, matchCache, allianceTeamCache, teamCache);
+        teamHandler = new TeamHandler(dao);
+        matchHandler = new MatchHandler(dao);
         scoreHandler = new ScoreHandler(dao, daoFile);
         rankingHandler = new RankingHandler(dao, matchHandler);
 

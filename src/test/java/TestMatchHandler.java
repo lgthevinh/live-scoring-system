@@ -8,12 +8,9 @@ import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.time.TimeBlock;
 import org.thingai.app.scoringservice.handler.entityhandler.MatchHandler;
-import org.thingai.base.cache.LRUCache;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoFile;
-import org.thingai.base.dao.DaoSqlite;
-
-import java.util.HashMap;
+import org.thingai.platform.dao.DaoFile;
+import org.thingai.platform.dao.DaoSqlite;
 
 public class TestMatchHandler {
     private static MatchHandler matchHandler;
@@ -31,7 +28,7 @@ public class TestMatchHandler {
         }); // Ensure the DAO is ready for use
 
         DaoFile daoFile = new DaoFile("src/test/resources/files");
-        matchHandler = new MatchHandler(dao, new LRUCache<>(100, new HashMap<>()), new LRUCache<>(100, new HashMap<>()), new LRUCache<>(100, new HashMap<>()));
+        matchHandler = new MatchHandler(dao);
     }
 
     @Test

@@ -4,7 +4,7 @@ import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.handler.entityhandler.TeamHandler;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoSqlite;
+import org.thingai.platform.dao.DaoSqlite;
 
 public class TestTeamHandler {
     private static TeamHandler teamHandler;
@@ -17,7 +17,7 @@ public class TestTeamHandler {
         dao.initDao(new Class[] {
                 Team.class,
         }); // Ensure the DAO is ready for use
-        teamHandler = new TeamHandler(dao, null);
+        teamHandler = new TeamHandler(dao);
     }
 
     private Team[] generateRandomTeams(int count) {
