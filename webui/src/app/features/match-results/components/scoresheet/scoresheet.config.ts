@@ -52,7 +52,8 @@ export const CUSTOM_SEASON_CONFIG: ScoresheetConfig = {
                     title: 'Barriers & Movement',
                     type: 'fields',
                     fields: [
-                        { key: 'barriersPushed', label: 'Barrier Pushed Away', type: 'boolean' }
+                        { key: 'allianceBarrierPushed', label: 'Alliance Barrier Pushed', type: 'boolean' },
+                        { key: 'opponentBarrierPushed', label: 'Opponent Barrier Pushed', type: 'boolean' }
                     ]
                 },
                 {

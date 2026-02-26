@@ -131,6 +131,7 @@ If you encounter any issues while using the Live Scoring System, refer to the tr
 
 Or contact the developer at
 - Email: `everwellmax@gmail.com` (Official live scoring system maintainer)
+- Email: `hirovn9395@gmail.com`  (Official live scoring system maintainer)
 
 Event specific software support contact:
 - Email: `truongcongminhquan09@gmail.com` (FANROC event live scoring system maintainer)

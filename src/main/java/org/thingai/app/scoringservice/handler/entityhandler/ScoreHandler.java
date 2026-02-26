@@ -7,8 +7,8 @@ import org.thingai.app.scoringservice.define.ScoreStatus;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.score.ScoreDefine;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoFile;
 import org.thingai.base.log.ILog;
+import org.thingai.platform.dao.DaoFile;
 
 import java.util.HashMap;
 

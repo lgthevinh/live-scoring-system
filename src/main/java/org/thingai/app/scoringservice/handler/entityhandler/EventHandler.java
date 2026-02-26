@@ -10,9 +10,9 @@ import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.base.dao.Dao;
-import org.thingai.base.dao.DaoFile;
-import org.thingai.base.dao.DaoSqlite;
 import org.thingai.base.log.ILog;
+import org.thingai.platform.dao.DaoFile;
+import org.thingai.platform.dao.DaoSqlite;
 
 import java.io.File;
 
@@ -230,14 +230,6 @@ public class EventHandler {
 
     public Event getCurrentEvent() {
         return currentEvent;
-    }
-
-    public Dao getEventDao() {
-        return eventDao;
-    }
-
-    public DaoFile getEventDaoFile() {
-        return eventDaoFile;
     }
 
     public interface EventCallback {

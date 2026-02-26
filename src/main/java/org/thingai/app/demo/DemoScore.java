@@ -1,4 +1,4 @@
-package org.thingai.app.fanroc;
+package org.thingai.app.demo;
 
 import com.google.gson.Gson;
 import org.thingai.app.scoringservice.entity.score.IScoreConfig;
@@ -7,12 +7,11 @@ import org.thingai.app.scoringservice.entity.score.ScoreDefine;
 
 import java.util.HashMap;
 
-public class FanrocScore extends Score implements IScoreConfig {
+public class DemoScore extends Score implements IScoreConfig {
     // New scoring system fields
     private int whiteBallsScored; // 1 point each via human player
     private int goldenBallsScored; // 3 points each via robot autonomous
-    private boolean allianceBarrierPushed; // true if alliance pushed their own barrier (10 points, no coefficient penalty)
-    private boolean opponentBarrierPushed; // true if alliance pushed opponent's barrier (10 bonus points)
+    private int barriersPushed; // 0-2, 10 points each
     private int imbalanceCategory; // 0=balanced(2.0), 1=medium(1.5), 2=large(1.3)
     private int partialParking; // number of robots partially in green zone (5 points each)
     private int fullParking; // number of robots fully in green zone (10 points each)
@@ -33,8 +32,8 @@ public class FanrocScore extends Score implements IScoreConfig {
             default -> 1.3;
         };
 
-        // Subtract 0.2 if alliance didn't push their barrier
-        if (!allianceBarrierPushed) {
+        // Subtract 0.2 if alliance didn't push their barrier (assuming 1 barrier per alliance)
+        if (barriersPushed == 0) {
             baseCoeff -= 0.2;
         }
 
@@ -54,8 +53,8 @@ public class FanrocScore extends Score implements IScoreConfig {
         // Biological points = robot-scored balls + human-scored balls
         int biologicalPoints = (goldenBallsScored * 3) + whiteBallsScored;
 
-        // Barrier points: 10 points for each barrier pushed
-        int barrierPoints = (allianceBarrierPushed ? 10 : 0) + (opponentBarrierPushed ? 10 : 0);
+        // Barrier points
+        int barrierPoints = barriersPushed * 10;
 
         // End game points
         int endGamePoints = (partialParking * 5) + (fullParking * 10);
@@ -83,12 +82,11 @@ public class FanrocScore extends Score implements IScoreConfig {
     @Override
     public void fromJson(String json) {
         Gson gson = new Gson();
-        FanrocScore temp = gson.fromJson(json, FanrocScore.class);
+        DemoScore temp = gson.fromJson(json, DemoScore.class);
         // New fields
         this.whiteBallsScored = temp.whiteBallsScored;
         this.goldenBallsScored = temp.goldenBallsScored;
-        this.allianceBarrierPushed = temp.allianceBarrierPushed;
-        this.opponentBarrierPushed = temp.opponentBarrierPushed;
+        this.barriersPushed = temp.barriersPushed;
         this.imbalanceCategory = temp.imbalanceCategory;
         this.partialParking = temp.partialParking;
         this.fullParking = temp.fullParking;
@@ -113,8 +111,7 @@ public class FanrocScore extends Score implements IScoreConfig {
 
         definitions.put("whiteBallsScored", new ScoreDefine("White Balls Scored by Human", null, null));
         definitions.put("goldenBallsScored", new ScoreDefine("Golden Balls Scored by Robot", null, null));
-        definitions.put("allianceBarrierPushed", new ScoreDefine("Alliance Barrier Pushed", null, null));
-        definitions.put("opponentBarrierPushed", new ScoreDefine("Opponent Barrier Pushed", null, null));
+        definitions.put("barriersPushed", new ScoreDefine("Barriers Pushed Away", null, null));
         definitions.put("imbalanceCategory", new ScoreDefine("Ball Imbalance Category (0=Balanced, 1=Medium, 2=Large)", null, null));
         definitions.put("partialParking", new ScoreDefine("Robots Partially in Green Zone", null, null));
         definitions.put("fullParking", new ScoreDefine("Robots Fully in Green Zone", null, null));

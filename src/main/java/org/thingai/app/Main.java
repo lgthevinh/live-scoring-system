@@ -1,6 +1,5 @@
 package org.thingai.app;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
@@ -36,6 +35,7 @@ public class Main {
         scoringService.init();
 
         scoringService.registerScoreClass(FanrocScore.class); // Register the scoring class for the season specific logic
+        scoringService.registerRankingStrategy(new FanrocRankingStrategy());
         ILog.i("Main", "Service running on URL:" + " http://" + getIpAddress() + ":" + getActualPort(context));
     }
 

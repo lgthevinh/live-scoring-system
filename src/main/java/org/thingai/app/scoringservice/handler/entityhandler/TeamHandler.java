@@ -10,8 +10,7 @@ public class TeamHandler {
     private final LRUCache<String, Team> teamCache;
 
     private Dao dao;
-
-
+    
     public TeamHandler(Dao dao, LRUCache<String, Team> teamCache) {
         this.dao = dao;
         this.teamCache = teamCache;

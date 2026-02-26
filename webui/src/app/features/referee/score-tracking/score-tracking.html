@@ -101,27 +101,44 @@
             <i class="bi bi-barrier me-2"></i>Barriers & Movement
           </div>
 
-          <!-- Barrier Push Toggle Button -->
+          <!-- Alliance Barrier Push Toggle Button -->
           <div class="barrier-push-section">
-            <div class="d-flex justify-content-center mt-3">
-              <button (click)="toggleBarrierPush()"
-                      [class.active]="barriersPushed()"
+            <div [class.bg-danger]="color === 'red'" [class.bg-primary]="color === 'blue'" class="d-flex justify-content-center mt-3 rounded-3 p-3">
+              <button (click)="toggleAllianceBarrierPush()"
+                      [class.active]="allianceBarrierPushed()"
+                      [class.btn-danger]="color === 'red'"
+                      [class.btn-primary]="color === 'blue'"
                       [disabled]="submitting()"
                       class="btn btn-lg barrier-push-button">
                 <div class="barrier-push-content">
                   <div class="barrier-push-icon-large">🚧</div>
                   <div class="barrier-push-text">
-                    <div class="barrier-push-title">{{ barriersPushed() ? 'Barrier Pushed' : 'Push Barrier' }}</div>
-                    <div class="barrier-push-subtitle">+10 points if pushed, -0.2 balance if not</div>
+                    <div class="barrier-push-title">{{ allianceBarrierPushed() ? 'Alliance Barrier Pushed' : 'Push Alliance Barrier' }}</div>
+                    <div class="barrier-push-subtitle">+10 points, no -0.2 penalty</div>
                   </div>
                 </div>
               </button>
             </div>
-            @if (!barriersPushed()) {
-              <div class="alert alert-warning mt-3 text-center small">
-                ⚠️ No barrier pushed - 0.2 penalty will be applied to balance coefficient
-              </div>
-            }
+          </div>
+
+          <!-- Opponent Barrier Push Toggle Button -->
+          <div class="barrier-push-section">
+            <div [class.bg-primary]="color === 'red'" [class.bg-danger]="color === 'blue'" class="d-flex justify-content-center mt-3 rounded-3 p-3">
+              <button (click)="toggleOpponentBarrierPush()"
+                      [class.active]="opponentBarrierPushed()"
+                      [class.btn-primary]="color === 'red'"
+                      [class.btn-danger]="color === 'blue'"
+                      [disabled]="submitting()"
+                      class="btn btn-lg barrier-push-button">
+                <div class="barrier-push-content">
+                  <div class="barrier-push-icon-large">🎯</div>
+                  <div class="barrier-push-text">
+                    <div class="barrier-push-title">{{ opponentBarrierPushed() ? 'Opponent Barrier Pushed' : 'Push Opponent Barrier' }}</div>
+                    <div class="barrier-push-subtitle">+10 bonus points</div>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
