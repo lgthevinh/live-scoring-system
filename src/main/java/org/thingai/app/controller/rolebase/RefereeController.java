@@ -14,6 +14,9 @@ public class RefereeController {
 
     @PostMapping("/submit/{color}/{allianceId}/final-score")
     public ResponseEntity<Object> submitFinalScore(@PathVariable String color, @PathVariable String allianceId, @RequestBody String jsonScoreData) {
+        if (color == null || color.isEmpty()) {
+            return ResponseEntity.badRequest().body("Color parameter is required");
+        }
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
         boolean isRed = color.equalsIgnoreCase("red");
         ScoringService.liveScoreHandler().handleScoreSubmission(isRed, allianceId, jsonScoreData, new RequestCallback<Boolean>() {

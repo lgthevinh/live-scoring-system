@@ -322,8 +322,25 @@ public class LiveScoreHandler {
     public void overrideScore(String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
         ILog.d(TAG, "Override score request received for alliance " + allianceId + ": " + jsonScoreData);
         
+        // Validate inputs
+        if (allianceId == null || allianceId.isEmpty()) {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "AllianceId is required");
+            return;
+        }
+        if (jsonScoreData == null || jsonScoreData.isEmpty()) {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "Score data is required");
+            return;
+        }
+        
         // Extract matchId from allianceId (e.g., "Q1_R" -> "Q1")
-        String matchId = allianceId.contains("_") ? allianceId.substring(0, allianceId.lastIndexOf("_")) : allianceId;
+        String matchId;
+        if (!allianceId.contains("_")) {
+            ILog.w(TAG, "AllianceId does not contain underscore: " + allianceId);
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "Invalid allianceId format: " + allianceId + " (expected format: MATCHID_R or MATCHID_B)");
+            return;
+        }
+        matchId = allianceId.substring(0, allianceId.lastIndexOf("_"));
+        ILog.d(TAG, "Extracted matchId: " + matchId);
         String otherAllianceId = allianceId.endsWith("_R") ? matchId + "_B" : matchId + "_R";
         
         // Fetch the other alliance's score first
@@ -530,9 +547,17 @@ public class LiveScoreHandler {
         String currentAllianceId;
         boolean isCommited;
         if (isRed) {
+            if (currentRedScoreHolder == null) {
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "No red score holder available - no active match?");
+                return;
+            }
             currentAllianceId = currentRedScoreHolder.getAllianceId();
             isCommited = isRedCommitable;
         } else {
+            if (currentBlueScoreHolder == null) {
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "No blue score holder available - no active match?");
+                return;
+            }
             currentAllianceId = currentBlueScoreHolder.getAllianceId();
             isCommited = isBlueCommitable;
         }

@@ -200,6 +200,15 @@ tasks.register('copyWebUi', Copy) {
     // Copy after an npm build
     enabled = hasWebUi && !skipWebuiBuild
     dependsOn 'npmBuild'
+
+    // Always run this task, never mark as UP-TO-DATE
+    outputs.upToDateWhen { false }
+
+    // Clean destination before copying to avoid stale files
+    doFirst {
+        delete "${buildDir}/resources/main/static"
+    }
+
     from(webUiDistDir) { include '**/*' }
     into("${buildDir}/resources/main/static")
 }
@@ -207,6 +216,15 @@ tasks.register('copyWebUi', Copy) {
 tasks.register('copyWebUiIfPresent', Copy) {
     // Fallback: if we skip build but dist exists, still package UI
     enabled = hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()
+
+    // Always run this task, never mark as UP-TO-DATE
+    outputs.upToDateWhen { false }
+
+    // Clean destination before copying to avoid stale files
+    doFirst {
+        delete "${buildDir}/resources/main/static"
+    }
+
     from(webUiDistDir) { include '**/*' }
     into("${buildDir}/resources/main/static")
 }
