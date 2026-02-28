@@ -5,6 +5,8 @@ import { Score } from '../../../../../core/models/score.model';
 import { Team } from '../../../../../core/models/team.model';
 import { ScoresheetConfig, FieldConfig } from '../scoresheet.config';
 import { RefereeService } from '../../../../../core/services/referee.service';
+import { ScorekeeperService } from '../../../../../core/services/scorekeeper.service';
+import { ToastService } from '../../../../../core/services/toast.service';
 
 @Component({
   selector: 'app-alliance-scoresheet',
@@ -12,11 +14,6 @@ import { RefereeService } from '../../../../../core/services/referee.service';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="alliance-container st-container my-3">
-      <!-- Submit message -->
-      <div *ngIf="submitMessage" class="alert alert-info text-center py-2">
-        {{ submitMessage }}
-      </div>
-
       <!-- Title Header -->
       <div [class.bg-danger]="alliance === 'red'" [class.bg-primary]="alliance === 'blue'"
         class="d-flex justify-content-center align-items-center my-3 p-3 rounded-3">
@@ -210,9 +207,9 @@ import { RefereeService } from '../../../../../core/services/referee.service';
       <!-- Action bar -->
       <div class="action-bar d-flex flex-wrap gap-3 justify-content-center mt-4" *ngIf="editable">
         <button (click)="submitScore()" [class.btn-danger]="alliance === 'red'" [class.btn-primary]="alliance === 'blue'"
-          [disabled]="submitting" class="btn">
-          <span *ngIf="!submitting">Submit Score</span>
-          <span *ngIf="submitting">Submitting...</span>
+          class="btn btn-submit">
+          <span class="btn-text">Submit Score</span>
+          <span class="btn-icon">→</span>
         </button>
       </div>
     </div>
@@ -261,6 +258,52 @@ import { RefereeService } from '../../../../../core/services/referee.service';
     /* Alliance-specific styles */
     .alliance-header h3 { font-weight: bold; }
     .match-info { font-size: 1.1rem; }
+
+    /* Button Animation Styles */
+    .btn-submit {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .btn-submit.clicked {
+      transform: scale(0.95);
+    }
+    .btn-submit:active {
+      transform: scale(0.92);
+    }
+    .btn-icon {
+      transition: transform 0.2s ease;
+    }
+    .btn-submit:hover .btn-icon {
+      transform: translateX(4px);
+    }
+    .btn-submit::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255,255,255,0.3);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease, height 0.3s ease;
+    }
+    .btn-submit:active::after {
+      width: 200px;
+      height: 200px;
+    }
   `]
 })
 export class AllianceScoresheetComponent implements OnChanges {
@@ -269,14 +312,16 @@ export class AllianceScoresheetComponent implements OnChanges {
   @Input() config: ScoresheetConfig | undefined;
   @Input() alliance: 'red' | 'blue' = 'red';
   @Input() matchInfo: { matchCode: string, fieldNumber: number } | null = null;
+  @Input() matchId: string | null = null; // Added for scorekeeper override
   @Input() editable: boolean = false;
   @Output() scoreChange = new EventEmitter<any>();
 
   scoreData: any = {};
-  submitting: boolean = false;
   submitMessage: string = '';
 
   private refereeService = inject(RefereeService);
+  private scorekeeperService = inject(ScorekeeperService);
+  private toastService = inject(ToastService);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['score'] && this.score) {
@@ -376,27 +421,45 @@ export class AllianceScoresheetComponent implements OnChanges {
 
   submitScore() {
     if (!this.matchInfo) {
-      this.submitMessage = 'No match information available';
-      setTimeout(() => this.submitMessage = '', 3000);
+      this.toastService.show('No match information available', 'error', 3000);
       return;
     }
 
-    this.submitting = true;
     this.submitMessage = '';
 
-    const allianceId = this.matchInfo.matchCode + (this.alliance === 'red' ? '_R' : '_B');
+    // Use matchId if provided (for Match Control override), otherwise fall back to matchCode (for Referee)
+    const matchIdentifier = this.matchId || this.matchInfo.matchCode;
+    const allianceId = matchIdentifier + (this.alliance === 'red' ? '_R' : '_B');
 
-    this.refereeService.submitFinalScore(this.alliance, allianceId, JSON.stringify(this.scoreData)).subscribe({
-      next: (res) => {
-        this.submitting = false;
-        this.submitMessage = 'Score submitted successfully';
-        setTimeout(() => this.submitMessage = '', 4000);
-      },
-      error: (err) => {
-        this.submitting = false;
-        this.submitMessage = 'Failed to submit score: ' + (err?.error?.message || 'Unknown error');
-        setTimeout(() => this.submitMessage = '', 6000);
-      }
-    });
+    // Show toast notification for score submission
+    const allianceName = this.alliance === 'red' ? 'Red' : 'Blue';
+    this.toastService.show(`Submitting ${allianceName} Alliance score for ${matchIdentifier}...`, 'info', 4000);
+
+    // Use scorekeeper service for override (doesn't require active match)
+    // When editable=true, we use scorekeeper override; otherwise use referee final-score
+    if (this.editable && this.matchId) {
+      this.scorekeeperService.overrideScore(allianceId, JSON.stringify(this.scoreData)).subscribe({
+        next: (res) => {
+          this.submitMessage = 'Score submitted successfully';
+          this.toastService.show(`${allianceName} Alliance score for ${matchIdentifier} saved successfully!`, 'success', 4000);
+        },
+        error: (err) => {
+          this.submitMessage = 'Failed to submit score: ' + (err?.error?.message || 'Unknown error');
+          this.toastService.show(`Failed to save ${allianceName} Alliance score: ${err?.error?.message || 'Unknown error'}`, 'error', 6000);
+        }
+      });
+    } else {
+      // Use referee service for final score submission (requires active match)
+      this.refereeService.submitFinalScore(this.alliance, allianceId, JSON.stringify(this.scoreData)).subscribe({
+        next: (res) => {
+          this.submitMessage = 'Score submitted successfully';
+          this.toastService.show(`${allianceName} Alliance score for ${matchIdentifier} submitted successfully!`, 'success', 4000);
+        },
+        error: (err) => {
+          this.submitMessage = 'Failed to submit score: ' + (err?.error?.message || 'Unknown error');
+          this.toastService.show(`Failed to submit ${allianceName} Alliance score: ${err?.error?.message || 'Unknown error'}`, 'error', 6000);
+        }
+      });
+    }
   }
 }

@@ -15,6 +15,7 @@ import { BroadcastService } from '../../core/services/broadcast.service';
 import { SyncService } from '../../core/services/sync.service';
 import { RankService } from '../../core/services/rank.service';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
+import { ToastService } from '../../core/services/toast.service';
 
 type TabKey =
   | 'schedule'
@@ -90,7 +91,8 @@ constructor(
     private scorekeeper: ScorekeeperService,
     private broadcastService: BroadcastService,
     private syncService: SyncService,
-    private rankService: RankService
+    private rankService: RankService,
+    private toastService: ToastService
   ) { }
 
   ngOnInit(): void {
@@ -248,7 +250,12 @@ constructor(
       return;
     }
 
-    forkJoin(requests).subscribe({
+    forkJoin(requests).pipe(
+      finalize(() => {
+        console.log('Finalizing saveScores - resetting isSaving to false');
+        this.isSaving.set(false);
+      })
+    ).subscribe({
       next: (results) => {
         const errors = results.filter(r => r && r.error);
         if (errors.length > 0) {
@@ -264,9 +271,10 @@ constructor(
       error: (err) => {
         console.error('Error saving scores', err);
         alert('Error saving scores');
+        // isSaving is reset in finalize operator
       },
       complete: () => {
-        this.isSaving.set(false);
+        console.log('saveScores completed successfully');
       }
     });
   }
@@ -520,14 +528,16 @@ cancelEdit() {
   }
 
   commitAndPostLastMatch() {
+    this.toastService.show('Committing last match results...', 'info', 2000);
+    
     this.scorekeeper.commitFinalScore().subscribe({
       next: () => {
         console.debug('Committed last match results')
-        alert('Successfully committed last match results');
+        this.toastService.show('Successfully committed last match results!', 'success', 4000);
       },
       error: (e) => {
         console.error('Failed to commit last match', e)
-        alert('Failed to commit last match results');
+        this.toastService.show('Failed to commit last match results: ' + (e?.message || 'No match to commit'), 'error', 6000);
       }
     });
   }

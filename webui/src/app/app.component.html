@@ -1,6 +1,9 @@
+<!-- Global Toast Container -->
+<app-toast-container></app-toast-container>
+
 @if (showNavbar) {
   <div class="d-flex flex-column container shadow p-0">
-      <p class="text-center w-100 m-0 bg-primary text-white">Live Scoring System running at {{(localIp | async)?.toString()}} </p>
+      <p class="text-center w-100 m-0 bg-primary text-white">Live Scoring System v{{version}} running at {{(localIp | async)?.toString()}} </p>
       <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
           <a class="navbar-brand fw-semibold text-white" href="#">Scoring System</a>
