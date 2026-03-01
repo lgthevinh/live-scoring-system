@@ -17,6 +17,16 @@ public class Team {
     @DaoColumn(name = "region")
     private String teamRegion;
 
+    public Team() {
+    }
+
+    public Team(String teamId, String teamName, String teamSchool, String teamRegion) {
+        this.teamId = teamId;
+        this.teamName = teamName;
+        this.teamSchool = teamSchool;
+        this.teamRegion = teamRegion;
+    }
+
     public String getTeamId() {
         return teamId;
     }

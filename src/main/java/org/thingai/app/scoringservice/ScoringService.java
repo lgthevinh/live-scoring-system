@@ -8,6 +8,7 @@ import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.BroadcastHandler;
 import org.thingai.app.scoringservice.handler.LiveScoreHandler;
 import org.thingai.app.scoringservice.handler.entityhandler.*;
+import org.thingai.app.scoringservice.repository.TeamRepository;
 import org.thingai.base.Service;
 import org.thingai.base.cache.LRUCache;
 import org.thingai.base.dao.Dao;
@@ -31,7 +32,7 @@ public class ScoringService extends Service {
 
     private static AuthHandler authHandler;
     private static EventHandler eventHandler;
-    private static TeamHandler teamHandler;
+    private static TeamRepository teamRepository;
     private static ScoreHandler scoreHandler;
     private static MatchHandler matchHandler;
     private static RankingHandler rankingHandler;
@@ -86,8 +87,8 @@ public class ScoringService extends Service {
         return eventHandler;
     }
 
-    public static TeamHandler teamHandler() {
-        return teamHandler;
+    public static TeamRepository teamRepository() {
+        return teamRepository;
     }
 
     public static ScoreHandler scoreHandler() {
@@ -124,7 +125,7 @@ public class ScoringService extends Service {
     }
 
     private void injectHandler(Dao dao, DaoFile daoFile) {
-        teamHandler = new TeamHandler(dao);
+        teamRepository = new TeamRepository(dao);
         matchHandler = new MatchHandler(dao);
         scoreHandler = new ScoreHandler(dao, daoFile);
         rankingHandler = new RankingHandler(dao, matchHandler);
