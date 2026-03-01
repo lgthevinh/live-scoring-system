@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.handler.entityhandler;
+package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
@@ -9,7 +9,9 @@ import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.repository.EventRepository;
 import org.thingai.base.dao.Dao;
+import org.thingai.base.dao.exceptions.DaoException;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.dao.DaoFile;
 import org.thingai.platform.dao.DaoSqlite;
@@ -20,6 +22,7 @@ public class EventHandler {
     private static final String TAG = "EventHandler";
 
     private final Dao systemDao;
+    private final EventRepository eventRepository;
     private final EventCallback eventCallback;
 
     private Dao eventDao;
@@ -27,45 +30,47 @@ public class EventHandler {
 
     private Event currentEvent;
 
-    public EventHandler(Dao dao, EventCallback eventCallback) {
+    public EventHandler(Dao dao, EventRepository eventRepository, EventCallback eventCallback) {
         this.systemDao = dao;
+        this.eventRepository = eventRepository;
         this.eventCallback = eventCallback;
 
-        // check if current event is set
+        try {
+            if (isCurrentEventSet()) {
+                eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
+                eventDao.initDao(new Class[]{
+                        Match.class,
+                        AllianceTeam.class,
+                        Team.class,
+                        Score.class,
+                        RankingEntry.class,
+                });
 
-        if (isCurrentEventSet()) {
-            eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
-            eventDao.initDao(new Class[]{
-                    Match.class,
-                    AllianceTeam.class,
-                    Team.class,
-                    Score.class,
-                    RankingEntry.class,
-            });
+                eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
 
-            // init new folder for event files
-            eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
-
-            eventCallback.isCurrentEventSet(this.currentEvent, eventDao, eventDaoFile);
-        } else {
+                eventCallback.isCurrentEventSet(this.currentEvent, eventDao, eventDaoFile);
+            } else {
+                eventCallback.isNotCurrentEventSet();
+            }
+        } catch (Exception e) {
+            ILog.e(TAG, "Error initializing EventHandler: " + e.getMessage());
             eventCallback.isNotCurrentEventSet();
         }
     }
 
     public void createEvent(Event event, RequestCallback<Event> callback) {
         try {
-            systemDao.insertOrUpdate(event);
+            eventRepository.insertEvent(event);
             this.currentEvent = event;
+            callback.onSuccess(event, "Event created successfully");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.CREATE_FAILED, "Failed to create event: " + e.getMessage());
-            return;
         }
-        callback.onSuccess(event, "Event created successfully");
     }
 
     public void listEvents(RequestCallback<Event[]> callback) {
         try {
-            Event[] events = systemDao.readAll(Event.class);
+            Event[] events = eventRepository.listEvents();
             callback.onSuccess(events, "Events retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error retrieving events: " + e.getMessage());
@@ -74,12 +79,12 @@ public class EventHandler {
 
     public void getEventByCode(String eventCode, RequestCallback<Event> callback) {
         try {
-            Event[] events = systemDao.query(Event.class, "eventCode", eventCode);
-            if (events.length == 0) {
+            Event event = eventRepository.getEventByEventCode(eventCode);
+            if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
-            callback.onSuccess(events[0], "Event retrieved successfully.");
+            callback.onSuccess(event, "Event retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error retrieving event: " + e.getMessage());
         }
@@ -92,28 +97,33 @@ public class EventHandler {
                 return;
             }
 
-            Event[] events = systemDao.query(Event.class, "eventCode", eventCode);
-            if (events.length == 0) {
+            Event event = eventRepository.getEventByEventCode(eventCode);
+            if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
-            systemDao.delete(events[0]);
+
+            eventRepository.deleteEvent(event.getUuid());
 
             if (cleanDelete) {
-                // delete event database file
                 File dbFile = new File(eventCode + ".db");
                 if (dbFile.exists()) {
                     if (!dbFile.delete()) {
-                        // TODO: This might failed due to Hikari connection still open, need to close it first
-                        // Log warning but don't fail the entire operation
-                        ILog.w(TAG, "Failed to delete event database file: " + dbFile.getAbsolutePath());
+                        callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete event database file.");
+                        return;
                     }
                 }
-                // delete event files folder
                 File eventFilesDir = new File("files/" + eventCode);
                 if (eventFilesDir.exists() && eventFilesDir.isDirectory()) {
-                    if (!deleteRecursively(eventFilesDir)) {
-                        ILog.w(TAG, "Failed to delete event files directory: " + eventFilesDir.getAbsolutePath());
+                    File[] files = eventFilesDir.listFiles();
+                    if (files == null) {
+                        return;
+                    }
+                    for (File file : files) {
+                        if (!file.delete()) {
+                            callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete event file: " + file.getName());
+                            return;
+                        }
                     }
                 }
             }
@@ -135,7 +145,7 @@ public class EventHandler {
                 currentEvent = event;
             }
 
-            systemDao.insertOrUpdate(event);
+            eventRepository.updateEvent(event);
             callback.onSuccess(true, "Event updated successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Error updating event: " + e.getMessage());
@@ -145,12 +155,12 @@ public class EventHandler {
     public void setSystemEvent(String eventCode, RequestCallback<Event> callback) {
         try {
             ILog.d(TAG, eventCode);
-            Event[] events = systemDao.query(Event.class, "eventCode", eventCode);
-            if (events.length == 0) {
+            Event event = eventRepository.getEventByEventCode(eventCode);
+            if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
-            this.currentEvent = events[0];
+            this.currentEvent = event;
             eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
             eventDao.initDao(new Class[]{
                     Match.class,
@@ -161,10 +171,8 @@ public class EventHandler {
                     DbMapEntity.class
             });
 
-            // init new folder for event files
             eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
 
-            // store current event code in system dao for persistence
             DbMapEntity mapEntity = new DbMapEntity();
             mapEntity.setKey("current_event");
             mapEntity.setValue(eventCode);
@@ -189,7 +197,6 @@ public class EventHandler {
             this.eventDao = null;
             this.eventDaoFile = null;
             
-            // Delete persisted current event entry (can't set to null due to NOT NULL constraint)
             DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event");
             if (mapEntities.length > 0) {
                 systemDao.delete(mapEntities[0]);
@@ -203,14 +210,14 @@ public class EventHandler {
         }
     }
 
-    public boolean isCurrentEventSet() {
-        DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event"); // this get event code
+    public boolean isCurrentEventSet() throws DaoException {
+        DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event");
         if (mapEntities.length > 0) {
             String eventCode = mapEntities[0].getValue();
             try {
-                Event[] events = systemDao.query(Event.class, new String[]{"eventCode"}, new String[]{eventCode});
-                if (events.length > 0) {
-                    this.currentEvent = events[0];
+                Event event = eventRepository.getEventByEventCode(eventCode);
+                if (event != null) {
+                    this.currentEvent = event;
                     return true;
                 }
             } catch (Exception e) {
@@ -223,18 +230,6 @@ public class EventHandler {
 
     public Event getCurrentEvent() {
         return currentEvent;
-    }
-
-    private boolean deleteRecursively(File file) {
-        if (file.isDirectory()) {
-            File[] children = file.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        return file.delete();
     }
 
     public interface EventCallback {

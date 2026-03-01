@@ -10,9 +10,6 @@ import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.dto.MatchTimeStatusDto;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.handler.entityhandler.MatchHandler;
-import org.thingai.app.scoringservice.handler.entityhandler.RankingHandler;
-import org.thingai.app.scoringservice.handler.entityhandler.ScoreHandler;
 import org.thingai.base.log.ILog;
 
 import java.time.LocalDateTime;
