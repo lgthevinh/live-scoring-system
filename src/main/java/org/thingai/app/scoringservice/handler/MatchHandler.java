@@ -1,15 +1,13 @@
-package org.thingai.app.scoringservice.handler.entityhandler;
+package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.define.MatchType;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
-import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.app.scoringservice.entity.match.AllianceTeam;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.time.TimeBlock;
-import org.thingai.app.scoringservice.handler.MatchMakerHandler;
 import org.thingai.base.dao.Dao;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;

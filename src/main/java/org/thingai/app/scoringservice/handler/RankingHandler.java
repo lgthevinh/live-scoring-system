@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.handler.entityhandler;
+package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.MatchType;
@@ -8,6 +8,7 @@ import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
 import org.thingai.app.scoringservice.entity.ranking.RankingStat;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.base.dao.Dao;
+import org.thingai.base.dao.exceptions.DaoException;
 import org.thingai.base.log.ILog;
 
 import java.util.HashMap;
@@ -83,12 +84,21 @@ public class RankingHandler {
                 entry.setHighestScore(stat.getScore());
             }
 
-            dao.insertOrUpdate(entry);
+            try {
+                dao.insertOrUpdate(entry);
+            } catch (DaoException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
     public void getRankingStatus(RequestCallback<RankingEntry[]> callback) {
-        RankingEntry[] entries = dao.readAll(RankingEntry.class);
+        RankingEntry[] entries = null;
+        try {
+            entries = dao.readAll(RankingEntry.class);
+        } catch (DaoException e) {
+            throw new RuntimeException(e);
+        }
         RankingEntry[] sortedEntries = rankingStrategy.sortRankingEntries(entries);
         if (callback != null) {
             callback.onSuccess(sortedEntries, "All ranking entries fetched and sorted.");
@@ -107,7 +117,16 @@ public class RankingHandler {
      * @param callback Optional callback for completion notification
      */
     public void recalculateRankings(RequestCallback<Boolean> callback) {
-        dao.deleteAll(RankingEntry.class);
+        try {
+            dao.deleteAll(RankingEntry.class);
+        } catch (DaoException e) {
+            e.printStackTrace();
+            ILog.e(TAG, "Failed to clear existing rankings: " + e.getMessage());
+            if (callback != null) {
+                callback.onFailure(-1, "Failed to clear existing rankings: " + e.getMessage());
+            }
+            return;
+        }
         new Thread(() -> {
             try {
                 matchHandler.listMatchDetails(MatchType.QUALIFICATION, true, new RequestCallback<MatchDetailDto[]>() {
