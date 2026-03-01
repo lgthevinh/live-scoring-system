@@ -33,9 +33,6 @@ repositories {
 }
 
 dependencies {
-    testImplementation platform('org.junit:junit-bom:5.10.0')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     implementation "org.xerial:sqlite-jdbc:3.43.2.0"
     implementation 'com.zaxxer:HikariCP:5.1.0'

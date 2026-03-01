@@ -17,6 +17,7 @@ import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.dao.DaoFile;
 import org.thingai.platform.dao.DaoSqlite;
+import org.thingai.platform.log.ILogImpl;
 
 public class ScoringService extends Service {
     private static final String SERVICE_NAME = "ScoringService";
@@ -33,11 +34,18 @@ public class ScoringService extends Service {
     private static BroadcastHandler broadcastHandler;
     private static LiveScoreHandler liveScoreHandler;
 
+    public ScoringService() {
+        super();
+        ILog.ENABLE_LOGGING = true;
+        ILog.logLevel = ILog.INFO;
+    }
+
     @Override
     protected void onServiceInit() {
+        new ILogImpl(appDir, true);
         Dao dao = new DaoSqlite(appDir + "/scoring_system.db");
 
-        System.out.println("Service initialized with app directory: " + appDir);
+        ILog.i(SERVICE_NAME, "Initializing ScoringService with app directory: " + appDir);
 
         dao.initDao(new Class[]{
                 Event.class,
