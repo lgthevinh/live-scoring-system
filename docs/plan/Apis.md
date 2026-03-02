@@ -111,12 +111,12 @@
         {
           "state": "number",
           "matchId": "string",
-          "red": {
+          "r": {
             "score": number,
             "penalties": number,
             ...
           },
-          "blue": {
+          "b": {
             "score": number,
             "penalties": number,
             ...
@@ -130,8 +130,8 @@
           "state": "number",
           "matchId": "string",
           "fieldId": "string",
-          "red": [{teamId}, {teamId}],
-          "blue": [{teamId}, {teamId}],
+          "r": [{teamId}, {teamId}],
+          "b": [{teamId}, {teamId}],
           "state": number // MatchLifeCycleState
         }
         ```
@@ -147,22 +147,50 @@ Base topic: `live/`
     {
       "state": 1, 2 or 3... in MatchLifeCycleState
       "matchId": "string",
-      "red": [{teamId}, {teamId}],
-      "blue": [{teamId}, {teamId}]
+      "r": [{teamId}, {teamId}],
+      "b": [{teamId}, {teamId}]
     }
     ```
 
-### Score live update events (referee update) - Topic: `live/score/red` and `live/score/blue`
+### Score live update events (referee update to server) - Topic: `live/score/red` and `live/score/blue`
 
 - Payload:
   ```json
     {
       "matchId": "string",
-      "red": {
+      "r": {
         ...
       },
-      "blue": {
+      "b": {
         ...
       },
     }
   ```
+
+### Display control events (for score display system) - Topic: `live/display`
+
+- Score event - Topic `live/display/score`
+    - Payload:
+      ```json
+        {
+          "matchId": "string",
+          "fieldId": "string",
+          "r": {
+            ...
+          },
+          "b": {
+            ...
+          },
+          "state": number // MatchLifeCycleState
+        }
+      ```
+- Control event - Topic `live/display/control`
+    - Payload:
+      ```json
+        {
+          "action": 1, 2, 3... in DisplayControlAction,
+          "data": {
+            // Optional data for the control action, e.g., matchId for loading a match
+          }
+        }
+      ```
