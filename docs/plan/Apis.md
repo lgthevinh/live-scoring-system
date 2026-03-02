@@ -40,10 +40,9 @@
         }
         ```
 - `POST /api/scores/commit` - Commit final score after both alliances submit
-- `GET /api/scores` - Get current score for an alliance/match if available
-    - Parameters: `matchId=string` or `allianceId=string`
+- `GET /api/scores/match/{matchId}` - Get current score for a match
     - Response:
-        ```json
+      ```json
         {
           "matchId": "string",
           "red": {
@@ -57,23 +56,7 @@
             ...
           },
           "state": number
-        }
-        ```
+        },
+      ```
 - `GET /api/scores/current` - Get current scores of currently active matches
-    - Response:
-        ```json
-          {
-            "matchId": "string",
-            "red": {
-              "score": number,
-              "penalties": number,
-              ...
-            },
-            "blue": {
-              "score": number,
-              "penalties": number,
-              ...
-            },
-            "state": number
-          },
-        ```
+    
