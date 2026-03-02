@@ -5,43 +5,24 @@ import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 
-import java.util.HashMap;
-
 public class MatchDetailDto {
     private Match match;
+    private AllianceTeam[] redAllianceTeams;
+    private AllianceTeam[] blueAllianceTeams;
     private Team[] redTeams;
     private Team[] blueTeams;
     private Score redScore;
     private Score blueScore;
 
-    private HashMap<String, Boolean> surrogateMap;
-
     public MatchDetailDto() {
     }
 
-    public MatchDetailDto(Match match, Team[] redTeams, Team[] blueTeams, HashMap<String, Boolean> surrogateMap) {
+    public MatchDetailDto(Match match, AllianceTeam[] redAllianceTeams, AllianceTeam[] blueAllianceTeams, Team[] redTeams, Team[] blueTeams) {
         this.match = match;
         this.redTeams = redTeams;
         this.blueTeams = blueTeams;
-        this.surrogateMap = surrogateMap;
     }
 
-    public MatchDetailDto(Match match, Team[] redTeams, Team[] blueTeams, Score redScore, Score blueScore, HashMap<String, Boolean> surrogateMap) {
-        this.match = match;
-        this.redTeams = redTeams;
-        this.blueTeams = blueTeams;
-        this.redScore = redScore;
-        this.blueScore = blueScore;
-        this.surrogateMap = surrogateMap;
-    }
-
-    public HashMap<String, Boolean> getSurrogateMap() {
-        return surrogateMap;
-    }
-
-    public void setSurrogateMap(HashMap<String, Boolean> surrogateMap) {
-        this.surrogateMap = surrogateMap;
-    }
 
     public Match getMatch() {
         return match;
@@ -81,5 +62,21 @@ public class MatchDetailDto {
 
     public void setBlueScore(Score blueScore) {
         this.blueScore = blueScore;
+    }
+
+    public AllianceTeam[] getRedAllianceTeams() {
+        return redAllianceTeams;
+    }
+
+    public void setRedAllianceTeams(AllianceTeam[] redAllianceTeams) {
+        this.redAllianceTeams = redAllianceTeams;
+    }
+
+    public AllianceTeam[] getBlueAllianceTeams() {
+        return blueAllianceTeams;
+    }
+
+    public void setBlueAllianceTeams(AllianceTeam[] blueAllianceTeams) {
+        this.blueAllianceTeams = blueAllianceTeams;
     }
 }

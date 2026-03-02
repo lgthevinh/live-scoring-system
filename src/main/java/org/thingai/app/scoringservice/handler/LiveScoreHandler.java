@@ -21,8 +21,8 @@ public class LiveScoreHandler {
     private static final int MATCH_DURATION_SECONDS = 180; // modify this based on season rules
 
     private final MatchTimerHandler matchTimerHandler;
-    private final MatchHandler matchHandler;
-    private final ScoreHandler scoreHandler;
+    private final ScheduleHandler scheduleHandler;
+    private final ScoringHandler scoringHandler;
     private final RankingHandler rankingHandler;
 
     private BroadcastHandler broadcastHandler;
@@ -37,9 +37,9 @@ public class LiveScoreHandler {
     private boolean isRedCommitable = false;
     private boolean isBlueCommitable = false;
 
-    public LiveScoreHandler(MatchHandler matchHandler, ScoreHandler scoreHandler, RankingHandler rankingHandler) {
-        this.matchHandler = matchHandler;
-        this.scoreHandler = scoreHandler;
+    public LiveScoreHandler(ScheduleHandler scheduleHandler, ScoringHandler scoringHandler, RankingHandler rankingHandler) {
+        this.scheduleHandler = scheduleHandler;
+        this.scoringHandler = scoringHandler;
         this.rankingHandler = rankingHandler;
 
         matchTimerHandler = new MatchTimerHandler(MATCH_DURATION_SECONDS);
@@ -65,7 +65,7 @@ public class LiveScoreHandler {
     public void setNextMatch(String matchId, RequestCallback<MatchDetailDto> callback) {
         try {
             // Retrieve match detail and return callback response
-            nextMatch = matchHandler.getMatchDetailSync(matchId);
+            nextMatch = scheduleHandler.getMatchDetailSync(matchId);
             broadcastHandler.broadcast("/topic/match/available", nextMatch, BroadcastMessageType.MATCH_STATUS);
 
             callback.onSuccess(nextMatch, "Set next match success");
@@ -83,8 +83,8 @@ public class LiveScoreHandler {
                 currentMatch = nextMatch;
                 nextMatch = null;
 
-                currentRedScoreHolder = ScoreHandler.factoryScore();
-                currentBlueScoreHolder = ScoreHandler.factoryScore();
+                currentRedScoreHolder = ScoringHandler.factoryScore();
+                currentBlueScoreHolder = ScoringHandler.factoryScore();
 
                 currentBlueScoreHolder.setAllianceId(currentMatch.getMatch().getId() + "_B");
                 currentRedScoreHolder.setAllianceId(currentMatch.getMatch().getId() + "_R");
@@ -156,8 +156,8 @@ public class LiveScoreHandler {
             int fieldNumber = currentMatch.getMatch().getFieldNumber();
             String rootTopic = "/topic/display/field/" + fieldNumber;
 
-            currentRedScoreHolder = ScoreHandler.factoryScore();
-            currentBlueScoreHolder = ScoreHandler.factoryScore();
+            currentRedScoreHolder = ScoringHandler.factoryScore();
+            currentBlueScoreHolder = ScoringHandler.factoryScore();
 
             currentBlueScoreHolder.setAllianceId(currentMatch.getMatch().getId() + "_B");
             currentRedScoreHolder.setAllianceId(currentMatch.getMatch().getId() + "_R");
@@ -178,7 +178,7 @@ public class LiveScoreHandler {
 
         try {
             // Create score object for database persistence
-            Score liveScore = ScoreHandler.factoryScore();
+            Score liveScore = ScoringHandler.factoryScore();
 
             // Set alliance ID - use matchId if provided, otherwise use temporary ID
             String allianceId;
@@ -199,7 +199,7 @@ public class LiveScoreHandler {
 
             // Persist to database for logging/tracking
             ILog.d(TAG, "Persisting live score update for alliance: " + allianceId + " with score: " + liveScore.getTotalScore());
-            scoreHandler.submitScore(liveScore, false, new RequestCallback<Score>() {
+            scoringHandler.submitScore(liveScore, false, new RequestCallback<Score>() {
                 @Override
                 public void onSuccess(Score responseObject, String message) {
                     ILog.d(TAG, "Live score persisted successfully for " + allianceId + ": Total=" + responseObject.getTotalScore() + " (" + message + ")");
@@ -259,7 +259,7 @@ public class LiveScoreHandler {
         currentBlueScoreHolder.calculateTotalScore();
 
         final Score[] result = new Score[2];
-        scoreHandler.submitScore(currentRedScoreHolder, true, new RequestCallback<Score>() {
+        scoringHandler.submitScore(currentRedScoreHolder, true, new RequestCallback<Score>() {
             @Override
             public void onSuccess(Score responseObject, String message) {
                 ILog.d(TAG, "Red alliance score submitted: " + message);
@@ -272,7 +272,7 @@ public class LiveScoreHandler {
             }
         });
 
-        scoreHandler.submitScore(currentBlueScoreHolder, true, new RequestCallback<Score>() {
+        scoringHandler.submitScore(currentBlueScoreHolder, true, new RequestCallback<Score>() {
             @Override
             public void onSuccess(Score responseObject, String message) {
                 ILog.d(TAG, "Blue alliance score submitted: " + message);
@@ -290,7 +290,7 @@ public class LiveScoreHandler {
         LocalDateTime currentTime = LocalDateTime.now();
 
         currentMatch.getMatch().setMatchEndTime(currentTime.format(timeFormatter));
-        matchHandler.updateMatch(currentMatch.getMatch(), new RequestCallback<Match>() {
+        scheduleHandler.updateMatch(currentMatch.getMatch(), new RequestCallback<Match>() {
             @Override
             public void onSuccess(Match responseObject, String message) {
                 ILog.d(TAG, "Match end time updated: " + message);
@@ -324,7 +324,7 @@ public class LiveScoreHandler {
         String otherAllianceId = allianceId.endsWith("_R") ? matchId + "_B" : matchId + "_R";
         
         // Fetch the other alliance's score first
-        scoreHandler.getScoreByAllianceId(otherAllianceId, new RequestCallback<Score>() {
+        scoringHandler.getScoreByAllianceId(otherAllianceId, new RequestCallback<Score>() {
             @Override
             public void onSuccess(Score otherScore, String message) {
                 // Now process the override for the target alliance
@@ -344,7 +344,7 @@ public class LiveScoreHandler {
      * Process the score override and update rankings
      */
     private void processScoreOverride(String allianceId, String jsonScoreData, String matchId, Score otherScore, RequestCallback<Boolean> callback) {
-        Score targetScore = ScoreHandler.factoryScore();
+        Score targetScore = ScoringHandler.factoryScore();
         try {
             targetScore.setAllianceId(allianceId);
             targetScore.fromJson(jsonScoreData);
@@ -352,7 +352,7 @@ public class LiveScoreHandler {
             targetScore.calculateTotalScore();
             targetScore.setStatus(ScoreStatus.SCORED);
 
-            scoreHandler.submitScore(targetScore, true, new RequestCallback<Score>() {
+            scoringHandler.submitScore(targetScore, true, new RequestCallback<Score>() {
                 @Override
                 public void onSuccess(Score responseObject, String message) {
                     ILog.d(TAG, "Score override submitted for alliance " + allianceId + ": " + message);
@@ -379,7 +379,7 @@ public class LiveScoreHandler {
      */
     private void updateRankingsForOverride(String matchId, Score updatedScore, Score otherScore, RequestCallback<Boolean> callback) {
         // Fetch the match details
-        matchHandler.getMatchDetail(matchId, new RequestCallback<MatchDetailDto>() {
+        scheduleHandler.getMatchDetail(matchId, new RequestCallback<MatchDetailDto>() {
             @Override
             public void onSuccess(MatchDetailDto matchDetail, String message) {
                 // Determine which score is red and which is blue
@@ -398,7 +398,7 @@ public class LiveScoreHandler {
                 if (redScore == null) {
                     // Try to fetch red score
                     final Score finalBlueScore = blueScore;
-                    scoreHandler.getScoreByAllianceId(matchId + "_R", new RequestCallback<Score>() {
+                    scoringHandler.getScoreByAllianceId(matchId + "_R", new RequestCallback<Score>() {
                         @Override
                         public void onSuccess(Score rScore, String message) {
                             Score finalRedScore = rScore;
@@ -422,7 +422,7 @@ public class LiveScoreHandler {
                 if (blueScore == null) {
                     // Try to fetch blue score
                     final Score finalRedScore = redScore;
-                    scoreHandler.getScoreByAllianceId(matchId + "_B", new RequestCallback<Score>() {
+                    scoringHandler.getScoreByAllianceId(matchId + "_B", new RequestCallback<Score>() {
                         @Override
                         public void onSuccess(Score bScore, String message) {
                             Score finalBlueScore = bScore;

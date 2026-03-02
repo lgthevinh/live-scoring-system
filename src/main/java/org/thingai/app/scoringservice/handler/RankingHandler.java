@@ -17,12 +17,12 @@ public class RankingHandler {
     private static final String TAG = "RankingHandler";
 
     private final Dao dao;
-    private final MatchHandler matchHandler;
+    private final ScheduleHandler scheduleHandler;
     private static IRankingStrategy rankingStrategy;
 
-    public RankingHandler(Dao dao, MatchHandler matchHandler) {
+    public RankingHandler(Dao dao, ScheduleHandler scheduleHandler) {
         this.dao = dao;
-        this.matchHandler = matchHandler;
+        this.scheduleHandler = scheduleHandler;
 
         ILog.i(TAG, "RankingHandler initialized with IndividualTeamRankingStrategy");
     }
@@ -129,7 +129,7 @@ public class RankingHandler {
         }
         new Thread(() -> {
             try {
-                matchHandler.listMatchDetails(MatchType.QUALIFICATION, true, new RequestCallback<MatchDetailDto[]>() {
+                scheduleHandler.listMatchDetails(MatchType.QUALIFICATION, true, new RequestCallback<MatchDetailDto[]>() {
                     @Override
                     public void onSuccess(MatchDetailDto[] result, String message) {
                         for (MatchDetailDto matchDetail : result) {

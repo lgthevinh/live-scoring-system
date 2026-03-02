@@ -1,7 +1,6 @@
 package org.thingai.app.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.thingai.app.scoringservice.ScoringService;
@@ -145,7 +144,7 @@ public class MatchController {
             int fieldCount = (int) request.get("fieldCount");
             List<Map<String, String>> timeBlockMaps = (List<Map<String, String>>) request.get("timeBlocks");
             TimeBlock[] timeBlocks = objectMapper.convertValue(timeBlockMaps, TimeBlock[].class);
-            ScoringService.matchHandler().generateMatchScheduleV2(rounds, startTime, matchDuration, fieldCount, timeBlocks, new RequestCallback<Void>() {
+            ScoringService.matchHandler().generateSchedule(rounds, startTime, matchDuration, fieldCount, timeBlocks, new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void result, String successMessage) {
                     future.complete(ResponseEntity.ok(Map.of("message", successMessage)));

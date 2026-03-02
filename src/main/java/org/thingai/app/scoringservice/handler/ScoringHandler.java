@@ -12,7 +12,7 @@ import org.thingai.platform.dao.DaoFile;
 
 import java.util.HashMap;
 
-public class ScoreHandler {
+public class ScoringHandler {
     private final ObjectMapper objectMapper = new ObjectMapper(); // For converting DTO to JSON
 
     private final Dao dao;
@@ -20,7 +20,7 @@ public class ScoreHandler {
 
     private static Class<? extends Score> scoreClass;
 
-    public ScoreHandler(Dao dao, DaoFile daoFile) {
+    public ScoringHandler(Dao dao, DaoFile daoFile) {
         this.dao = dao;
         this.daoFile = daoFile;
     }
@@ -34,7 +34,7 @@ public class ScoreHandler {
         try {
             return scoreClass.getDeclaredConstructor().newInstance();
         } catch (Exception e) {
-            ILog.e("ScoreHandler", "Failed to instantiate score class: " + e.getMessage());
+            ILog.e("ScoringHandler", "Failed to instantiate score class: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Failed to instantiate score class, define score specific class first.");
         }
@@ -116,61 +116,8 @@ public class ScoreHandler {
         }
     }
 
-    /**
-     * Takes raw scoring data (as a DTO), calculates the final score, and persists
-     * the result.
-     * 
-     * @param allianceId      The unique ID of the alliance being scored.
-     * @param scoreDetailsDto A DTO representing the raw scoring inputs from the UI.
-     * @param callback        Callback to signal completion.
-     */
-    public void submitScore(String allianceId, Object scoreDetailsDto, boolean isForceUpdate,
-            RequestCallback<Score> callback) {
-        try {
-            // 1. Retrieve the existing score object.
-            Score score = dao.query(Score.class, "id", allianceId)[0];
-            if (score == null) {
-                callback.onFailure(ErrorCode.NOT_FOUND, "Cannot submit score, match/alliance not found: " + allianceId);
-                return;
-            }
-
-            if (score.getStatus() == ScoreStatus.SCORED && !isForceUpdate) {
-                callback.onFailure(ErrorCode.UPDATE_FAILED, "Score already submitted for alliance: " + allianceId);
-                return;
-            }
-
-            // 2. Convert the incoming DTO to a JSON string.
-            Score finalScore = factoryScore();
-            finalScore.setAllianceId(allianceId);
-            String rawJsonData = objectMapper.writeValueAsString(scoreDetailsDto);
-
-            // 3. Use the entity's fromJson method to populate its internal state.
-            finalScore.fromJson(rawJsonData);
-
-            // 4. Trigger the calculation logic within the finalScore object.
-            finalScore.calculateTotalScore();
-            finalScore.calculatePenalties();
-            finalScore.setStatus(ScoreStatus.SCORED);
-
-            ILog.d("ScoreHandler", "Final calculated score for alliance " + allianceId + ": Total="
-                    + finalScore.getTotalScore() + ", Penalties=" + finalScore.getPenaltiesScore());
-
-            // 5. Call the existing save method to persist the changes.
-            updateAndSaveScore(finalScore, new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void result, String message) {
-                    callback.onSuccess(finalScore, "Score submitted and calculated successfully.");
-                }
-
-                @Override
-                public void onFailure(int errorCode, String errorMessage) {
-                    callback.onFailure(errorCode, errorMessage);
-                }
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-            callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to submit score: " + e.getMessage());
-        }
+    public static void setScoreClass(Class<? extends Score> scoreClass) {
+        ScoringHandler.scoreClass = scoreClass;
     }
 
     public void submitScore(Score score, boolean isForceUpdate, RequestCallback<Score> callback) {
@@ -233,7 +180,64 @@ public class ScoreHandler {
         }
     }
 
-    public void getScoreUi(RequestCallback<HashMap<String, ScoreDefine>> callback) {
+    /**
+     * Takes raw scoring data (as a DTO), calculates the final score, and persists
+     * the result.
+     *
+     * @param allianceId      The unique ID of the alliance being scored.
+     * @param scoreDetailsDto A DTO representing the raw scoring inputs from the UI.
+     * @param callback        Callback to signal completion.
+     */
+    public void submitScore(String allianceId, Object scoreDetailsDto, boolean isForceUpdate,
+            RequestCallback<Score> callback) {
+        try {
+            // 1. Retrieve the existing score object.
+            Score score = dao.query(Score.class, "id", allianceId)[0];
+            if (score == null) {
+                callback.onFailure(ErrorCode.NOT_FOUND, "Cannot submit score, match/alliance not found: " + allianceId);
+                return;
+            }
+
+            if (score.getStatus() == ScoreStatus.SCORED && !isForceUpdate) {
+                callback.onFailure(ErrorCode.UPDATE_FAILED, "Score already submitted for alliance: " + allianceId);
+                return;
+            }
+
+            // 2. Convert the incoming DTO to a JSON string.
+            Score finalScore = factoryScore();
+            finalScore.setAllianceId(allianceId);
+            String rawJsonData = objectMapper.writeValueAsString(scoreDetailsDto);
+
+            // 3. Use the entity's fromJson method to populate its internal state.
+            finalScore.fromJson(rawJsonData);
+
+            // 4. Trigger the calculation logic within the finalScore object.
+            finalScore.calculateTotalScore();
+            finalScore.calculatePenalties();
+            finalScore.setStatus(ScoreStatus.SCORED);
+
+            ILog.d("ScoringHandler", "Final calculated score for alliance " + allianceId + ": Total="
+                    + finalScore.getTotalScore() + ", Penalties=" + finalScore.getPenaltiesScore());
+
+            // 5. Call the existing save method to persist the changes.
+            updateAndSaveScore(finalScore, new RequestCallback<Void>() {
+                @Override
+                public void onSuccess(Void result, String message) {
+                    callback.onSuccess(finalScore, "Score submitted and calculated successfully.");
+                }
+
+                @Override
+                public void onFailure(int errorCode, String errorMessage) {
+                    callback.onFailure(errorCode, errorMessage);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to submit score: " + e.getMessage());
+        }
+    }
+
+    public void getScoreDefinitions(RequestCallback<HashMap<String, ScoreDefine>> callback) {
         try {
             Score score = factoryScore();
             HashMap<String, ScoreDefine> scoreUiMap = score.getScoreDefinitions();
@@ -243,9 +247,5 @@ public class ScoreHandler {
             e.printStackTrace();
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve score UI definitions: " + e.getMessage());
         }
-    }
-
-    public static void setScoreClass(Class<? extends Score> scoreClass) {
-        ScoreHandler.scoreClass = scoreClass;
     }
 }
