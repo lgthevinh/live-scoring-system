@@ -15,7 +15,7 @@ export class App implements OnInit {
   isLoggedIn: WritableSignal<boolean> = signal(false);
   showNavbar = true;
   localIp: Observable<string> | undefined;
-  version = '1.7';
+  version = '1.5';
 
   constructor(protected authService: AuthService, private router: Router) {
 

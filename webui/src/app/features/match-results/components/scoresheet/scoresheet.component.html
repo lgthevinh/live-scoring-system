@@ -4,7 +4,7 @@
         <!-- Red Alliance -->
         @if (!alliance || alliance === 'red') {
         <div class="col-md-6">
-            <app-alliance-scoresheet [score]="match.redScore" [initialScoreData]="redScoreData" [teams]="getTeams('red')" [config]="config"
+            <app-alliance-scoresheet [score]="match.redScore" [teams]="getTeams('red')" [config]="config"
                 [alliance]="'red'" [matchInfo]="getMatchInfo()" [matchId]="getMatchId()" [editable]="editable"
                 (scoreChange)="redScoreChange.emit($event)">
             </app-alliance-scoresheet>
@@ -14,7 +14,7 @@
         @if (!alliance || alliance === 'blue') {
         <!-- Blue Alliance -->
         <div class="col-md-6">
-            <app-alliance-scoresheet [score]="match.blueScore" [initialScoreData]="blueScoreData" [teams]="getTeams('blue')" [config]="config"
+            <app-alliance-scoresheet [score]="match.blueScore" [teams]="getTeams('blue')" [config]="config"
                 [alliance]="'blue'" [matchInfo]="getMatchInfo()" [matchId]="getMatchId()" [editable]="editable"
                 (scoreChange)="blueScoreChange.emit($event)">
             </app-alliance-scoresheet>

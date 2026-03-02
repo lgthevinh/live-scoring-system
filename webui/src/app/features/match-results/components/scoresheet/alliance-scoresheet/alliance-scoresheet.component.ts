@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject, signal, computed } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Score } from '../../../../../core/models/score.model';
@@ -30,33 +30,6 @@ import { ToastService } from '../../../../../core/services/toast.service';
           <span *ngFor="let team of teams" class="badge bg-light text-dark fw-bold fs-5 px-3 py-2">
             {{ team.teamId }}
           </span>
-        </div>
-      </div>
-
-      <!-- Calculated Score Preview -->
-      <div class="score-preview-card" *ngIf="editable">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="calculated-score">
-            <span class="score-label">Calculated Score:</span>
-            <span class="score-value" [class.zero-score]="calculatedScore() === 0" [class.positive]="calculatedScore() > 0">
-              {{ calculatedScore() }}
-            </span>
-          </div>
-          <button class="btn btn-outline-secondary btn-sm" (click)="resetScores()" title="Reset all scores to 0">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
-          </button>
-        </div>
-        <div class="score-breakdown text-muted small mt-2" *ngIf="!redCardValue()">
-          <span *ngIf="biologicalPoints() > 0">Biological: {{ biologicalPoints() }} pts</span>
-          <span *ngIf="barrierPoints() > 0">• Barriers: {{ barrierPoints() }} pts</span>
-          <span *ngIf="endGamePoints() > 0">• End Game: {{ endGamePoints() }} pts</span>
-          <span *ngIf="fleetBonus() > 0" class="fleet-bonus-text">• Fleet Bonus: +{{ fleetBonus() }} pts</span>
-          <span *ngIf="penaltyPoints() > 0" class="penalty-text">• Penalties: -{{ penaltyPoints() }} pts</span>
-          <span *ngIf="coefficient() !== 1">• Coefficient: {{ coefficient() }}x</span>
-        </div>
-        <div class="red-card-warning" *ngIf="redCardValue()">
-          <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
-          <span class="text-danger fw-bold">Red Card Active - Score will be zero!</span>
         </div>
       </div>
 
@@ -99,43 +72,33 @@ import { ToastService } from '../../../../../core/services/toast.service';
                     </option>
                   </select>
                 </div>
-                <!-- Counter controls for number fields with direct input -->
-                <div class="counter-controls enhanced" *ngIf="editable && field.type === 'number'">
+                <!-- Counter controls for number fields -->
+                <div class="counter-controls" *ngIf="editable && field.type === 'number'">
                   <button class="btn-counter btn-counter-minus"
-                          (click)="decrementValue(field.key, field.min)"
-                          [disabled]="isAtMin(field.key, field.min)"
+                          (click)="decrementValue(field.key)"
                           type="button">
                     <i class="bi bi-dash-lg"></i>
                   </button>
-                  <div class="counter-display-with-input">
-                    <input type="number"
-                           class="counter-input"
-                           [value]="getValue(scoreData, field.key) || 0"
-                           (change)="setNumberValue(field.key, $event, field.min, field.max)"
-                           [min]="field.min || 0"
-                           [max]="field.max"
-                           step="1">
-                    <span class="counter-points" *ngIf="getPointsForField(field.key) > 0">
-                      = {{ getPointsForField(field.key) }} pts
+                  <div class="counter-display">
+                    <span class="counter-value">{{ getValue(scoreData, field.key) || 0 }}</span>
+                    <span class="counter-total" *ngIf="field.key.includes('Ball') && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ field.key === 'goldenBallsScored' ? (getValue(scoreData, field.key) || 0) * 3 : getValue(scoreData, field.key) || 0 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key.includes('Parking') && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 5 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key === 'allianceBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 10 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key === 'opponentBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 10 }}
                     </span>
                   </div>
                   <button class="btn-counter btn-counter-plus"
-                          (click)="incrementValue(field.key, field.max)"
-                          [disabled]="isAtMax(field.key, field.max)"
+                          (click)="incrementValue(field.key)"
                           type="button">
                     <i class="bi bi-plus-lg"></i>
                   </button>
-                </div>
-                <!-- Limit indicator for number fields -->
-                <div class="limit-indicator" *ngIf="editable && field.type === 'number' && (field.max !== undefined || field.min !== undefined)">
-                  <small class="text-muted">
-                    <span *ngIf="field.min !== undefined">Min: {{ field.min }}</span>
-                    <span *ngIf="field.min !== undefined && field.max !== undefined"> • </span>
-                    <span *ngIf="field.max !== undefined">Max: {{ field.max }}</span>
-                    <span *ngIf="field.key === 'fullParking' && getValue(scoreData, field.key) >= 2" class="fleet-bonus-badge">
-                      <i class="bi bi-trophy-fill text-warning me-1"></i>Fleet Bonus Unlocked!
-                    </span>
-                  </small>
                 </div>
                 <!-- Toggle button for boolean fields (allianceBarrierPushed, opponentBarrierPushed, redCard) -->
                 <div [ngClass]="{'bg-danger': (field.key === 'allianceBarrierPushed' && alliance === 'red') || (field.key === 'opponentBarrierPushed' && alliance === 'blue'), 'bg-primary': (field.key === 'allianceBarrierPushed' && alliance === 'blue') || (field.key === 'opponentBarrierPushed' && alliance === 'red')}" class="toggle-controls rounded-3 p-3" *ngIf="editable && field.type === 'boolean'">
@@ -158,8 +121,17 @@ import { ToastService } from '../../../../../core/services/toast.service';
                 <div class="text-center" *ngIf="!editable && field.type === 'number'">
                   <div class="counter-display">
                     <span class="counter-value">{{ getValue(scoreData, field.key) || 0 }}</span>
-                    <span class="counter-total" *ngIf="getPointsForField(field.key) > 0">
-                      {{ getPointsForField(field.key) }} pts
+                    <span class="counter-total" *ngIf="field.key.includes('Ball') && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ field.key === 'goldenBallsScored' ? (getValue(scoreData, field.key) || 0) * 3 : getValue(scoreData, field.key) || 0 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key.includes('Parking') && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 5 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key === 'allianceBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 10 }}
+                    </span>
+                    <span class="counter-total" *ngIf="field.key === 'opponentBarrierPushed' && (getValue(scoreData, field.key) || 0) > 0">
+                      {{ (getValue(scoreData, field.key) || 0) * 10 }}
                     </span>
                   </div>
                 </div>
@@ -214,10 +186,7 @@ import { ToastService } from '../../../../../core/services/toast.service';
                               <button class="btn btn-sm btn-outline-secondary me-1"
                                       (click)="decrementTeamValue(team.teamId, col.key)"
                                       type="button">-</button>
-                              <input type="number" class="form-control form-control-sm text-center mx-1"
-                                     style="width: 60px;"
-                                     [value]="getTeamValue(scoreData, team.teamId, col.key) || 0"
-                                     (change)="setTeamNumberValue(team.teamId, col.key, $event)">
+                              <span class="fw-bold mx-2" style="min-width: 30px;">{{ getTeamValue(scoreData, team.teamId, col.key) || 0 }}</span>
                               <button class="btn btn-sm btn-outline-secondary ms-1"
                                       (click)="incrementTeamValue(team.teamId, col.key)"
                                       type="button">+</button>
@@ -254,46 +223,14 @@ import { ToastService } from '../../../../../core/services/toast.service';
     .counter-header{display:flex;align-items:center;margin-bottom:1rem}
     .counter-label{display:flex;align-items:center;font-weight:600;color:#374151;font-size:1rem}
     .counter-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;margin-right:.75rem;background:#f1f5f9;border-radius:8px}
-    
-    /* Enhanced counter controls with input */
     .counter-controls{display:flex;align-items:center;gap:1rem}
-    .counter-controls.enhanced{gap:0.5rem}
-    .btn-counter{width:48px;height:48px;border-radius:50%;border:2px solid;font-size:1.25rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
-    .btn-counter:disabled{opacity:.3;cursor:not-allowed}
+    .btn-counter{width:48px;height:48px;border-radius:50%;border:2px solid;font-size:1.25rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .btn-counter:disabled{opacity:.5;cursor:not-allowed}
     .btn-counter-minus{background:#fee2e2;border-color:#fca5a5;color:#dc2626}
-    .btn-counter-minus:hover:not(:disabled){background:#fecaca;border-color:#f87171}
     .btn-counter-plus{background:#dbeafe;border-color:#93c5fd;color:#2563eb}
-    .btn-counter-plus:hover:not(:disabled){background:#bfdbfe;border-color:#60a5fa}
-    
-    /* Counter display with input */
-    .counter-display-with-input{display:flex;flex-direction:column;align-items:center;background:#1e293b;color:#fff;border-radius:12px;padding:.5rem 1rem;min-width:100px}
-    .counter-input{width:80px;text-align:center;background:transparent;border:none;color:#fff;font-size:1.75rem;font-weight:800;line-height:1;outline:none;-moz-appearance:textfield}
-    .counter-input::-webkit-outer-spin-button,.counter-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-    .counter-input:focus{background:rgba(255,255,255,0.1);border-radius:6px}
-    .counter-points{font-size:.8rem;color:#86efac;margin-top:.25rem}
-    
-    /* Legacy display styles */
     .counter-display{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1e293b;color:#fff;border-radius:12px;padding:.75rem 2rem;min-width:80px}
     .counter-value{font-size:2rem;font-weight:800;line-height:1}
     .counter-total{font-size:.875rem;color:#cbd5e1;margin-top:.125rem}
-    
-    /* Limit indicator */
-    .limit-indicator{margin-top:0.5rem;text-align:center}
-    .fleet-bonus-badge{color:#f59e0b;font-weight:600}
-    
-    /* Score preview card */
-    .score-preview-card{background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);border:2px solid #0ea5e9;border-radius:1rem;padding:1.25rem;margin-bottom:1.5rem}
-    .calculated-score{display:flex;align-items:center;gap:1rem}
-    .score-label{font-weight:600;color:#0369a1;font-size:1.1rem}
-    .score-value{font-size:2.5rem;font-weight:800;color:#0284c7;line-height:1}
-    .score-value.zero-score{color:#94a3b8}
-    .score-value.positive{color:#16a34a}
-    .score-breakdown{display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:center}
-    .fleet-bonus-text{color:#f59e0b;font-weight:600}
-    .penalty-text{color:#dc2626}
-    .red-card-warning{margin-top:0.5rem;padding:0.75rem;background:#fef2f2;border-radius:8px;text-align:center}
-    
-    /* Fleet bonus */
     .fleet-bonus{background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:.75rem 1rem;margin-top:.75rem;display:flex;align-items:center;justify-content:center;font-size:.9rem}
     .red-card-section{margin-top:1.5rem}
     .red-card-button{width:100%;height:80px;border-radius:1rem;border:3px solid #dc3545;background:#dc2626;color:#fff;font-weight:700;font-size:1.1rem;display:flex;align-items:center;justify-content:center;padding:0}
@@ -371,12 +308,11 @@ import { ToastService } from '../../../../../core/services/toast.service';
 })
 export class AllianceScoresheetComponent implements OnChanges {
   @Input() score: Score | undefined;
-  @Input() initialScoreData: any = null;
   @Input() teams: Team[] = [];
   @Input() config: ScoresheetConfig | undefined;
   @Input() alliance: 'red' | 'blue' = 'red';
   @Input() matchInfo: { matchCode: string, fieldNumber: number } | null = null;
-  @Input() matchId: string | null = null;
+  @Input() matchId: string | null = null; // Added for scorekeeper override
   @Input() editable: boolean = false;
   @Output() scoreChange = new EventEmitter<any>();
 
@@ -387,62 +323,10 @@ export class AllianceScoresheetComponent implements OnChanges {
   private scorekeeperService = inject(ScorekeeperService);
   private toastService = inject(ToastService);
 
-  // Computed signals for calculated score
-  whiteBalls = signal(0);
-  goldenBalls = signal(0);
-  allianceBarrier = signal(false);
-  opponentBarrier = signal(false);
-  partialPark = signal(0);
-  fullPark = signal(0);
-  imbalanceCat = signal(2);
-  penalties = signal(0);
-  yellowCards = signal(0);
-  redCardValue = signal(false);
-
-  // Calculated values
-  biologicalPoints = computed(() => (this.goldenBalls() * 3) + this.whiteBalls());
-  barrierPoints = computed(() => (this.allianceBarrier() ? 10 : 0) + (this.opponentBarrier() ? 10 : 0));
-  endGamePoints = computed(() => (this.partialPark() * 5) + (this.fullPark() * 10));
-  fleetBonus = computed(() => this.fullPark() >= 2 ? 10 : 0);
-  penaltyPoints = computed(() => (this.penalties() * 5) + (this.yellowCards() * 10));
-  coefficient = computed(() => {
-    const imbalanceMultipliers = [2.0, 1.5, 1.3];
-    let coeff = imbalanceMultipliers[this.imbalanceCat()] || 1.3;
-    if (!this.allianceBarrier()) {
-      coeff -= 0.2;
-    }
-    return Math.max(0, coeff);
-  });
-  calculatedScore = computed(() => {
-    if (this.redCardValue()) {
-      return 0;
-    }
-    const baseScore = (this.biologicalPoints() + this.barrierPoints()) * this.coefficient();
-    const totalScore = Math.round(baseScore + this.endGamePoints() + this.fleetBonus() - this.penaltyPoints());
-    return Math.max(0, totalScore);
-  });
-
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['initialScoreData'] && this.initialScoreData && Object.keys(this.initialScoreData).length > 0) {
-      this.scoreData = { ...this.initialScoreData };
-      this.updateComputedValues();
-    } else if (changes['score'] && this.score) {
+    if (changes['score'] && this.score) {
       this.scoreData = this.parseScore(this.score);
-      this.updateComputedValues();
     }
-  }
-
-  private updateComputedValues() {
-    this.whiteBalls.set(this.getValue(this.scoreData, 'whiteBallsScored') || 0);
-    this.goldenBalls.set(this.getValue(this.scoreData, 'goldenBallsScored') || 0);
-    this.allianceBarrier.set(this.getValue(this.scoreData, 'allianceBarrierPushed') || false);
-    this.opponentBarrier.set(this.getValue(this.scoreData, 'opponentBarrierPushed') || false);
-    this.partialPark.set(this.getValue(this.scoreData, 'partialParking') || 0);
-    this.fullPark.set(this.getValue(this.scoreData, 'fullParking') || 0);
-    this.imbalanceCat.set(this.getValue(this.scoreData, 'imbalanceCategory') ?? 2);
-    this.penalties.set(this.getValue(this.scoreData, 'penaltyCount') || 0);
-    this.yellowCards.set(this.getValue(this.scoreData, 'yellowCardCount') || 0);
-    this.redCardValue.set(this.getValue(this.scoreData, 'redCard') || false);
   }
 
   private parseScore(score: Score | undefined): any {
@@ -470,6 +354,9 @@ export class AllianceScoresheetComponent implements OnChanges {
   setValue(key: string, value: any) {
     if (!this.scoreData) this.scoreData = {};
 
+    // Handle nested keys if necessary, though simple assignment works for flat structure
+    // For this implementation, we assume flat keys or simple object structure
+    // If keys are like 'auto.parked', we need to split
     const parts = key.split('.');
     let current = this.scoreData;
     for (let i = 0; i < parts.length - 1; i++) {
@@ -478,29 +365,8 @@ export class AllianceScoresheetComponent implements OnChanges {
     }
     current[parts[parts.length - 1]] = value;
 
-    this.updateComputedValues();
     console.log('AllianceScoresheet: Score changed', this.scoreData);
     this.scoreChange.emit(this.scoreData);
-  }
-
-  setNumberValue(key: string, event: Event, min?: number, max?: number) {
-    const input = event.target as HTMLInputElement;
-    let value = parseInt(input.value, 10);
-    
-    if (isNaN(value)) value = 0;
-    if (min !== undefined && value < min) value = min;
-    if (max !== undefined && value > max) value = max;
-    
-    // Special handling for parking limits (total cannot exceed 2)
-    if (key === 'partialParking' || key === 'fullParking') {
-      const otherKey = key === 'partialParking' ? 'fullParking' : 'partialParking';
-      const otherValue = this.getValue(this.scoreData, otherKey) || 0;
-      if (value + otherValue > 2) {
-        value = 2 - otherValue;
-      }
-    }
-    
-    this.setValue(key, value);
   }
 
   setTeamValue(teamId: string, key: string, value: any) {
@@ -513,36 +379,19 @@ export class AllianceScoresheetComponent implements OnChanges {
     this.scoreChange.emit(this.scoreData);
   }
 
-  setTeamNumberValue(teamId: string, key: string, event: Event) {
-    const input = event.target as HTMLInputElement;
-    let value = parseInt(input.value, 10);
-    if (isNaN(value) || value < 0) value = 0;
-    this.setTeamValue(teamId, key, value);
+  decrementValue(key: string) {
+    const current = this.getValue(this.scoreData, key) || 0;
+    this.setValue(key, Math.max(0, current - 1));
   }
 
-  decrementValue(key: string, min?: number) {
+  incrementValue(key: string) {
     const current = this.getValue(this.scoreData, key) || 0;
-    const newValue = Math.max(min || 0, current - 1);
-    this.setValue(key, newValue);
-  }
-
-  incrementValue(key: string, max?: number) {
-    const current = this.getValue(this.scoreData, key) || 0;
-    
-    // Special handling for parking limits
-    if (key === 'partialParking' || key === 'fullParking') {
-      const otherKey = key === 'partialParking' ? 'fullParking' : 'partialParking';
-      const otherValue = this.getValue(this.scoreData, otherKey) || 0;
-      if (current + otherValue >= 2) {
-        return; // Cannot exceed total of 2
-      }
+    const max = this.getMax(key);
+    if (max !== undefined) {
+      this.setValue(key, Math.min(max, current + 1));
+    } else {
+      this.setValue(key, current + 1);
     }
-    
-    let newValue = current + 1;
-    if (max !== undefined && newValue > max) {
-      newValue = max;
-    }
-    this.setValue(key, newValue);
   }
 
   toggleBooleanValue(key: string) {
@@ -550,58 +399,9 @@ export class AllianceScoresheetComponent implements OnChanges {
     this.setValue(key, !current);
   }
 
-  isAtMin(key: string, min?: number): boolean {
-    const current = this.getValue(this.scoreData, key) || 0;
-    return current <= (min || 0);
-  }
-
-  isAtMax(key: string, max?: number): boolean {
-    const current = this.getValue(this.scoreData, key) || 0;
-    
-    // Special handling for parking limits
-    if (key === 'partialParking' || key === 'fullParking') {
-      const otherKey = key === 'partialParking' ? 'fullParking' : 'partialParking';
-      const otherValue = this.getValue(this.scoreData, otherKey) || 0;
-      if (current + otherValue >= 2) {
-        return true;
-      }
-    }
-    
-    if (max !== undefined && current >= max) {
-      return true;
-    }
-    return false;
-  }
-
-  getPointsForField(key: string): number {
-    const value = this.getValue(this.scoreData, key) || 0;
-    switch (key) {
-      case 'whiteBallsScored': return value * 1;
-      case 'goldenBallsScored': return value * 3;
-      case 'partialParking': return value * 5;
-      case 'fullParking': return value * 10 + (value >= 2 ? 10 : 0);
-      case 'allianceBarrierPushed': return value ? 10 : 0;
-      case 'opponentBarrierPushed': return value ? 10 : 0;
-      default: return 0;
-    }
-  }
-
-  resetScores() {
-    this.scoreData = {
-      whiteBallsScored: 0,
-      goldenBallsScored: 0,
-      allianceBarrierPushed: false,
-      opponentBarrierPushed: false,
-      partialParking: 0,
-      fullParking: 0,
-      imbalanceCategory: 2,
-      penaltyCount: 0,
-      yellowCardCount: 0,
-      redCard: false
-    };
-    this.updateComputedValues();
-    this.scoreChange.emit(this.scoreData);
-    this.toastService.show('All scores reset to 0', 'info');
+  private getMax(key: string): number | undefined {
+    const section = this.config?.periods[0]?.sections.find(s => s.type === 'fields');
+    return section?.fields?.find(f => f.key === key)?.max;
   }
 
   getEnumLabel(field: FieldConfig, value: number): string {
@@ -627,12 +427,16 @@ export class AllianceScoresheetComponent implements OnChanges {
 
     this.submitMessage = '';
 
+    // Use matchId if provided (for Match Control override), otherwise fall back to matchCode (for Referee)
     const matchIdentifier = this.matchId || this.matchInfo.matchCode;
     const allianceId = matchIdentifier + (this.alliance === 'red' ? '_R' : '_B');
 
+    // Show toast notification for score submission
     const allianceName = this.alliance === 'red' ? 'Red' : 'Blue';
     this.toastService.show(`Submitting ${allianceName} Alliance score for ${matchIdentifier}...`, 'info', 4000);
 
+    // Use scorekeeper service for override (doesn't require active match)
+    // When editable=true, we use scorekeeper override; otherwise use referee final-score
     if (this.editable && this.matchId) {
       this.scorekeeperService.overrideScore(allianceId, JSON.stringify(this.scoreData)).subscribe({
         next: (res) => {
@@ -645,6 +449,7 @@ export class AllianceScoresheetComponent implements OnChanges {
         }
       });
     } else {
+      // Use referee service for final score submission (requires active match)
       this.refereeService.submitFinalScore(this.alliance, allianceId, JSON.stringify(this.scoreData)).subscribe({
         next: (res) => {
           this.submitMessage = 'Score submitted successfully';
