@@ -38,6 +38,27 @@
         },
       ```
 - `GET /api/scores/current` - Get current scores of currently active matches
+    - Response:
+      ```json
+          {
+            "matchId": "string",
+            "pre-match": {
+              "red": 0, // 0 = No-show, 1 = No-robot, 2 = Shown
+              "blue": 0
+            },
+            "red": {
+              "score": number,
+              "penalties": number,
+              ...
+            },
+            "blue": {
+              "score": number,
+              "penalties": number,
+              ...
+            },
+            "state": number
+          },
+      ```
 
 ### Referee Endpoints
 
@@ -82,6 +103,39 @@
 - `PUT /api/teams/{id}` - Update team details
 - `DELETE /api/teams/{id}` - Delete a team
 
+### Sync Endpoints
+
+- `POST /api/sync/score` - Sync current score to external system
+    - Request body:
+        ```json
+        {
+          "state": "number",
+          "matchId": "string",
+          "red": {
+            "score": number,
+            "penalties": number,
+            ...
+          },
+          "blue": {
+            "score": number,
+            "penalties": number,
+            ...
+          }
+        }
+        ```
+- `POST /api/sync/match` - Sync match status to external system
+    - Request body:
+        ```json
+        {
+          "state": "number",
+          "matchId": "string",
+          "fieldId": "string",
+          "red": [{teamId}, {teamId}],
+          "blue": [{teamId}, {teamId}],
+          "state": number // MatchLifeCycleState
+        }
+        ```
+
 ## Websocket Events
 
 Base topic: `live/`
@@ -98,7 +152,7 @@ Base topic: `live/`
     }
     ```
 
-### Score update events - Topic: `live/score`
+### Score live update events (referee update) - Topic: `live/score/red` and `live/score/blue`
 
 - Payload:
   ```json
@@ -110,6 +164,5 @@ Base topic: `live/`
       "blue": {
         ...
       },
-      "state": number
     }
   ```
