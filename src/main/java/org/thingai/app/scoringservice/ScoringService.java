@@ -25,7 +25,6 @@ public class ScoringService extends Service {
     private static ScheduleHandler scheduleHandler;
     private static RankingHandler rankingHandler;
     private static BroadcastHandler broadcastHandler;
-    private static LiveScoreHandler liveScoreHandler;
 
     public ScoringService() {
         super();
