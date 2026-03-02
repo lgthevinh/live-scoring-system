@@ -97,9 +97,6 @@ public class ScoringService extends Service {
         return broadcastHandler;
     }
 
-    public static LiveScoreHandler liveScoreHandler() {
-        return liveScoreHandler;
-    }
 
     public static RankingHandler rankingHandler() {
         return rankingHandler;
@@ -127,10 +124,7 @@ public class ScoringService extends Service {
         RankEntryRepository.initialize(dao);
 
         scheduleHandler = new ScheduleHandler();
-        scoringHandler = new ScoringHandler(dao, daoFile);
         rankingHandler = new RankingHandler(dao, scheduleHandler);
 
-        liveScoreHandler = new LiveScoreHandler(scheduleHandler, scoringHandler, rankingHandler);
-        liveScoreHandler.setBroadcastHandler(broadcastHandler);
     }
 }
