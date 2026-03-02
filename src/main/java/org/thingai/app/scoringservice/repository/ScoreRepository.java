@@ -32,6 +32,13 @@ public class ScoreRepository {
         return dao.readAll(Score.class);
     }
 
+    /**
+     * Get a score by its Alliance ID.
+     *
+     * @param scoreId The Alliance ID of the score to retrieve. (Note: {@code matchId}_"R/B")
+     * @return The Score object if found, or null if not found.
+     * @throws Exception If there is an error during the database operation.
+     */
     public static Score getScoreById(String scoreId) throws Exception {
         Score[] scores = dao.query(Score.class, new String[]{"id"}, new String[]{scoreId});
         if (scores != null && scores.length > 0) {
