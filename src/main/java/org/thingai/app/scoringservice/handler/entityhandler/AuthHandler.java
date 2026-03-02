@@ -253,9 +253,15 @@ public class AuthHandler {
                 existingAuth.setSalt(bytesToHex(salt));
             }
 
-            // Update role
-            AccountRole accountRole = new AccountRole();
-            accountRole.setUsername(username);
+            // Update role - query existing first
+            AccountRole[] existingRoles = dao.query(AccountRole.class, new String[]{"username"}, new String[]{username});
+            AccountRole accountRole;
+            if (existingRoles.length > 0) {
+                accountRole = existingRoles[0];
+            } else {
+                accountRole = new AccountRole();
+                accountRole.setUsername(username);
+            }
             accountRole.setRole(newRole);
 
             dao.insertOrUpdate(existingAuth);
@@ -273,7 +279,7 @@ public class AuthHandler {
             
             // Delete from AuthData if user exists
             if (authData != null) {
-                dao.delete(AuthData.class, username);
+                dao.delete(authData);
             }
             
             // Delete from AccountRole if it exists - query first then delete object

@@ -5,6 +5,21 @@
 <div class="container my-3">
     <h2 class="fw-bold text-center my-3">Qualification Rankings</h2>
 
+    @if (isLoading()) {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading rankings...</span>
+            </div>
+        </div>
+    }
+
+    @if (error()) {
+        <div class="alert alert-danger text-center" role="alert">
+            {{ error() }}
+        </div>
+    }
+
+    @if (!isLoading() && !error()) {
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -29,7 +44,7 @@
                               <td class="text-center">{{ rank.matchesPlayed }}</td>
                             </tr>
                         }
-                        @if (rankings().length === 0 && isLoading()) {
+                        @if (rankings().length === 0 && !isLoading()) {
                             <tr>
                                 <td colspan="5" class="text-center py-5 text-muted">
                                     No rankings available yet.
@@ -41,4 +56,5 @@
             </div>
         </div>
     </div>
+    }
 </div>

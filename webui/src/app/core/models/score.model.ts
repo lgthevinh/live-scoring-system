@@ -1,9 +1,11 @@
 export interface Score {
   id: string;
   status: number;
-  totalScore: number;
+  approved: boolean;
+  totalScore?: number;
   penaltiesScore: number;
   rawScoreData: string; // JSON string
+  submittedAt?: number; // Timestamp when score was submitted (milliseconds since epoch)
 
   // Fanroc scoring system fields (from JSON)
   whiteBallsScored?: number;
@@ -16,6 +18,26 @@ export interface Score {
   penaltyCount?: number;
   yellowCardCount?: number;
   redCard?: boolean;
+}
+
+export interface TempScore {
+  tempScoreId: string;
+  allianceId: string;
+  scoreData: {
+    whiteBallsScored: number;
+    goldenBallsScored: number;
+    allianceBarrierPushed: boolean;
+    opponentBarrierPushed: boolean;
+    partialParking: number;
+    fullParking: number;
+    imbalanceCategory: number;
+    penaltyCount: number;
+    yellowCardCount: number;
+    redCard: boolean;
+  };
+  submittedBy: string;
+  submittedAt: string;
+  status: 'pending' | 'committed' | 'rejected';
 }
 
 export interface CustomScoreData {

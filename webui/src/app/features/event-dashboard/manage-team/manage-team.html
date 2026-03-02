@@ -18,10 +18,24 @@
           </button>
         </div>
         <div class="col-auto ms-auto">
-          <input type="file" class="form-control">
+          <button class="btn btn-success" type="button" (click)="exportTeamList()">
+            <i class="bi bi-download"></i> Export CSV
+          </button>
         </div>
         <div class="col-auto">
-          <button class="btn btn-secondary" type="button" (click)="uploadTeamList()">Upload Team List</button>
+          <button class="btn btn-info" type="button" (click)="downloadTemplate()">
+            <i class="bi bi-file-earmark-text"></i> Template
+          </button>
+        </div>
+      </form>
+      <form class="row g-2 align-items-center mb-3">
+        <div class="col-auto ms-auto">
+          <input type="file" class="form-control form-control-sm" accept=".csv" (change)="handleFileInput($event)">
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-primary btn-sm" type="button" (click)="uploadTeamList()" [disabled]="!fileToUpload">
+            <i class="bi bi-upload"></i> Import CSV
+          </button>
         </div>
       </form>
       <div class="table-responsive">

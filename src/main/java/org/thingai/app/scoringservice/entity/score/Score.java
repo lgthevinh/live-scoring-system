@@ -15,6 +15,12 @@ public class Score implements IScoreConfig {
     @DaoColumn(name = "status")
     private int status;
 
+    @DaoColumn(name = "isApproved")
+    private boolean isApproved;
+
+    @DaoColumn(name = "submittedAt")
+    private long submittedAt;
+
     @DaoColumn(name = "totalScore")
     protected int totalScore;
 
@@ -25,6 +31,7 @@ public class Score implements IScoreConfig {
 
     public Score() {
         this.status = ScoreStatus.NOT_SCORED;
+        this.isApproved = false;
         this.totalScore = 0;
         this.penaltiesScore = 0;
     }
@@ -76,5 +83,29 @@ public class Score implements IScoreConfig {
 
     public int getPenaltiesScore() {
         return penaltiesScore;
+    }
+
+    public void setTotalScore(int totalScore) {
+        this.totalScore = totalScore;
+    }
+
+    public void setPenaltiesScore(int penaltiesScore) {
+        this.penaltiesScore = penaltiesScore;
+    }
+
+    public boolean isApproved() {
+        return isApproved;
+    }
+
+    public void setApproved(boolean approved) {
+        this.isApproved = approved;
+    }
+
+    public long getSubmittedAt() {
+        return submittedAt;
+    }
+
+    public void setSubmittedAt(long submittedAt) {
+        this.submittedAt = submittedAt;
     }
 }

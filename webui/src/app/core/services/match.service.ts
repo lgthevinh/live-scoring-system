@@ -161,6 +161,7 @@ export class MockMatchService extends MatchService {
           redScore: {
             id: `red-${i}`,
             status: 1,
+            approved: true,
             totalScore: 100,
             penaltiesScore: 0,
             rawScoreData: JSON.stringify({
@@ -178,6 +179,7 @@ export class MockMatchService extends MatchService {
           blueScore: {
             id: `blue-${i}`,
             status: 1,
+            approved: true,
             totalScore: 80,
             penaltiesScore: 0,
             rawScoreData: JSON.stringify({
@@ -237,6 +239,7 @@ export class MockMatchService extends MatchService {
       const mockScore: Score = {
         id: allianceId,
         status: 1,
+        approved: true,
         penaltiesScore: RandomUtils.generateRandomNumber(0, 50),
         totalScore: RandomUtils.generateRandomNumber(100, 300),
         rawScoreData: JSON.stringify({
@@ -261,6 +264,7 @@ export class MockMatchService extends MatchService {
       const submittedScore: Score = {
         id: allianceId,
         status: 2,
+        approved: false,
         penaltiesScore: scoreData.penaltiesScore || 0,
         totalScore: scoreData.totalScore || 0,
         rawScoreData: JSON.stringify(scoreData)

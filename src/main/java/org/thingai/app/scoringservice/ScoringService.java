@@ -4,10 +4,12 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.match.AllianceTeam;
 import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
+import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.BroadcastHandler;
 import org.thingai.app.scoringservice.handler.LiveScoreHandler;
 import org.thingai.app.scoringservice.handler.entityhandler.*;
+import org.thingai.app.scoringservice.handler.TempScoreHandler;
 import org.thingai.base.Service;
 import org.thingai.base.cache.LRUCache;
 import org.thingai.base.dao.Dao;
@@ -37,6 +39,7 @@ public class ScoringService extends Service {
     private static RankingHandler rankingHandler;
     private static BroadcastHandler broadcastHandler;
     private static LiveScoreHandler liveScoreHandler;
+    private static TempScoreHandler tempScoreHandler;
 
     @Override
     protected void onServiceInit() {
@@ -46,6 +49,8 @@ public class ScoringService extends Service {
 
         dao.initDao(new Class[]{
                 Event.class,
+                Score.class,
+                RankingEntry.class,
 
                 // System entities
                 AuthData.class,
@@ -110,6 +115,10 @@ public class ScoringService extends Service {
         return rankingHandler;
     }
 
+    public static TempScoreHandler tempScoreHandler() {
+        return tempScoreHandler;
+    }
+
     public void setSimpMessagingTemplate(SimpMessagingTemplate simpMessagingTemplate) {
         broadcastHandler = new BroadcastHandler(simpMessagingTemplate);
         ILog.d("ScoringService::setSimpMessagingTemplate", broadcastHandler().toString());
@@ -125,12 +134,13 @@ public class ScoringService extends Service {
 
     private void injectHandler(Dao dao, DaoFile daoFile) {
         teamHandler = new TeamHandler(dao);
-        matchHandler = new MatchHandler(dao);
+        matchHandler = new MatchHandler(dao, daoFile);
         scoreHandler = new ScoreHandler(dao, daoFile);
         rankingHandler = new RankingHandler(dao, matchHandler);
 
         liveScoreHandler = new LiveScoreHandler(matchHandler, scoreHandler, rankingHandler);
         liveScoreHandler.setBroadcastHandler(broadcastHandler);
 
+        tempScoreHandler = new TempScoreHandler(dao, daoFile, scoreHandler);
     }
 }

@@ -13,6 +13,7 @@ import { RankingEntry } from '../../core/models/rank.model';
 export class Rankings implements OnInit {
     rankings: WritableSignal<RankingEntry[]> = signal([]);
     isLoading: WritableSignal<boolean> = signal(false);
+    error: WritableSignal<string | null> = signal(null);
 
     constructor(private rankService: RankService) { }
 
@@ -21,6 +22,7 @@ export class Rankings implements OnInit {
     }
 
     loadRankings(): void {
+        this.error.set(null);
         this.isLoading.set(true)
         this.rankService.getRankStatus().subscribe({
             next: (data) => {
@@ -29,6 +31,7 @@ export class Rankings implements OnInit {
             },
             error: (err) => {
                 console.error('Failed to load rankings', err);
+                this.error.set('Failed to load rankings. Please try again.');
                 this.isLoading.set(false);
             }
         });
@@ -42,6 +45,7 @@ export class Rankings implements OnInit {
             },
             error: (err) => {
                 console.error('Failed to recalculate rankings', err);
+                this.error.set('Failed to recalculate rankings. Please try again.');
                 this.isLoading.set(false);
             }
         });

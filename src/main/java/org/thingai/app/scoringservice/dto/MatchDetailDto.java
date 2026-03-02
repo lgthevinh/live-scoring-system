@@ -13,6 +13,10 @@ public class MatchDetailDto {
     private Team[] blueTeams;
     private Score redScore;
     private Score blueScore;
+    private String redTempScoreRawData;
+    private String blueTempScoreRawData;
+    private boolean hasRedTempScore;
+    private boolean hasBlueTempScore;
 
     private HashMap<String, Boolean> surrogateMap;
 
@@ -81,5 +85,37 @@ public class MatchDetailDto {
 
     public void setBlueScore(Score blueScore) {
         this.blueScore = blueScore;
+    }
+
+    public String getRedTempScoreRawData() {
+        return redTempScoreRawData;
+    }
+
+    public void setRedTempScoreRawData(String redTempScoreRawData) {
+        this.redTempScoreRawData = redTempScoreRawData;
+    }
+
+    public String getBlueTempScoreRawData() {
+        return blueTempScoreRawData;
+    }
+
+    public void setBlueTempScoreRawData(String blueTempScoreRawData) {
+        this.blueTempScoreRawData = blueTempScoreRawData;
+    }
+
+    public boolean isHasRedTempScore() {
+        return hasRedTempScore;
+    }
+
+    public void setHasRedTempScore(boolean hasRedTempScore) {
+        this.hasRedTempScore = hasRedTempScore;
+    }
+
+    public boolean isHasBlueTempScore() {
+        return hasBlueTempScore;
+    }
+
+    public void setHasBlueTempScore(boolean hasBlueTempScore) {
+        this.hasBlueTempScore = hasBlueTempScore;
     }
 }

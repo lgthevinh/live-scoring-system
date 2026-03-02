@@ -1,8 +1,9 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import {AccountRoleType} from "../../../core/define/AccounRoleType";
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {CommonModule} from '@angular/common';
 import {AuthService} from '../../../core/services/auth.service';
+import {ToastService} from '../../../core/services/toast.service';
 
 interface Account {
   username: string;
@@ -16,6 +17,10 @@ interface Account {
   styleUrl: './create-account.css'
 })
 export class CreateAccount implements OnInit {
+  private authService = inject(AuthService);
+  private toastService = inject(ToastService);
+  private formBuilder = inject(FormBuilder);
+
   protected readonly AccountRoleType = AccountRoleType;
   protected passwordVisible: boolean = false;
 
@@ -23,22 +28,13 @@ export class CreateAccount implements OnInit {
   isEditing: boolean = false;
   editingUsername: string = '';
   isLoading: boolean = false;
-  message: string = '';
-  messageType: string = '';
 
-  createAccountForm: FormGroup;
-
-  constructor(
-    private formBuilder: FormBuilder,
-    private authService: AuthService
-  ) {
-    this.createAccountForm = this.formBuilder.group({
-      username: ['', Validators.required],
-      password: ['', Validators.required],
-      reEnterPassword: ['', Validators.required],
-      role: [0, Validators.required]
-    });
-  }
+  createAccountForm: FormGroup = this.formBuilder.group({
+    username: ['', Validators.required],
+    password: ['', Validators.required],
+    reEnterPassword: ['', Validators.required],
+    role: [0, Validators.required]
+  });
 
   ngOnInit() {
     this.loadAccounts();
@@ -46,7 +42,6 @@ export class CreateAccount implements OnInit {
 
   loadAccounts() {
     this.isLoading = true;
-    this.message = '';
     this.authService.getAllAccounts().subscribe({
       next: (response: any) => {
         this.accounts = response.accounts || [];
@@ -54,20 +49,10 @@ export class CreateAccount implements OnInit {
       },
       error: (err) => {
         console.error('Error loading accounts:', err);
-        this.showMessage('Error loading accounts', 'error');
+        this.toastService.show('Error loading accounts', 'error');
         this.isLoading = false;
       }
     });
-  }
-
-  showMessage(text: string, type: string) {
-    this.message = text;
-    this.messageType = type;
-    // Auto-clear message after 3 seconds
-    setTimeout(() => {
-      this.message = '';
-      this.messageType = '';
-    }, 3000);
   }
 
   togglePasswordVisibility() {
@@ -94,18 +79,18 @@ export class CreateAccount implements OnInit {
       this.authService.createAccount(credentials).subscribe({
         next: () => {
           console.log('Account created successfully.');
-          this.showMessage('Account created successfully', 'success');
+          this.toastService.show('Account created successfully', 'success');
           this.resetForm();
           this.loadAccounts();
         },
         error: (err) => {
-          this.showMessage('Error creating account: ' + (err.error?.message || 'Unknown error'), 'error');
+          this.toastService.show('Error creating account: ' + (err.error?.message || 'Unknown error'), 'error');
           console.error('Error creating account:', err);
           this.isLoading = false;
         }
       });
     } else {
-      this.showMessage('Passwords do not match', 'error');
+      this.toastService.show('Passwords do not match', 'error');
     }
   }
 
@@ -119,18 +104,18 @@ export class CreateAccount implements OnInit {
       this.authService.updateAccount(this.editingUsername, credentials).subscribe({
         next: () => {
           console.log('Account updated successfully.');
-          this.showMessage('Account updated successfully', 'success');
+          this.toastService.show('Account updated successfully', 'success');
           this.resetForm();
           this.loadAccounts();
         },
         error: (err) => {
-          this.showMessage('Error updating account: ' + (err.error?.message || 'Unknown error'), 'error');
+          this.toastService.show('Error updating account: ' + (err.error?.message || 'Unknown error'), 'error');
           console.error('Error updating account:', err);
           this.isLoading = false;
         }
       });
     } else {
-      this.showMessage('Passwords do not match', 'error');
+      this.toastService.show('Passwords do not match', 'error');
     }
   }
 
@@ -148,20 +133,40 @@ export class CreateAccount implements OnInit {
   }
 
   deleteAccount(username: string) {
-    if (confirm(`Are you sure you want to delete account "${username}"?`)) {
-      this.isLoading = true;
-      this.authService.deleteAccount(username).subscribe({
-        next: () => {
-          this.showMessage('Account deleted successfully', 'success');
-          this.loadAccounts();
-        },
-        error: (err) => {
-          this.showMessage('Error deleting account: ' + (err.error?.message || 'Unknown error'), 'error');
-          console.error('Error deleting account:', err);
-          this.isLoading = false;
-        }
-      });
-    }
+    // Store account for potential undo
+    const deletedAccount = this.accounts.find(a => a.username === username);
+
+    this.isLoading = true;
+    this.authService.deleteAccount(username).subscribe({
+      next: () => {
+        this.toastService.show(`Account "${username}" deleted`, 'success', 15000, {
+          label: 'Undo',
+          onAction: () => {
+            if (deletedAccount) {
+              // Generate a secure random temporary password
+              const tempPassword = this.generateTempPassword();
+              const credentials = {
+                username: deletedAccount.username,
+                password: tempPassword,
+                role: deletedAccount.role
+              };
+              this.authService.createAccount(credentials).subscribe(() => {
+                this.loadAccounts();
+                this.toastService.show(`Account restored. Temporary password: ${tempPassword} - Please reset password immediately.`, 'success', 10000);
+              }, () => {
+                this.toastService.show('Failed to restore account', 'error');
+              });
+            }
+          }
+        });
+        this.loadAccounts();
+      },
+      error: (err) => {
+        this.toastService.show('Error deleting account: ' + (err.error?.message || 'Unknown error'), 'error');
+        console.error('Error deleting account:', err);
+        this.isLoading = false;
+      }
+    });
   }
 
   resetForm() {
@@ -173,6 +178,19 @@ export class CreateAccount implements OnInit {
 
   validatePasswords(password: string, confirmPassword: string): boolean {
     return password === confirmPassword;
+  }
+
+  /**
+   * Generate a secure random temporary password for account restoration
+   */
+  private generateTempPassword(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    const length = 12;
+    let password = '';
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
   }
 
   getRoleName(role: number): string {

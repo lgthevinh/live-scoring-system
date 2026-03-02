@@ -1,5 +1,6 @@
 package org.thingai.app.scoringservice.handler;
 
+import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.BroadcastMessageType;
 import org.thingai.app.scoringservice.define.ErrorCode;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class LiveScoreHandler {
     private static final String TAG = "ScorekeeperHandler";
     private static final int MATCH_DURATION_SECONDS = 180; // modify this based on season rules
+    private static final long SOUND_DEBOUNCE_MS = 5000; // Debounce sound for 5 seconds to prevent overlapping
 
     private final MatchTimerHandler matchTimerHandler;
     private final MatchHandler matchHandler;
@@ -39,6 +41,9 @@ public class LiveScoreHandler {
     /* Flags */
     private boolean isRedCommitable = false;
     private boolean isBlueCommitable = false;
+    /* Sound debouncing */
+    private volatile boolean isCountdownRunning = false;
+    private volatile long lastSoundBroadcastTime = 0;
 
     public LiveScoreHandler(MatchHandler matchHandler, ScoreHandler scoreHandler, RankingHandler rankingHandler) {
         this.matchHandler = matchHandler;
@@ -98,6 +103,13 @@ public class LiveScoreHandler {
                 return;
             }
 
+            // Prevent multiple countdowns from running simultaneously (debouncing)
+            if (isCountdownRunning) {
+                ILog.w(TAG, "Countdown already running, ignoring duplicate start request");
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "Match countdown already in progress");
+                return;
+            }
+
             int fieldNumber = currentMatch.getMatch().getFieldNumber();
             String rootTopic = "/topic/display/field/" + fieldNumber;
 
@@ -109,22 +121,33 @@ public class LiveScoreHandler {
             // Start 3-second countdown before main timer
             final int countdownSeconds = 3;
             final int[] countdown = {countdownSeconds};
+            isCountdownRunning = true;
+
             ScheduledExecutorService countdownScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
             countdownScheduler.scheduleAtFixedRate(() -> {
                 if (countdown[0] > 0) {
                     // Broadcast countdown value
                     MatchTimeStatusDto countdownDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), countdown[0]);
                     broadcastHandler.broadcast(rootTopic + "/timer", countdownDto, BroadcastMessageType.MATCH_STATUS);
-                    
+
                     // When countdown reaches 3 (first countdown tick), broadcast PLAY_SOUND for synchronized playback
+                    // Use debouncing to prevent overlapping sounds
                     if (countdown[0] == countdownSeconds) {
-                        broadcastHandler.broadcast(rootTopic + "/sound", countdownDto, BroadcastMessageType.PLAY_SOUND);
+                        long currentTimeMs = System.currentTimeMillis();
+                        if (currentTimeMs - lastSoundBroadcastTime > SOUND_DEBOUNCE_MS) {
+                            lastSoundBroadcastTime = currentTimeMs;
+                            broadcastHandler.broadcast(rootTopic + "/sound", countdownDto, BroadcastMessageType.PLAY_SOUND);
+                            ILog.d(TAG, "PLAY_SOUND broadcast at countdown " + countdown[0]);
+                        } else {
+                            ILog.w(TAG, "Sound broadcast debounced - too soon since last broadcast");
+                        }
                     }
-                    
+
                     countdown[0]--;
                 } else {
                     // Countdown finished, start main timer at full 3:00 (180 seconds)
                     countdownScheduler.shutdown();
+                    isCountdownRunning = false;
                     matchTimerHandler.startTimer(currentMatch.getMatch().getId(), fieldNumber, typicalMatchDuration);
                     MatchTimeStatusDto initialTimerDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), typicalMatchDuration);
                     broadcastHandler.broadcast(rootTopic + "/timer", initialTimerDto, BroadcastMessageType.MATCH_STATUS);
@@ -137,6 +160,7 @@ public class LiveScoreHandler {
 
             callback.onSuccess(true, "Match started");
         } catch (Exception e) {
+            isCountdownRunning = false;
             e.printStackTrace();
             callback.onFailure(ErrorCode.CUSTOM_ERR, "Failed to start match: " + e.getMessage());
         }
@@ -322,8 +346,25 @@ public class LiveScoreHandler {
     public void overrideScore(String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
         ILog.d(TAG, "Override score request received for alliance " + allianceId + ": " + jsonScoreData);
         
+        // Validate inputs
+        if (allianceId == null || allianceId.isEmpty()) {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "AllianceId is required");
+            return;
+        }
+        if (jsonScoreData == null || jsonScoreData.isEmpty()) {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "Score data is required");
+            return;
+        }
+        
         // Extract matchId from allianceId (e.g., "Q1_R" -> "Q1")
-        String matchId = allianceId.contains("_") ? allianceId.substring(0, allianceId.lastIndexOf("_")) : allianceId;
+        String matchId;
+        if (!allianceId.contains("_")) {
+            ILog.w(TAG, "AllianceId does not contain underscore: " + allianceId);
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "Invalid allianceId format: " + allianceId + " (expected format: MATCHID_R or MATCHID_B)");
+            return;
+        }
+        matchId = allianceId.substring(0, allianceId.lastIndexOf("_"));
+        ILog.d(TAG, "Extracted matchId: " + matchId);
         String otherAllianceId = allianceId.endsWith("_R") ? matchId + "_B" : matchId + "_R";
         
         // Fetch the other alliance's score first
@@ -354,6 +395,7 @@ public class LiveScoreHandler {
             targetScore.calculatePenalties();
             targetScore.calculateTotalScore();
             targetScore.setStatus(ScoreStatus.SCORED);
+            targetScore.setApproved(true); // Auto-approve score overrides from match control
 
             scoreHandler.submitScore(targetScore, true, new RequestCallback<Score>() {
                 @Override
@@ -468,11 +510,17 @@ public class LiveScoreHandler {
         // Stop the timer
         matchTimerHandler.stopTimer();
 
+        // Reset countdown flag to allow new countdowns
+        isCountdownRunning = false;
+
         // Broadcast abort state to all displays
         int fieldNumber = currentMatch.getMatch().getFieldNumber();
         String rootTopic = "/topic/display/field/" + fieldNumber;
         MatchTimeStatusDto abortDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), -1); // -1 indicates aborted
         broadcastHandler.broadcast(rootTopic + "/timer", abortDto, BroadcastMessageType.MATCH_STATUS);
+
+        // Broadcast STOP_SOUND to stop any playing sound
+        broadcastHandler.broadcast(rootTopic + "/sound", abortDto, BroadcastMessageType.STOP_SOUND);
 
         // Move current match back to loaded state (can be restarted)
         MatchDetailDto abortedMatch = currentMatch;
@@ -526,45 +574,99 @@ public class LiveScoreHandler {
     }
 
     public void handleScoreSubmission(boolean isRed, String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
-        // Check if allianceId matches current match
-        String currentAllianceId;
-        boolean isCommited;
-        if (isRed) {
-            currentAllianceId = currentRedScoreHolder.getAllianceId();
-            isCommited = isRedCommitable;
-        } else {
-            currentAllianceId = currentBlueScoreHolder.getAllianceId();
-            isCommited = isBlueCommitable;
+        ILog.d(TAG, "=== HANDLE SCORE SUBMISSION ===");
+        ILog.d(TAG, "isRed: " + isRed + ", allianceId: " + allianceId);
+        ILog.d(TAG, "jsonScoreData: " + jsonScoreData);
+        // Check if we have an active match with score holders
+        Score activeScoreHolder = isRed ? currentRedScoreHolder : currentBlueScoreHolder;
+        boolean hasActiveMatch = activeScoreHolder != null;
+        
+        // If active match exists, verify alliance ID matches
+        if (hasActiveMatch) {
+            String currentAllianceId = activeScoreHolder.getAllianceId();
+            boolean isCommited = isRed ? isRedCommitable : isBlueCommitable;
+            
+            if (!allianceId.equals(currentAllianceId) && isCommited) {
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "Current alliance is not commitable");
+                return;
+            }
         }
-
-        if (!allianceId.equals(currentAllianceId) && isCommited) {
-            callback.onFailure(ErrorCode.CUSTOM_ERR, "Current alliance is not commitable");
-            return;
-        }
-
+        
         try {
             Score submittedScore;
-
-            // Update current score holder
-            if (isRed) {
-                submittedScore = currentRedScoreHolder;
-                isRedCommitable = true;
+            
+            if (hasActiveMatch) {
+                // Use active match score holder
+                submittedScore = activeScoreHolder;
+                if (isRed) {
+                    isRedCommitable = true;
+                } else {
+                    isBlueCommitable = true;
+                }
             } else {
-                submittedScore = currentBlueScoreHolder;
-                isBlueCommitable = true;
+                // No active match - create new score from factory
+                submittedScore = ScoreHandler.factoryScore();
+                submittedScore.setAllianceId(allianceId);
             }
-
-            submittedScore.fromJson(jsonScoreData);
-            submittedScore.calculatePenalties();
-            submittedScore.calculateTotalScore();
-            submittedScore.setStatus(ScoreStatus.SCORED);
-
-            ILog.d(TAG, "Score submission received for alliance " + allianceId + ": Total=" + submittedScore.getTotalScore() + ", Penalties=" + submittedScore.getPenaltiesScore());
-
-            callback.onSuccess(true, "Score submission processed successfully");
+            
+            // Always save to temp score - scorekeeper will commit later
+            saveAsTempScore(allianceId, jsonScoreData, callback);
         } catch (Exception e) {
             e.printStackTrace();
             callback.onFailure(ErrorCode.CUSTOM_ERR, "Failed to process score submission: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Save score as temp score for scorekeeper review
+     */
+    private void saveAsTempScore(String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
+        // Get default submittedBy (could be enhanced to pass actual user)
+        String submittedBy = "referee";
+
+        // Use the temp score handler to save
+        TempScoreHandler tempHandler = ScoringService.tempScoreHandler();
+        if (tempHandler != null) {
+            tempHandler.saveTempScore(allianceId, jsonScoreData, submittedBy, new RequestCallback<String>() {
+                @Override
+                public void onSuccess(String tempScoreId, String message) {
+                    ILog.d(TAG, "Saved as temp score: " + tempScoreId);
+                    callback.onSuccess(true, "Score saved as temp - awaiting scorekeeper approval");
+                }
+
+                @Override
+                public void onFailure(int errorCode, String errorMessage) {
+                    ILog.e(TAG, "Failed to save temp score: " + errorMessage);
+                    callback.onFailure(errorCode, "Failed to save temp score: " + errorMessage);
+                }
+            });
+        } else {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "Temp score handler not available");
+        }
+    }
+
+    /**
+     * Updates the current match's end time when both scores are committed.
+     */
+    private void updateMatchEndTime() {
+        try {
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+            LocalDateTime currentTime = LocalDateTime.now();
+
+            currentMatch.getMatch().setMatchEndTime(currentTime.format(timeFormatter));
+            matchHandler.updateMatch(currentMatch.getMatch(), new RequestCallback<Match>() {
+                @Override
+                public void onSuccess(Match responseObject, String message) {
+                    ILog.d(TAG, "Match end time auto-set after both scores committed: " + message);
+                }
+
+                @Override
+                public void onFailure(int errorCode, String errorMessage) {
+                    ILog.d(TAG, "Failed to auto-set match end time: " + errorMessage);
+                }
+            });
+        } catch (Exception e) {
+            ILog.e(TAG, "Error updating match end time: " + e.getMessage());
         }
     }
 

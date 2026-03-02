@@ -16,6 +16,8 @@ export class ScoresheetComponent {
     @Input() match: MatchDetailDto | null = null;
     @Input() alliance: 'red' | 'blue' | null = null;
     @Input() editable: boolean = false;
+    @Input() redScoreData: any = null;
+    @Input() blueScoreData: any = null;
 
     @Output() redScoreChange = new EventEmitter<any>();
     @Output() blueScoreChange = new EventEmitter<any>();

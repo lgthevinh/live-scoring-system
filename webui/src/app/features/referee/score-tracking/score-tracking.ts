@@ -1,12 +1,14 @@
-import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, WritableSignal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { SyncService } from '../../../core/services/sync.service';
 import { MatchDetailDto } from '../../../core/models/match.model';
 import { BroadcastService } from '../../../core/services/broadcast.service';
 import { RefereeService } from '../../../core/services/referee.service';
+import { ScoreSubmitBufferService, BufferedScoreSubmission } from '../../../core/services/score-submit-buffer.service';
+import { ToastService } from '../../../core/services/toast.service';
 
 type CounterKey =
   | 'whiteBallsScored'
@@ -46,6 +48,10 @@ export class ScoreTracking implements OnInit, OnDestroy {
   submitting: WritableSignal<boolean> = signal(false);
   submitMessage: WritableSignal<string> = signal('');
 
+  // Buffer-related state
+  showCommitModal: WritableSignal<boolean> = signal(false);
+  bufferedSubmissionId: WritableSignal<string | null> = signal(null);
+
   // Versioning + source for robust live updates
   private version: WritableSignal<number> = signal(0);
   private readonly sourceId: string = this.initSourceId();
@@ -76,6 +82,24 @@ export class ScoreTracking implements OnInit, OnDestroy {
   // Selected imbalance category
   selectedImbalance: WritableSignal<number> = signal(2);
 
+  // Computed calculated score for display
+  calculatedScore = computed(() => this.calculateTotalScore());
+
+  // Breakdown computed values
+  biologicalPoints = computed(() => (this.counters.goldenBallsScored() * 3) + this.counters.whiteBallsScored());
+  barrierPoints = computed(() => (this.allianceBarrierPushed() ? 10 : 0) + (this.opponentBarrierPushed() ? 10 : 0));
+  endGamePoints = computed(() => (this.counters.partialParking() * 5) + (this.counters.fullParking() * 10));
+  fleetBonus = computed(() => this.counters.fullParking() >= 2 ? 10 : 0);
+  penaltyPoints = computed(() => (this.counters.penaltyCount() * 5) + (this.counters.yellowCardCount() * 10));
+  coefficient = computed(() => {
+    const imbalanceMultipliers = [2.0, 1.5, 1.3];
+    let coeff = imbalanceMultipliers[this.selectedImbalance()] || 1.3;
+    if (!this.allianceBarrierPushed()) {
+      coeff -= 0.2;
+    }
+    return Math.max(0, coeff);
+  });
+
   private sub: any;
 
   constructor(
@@ -83,7 +107,10 @@ export class ScoreTracking implements OnInit, OnDestroy {
     private sync: SyncService,
     private broadcastService: BroadcastService,
     private refereeService: RefereeService,
-    private location: Location
+    public bufferService: ScoreSubmitBufferService,
+    private location: Location,
+    private toastService: ToastService,
+    private router: Router
   ) { }
 
   ngOnInit(): void {
@@ -104,12 +131,17 @@ export class ScoreTracking implements OnInit, OnDestroy {
     this.loading.set(true);
     this.error.set(null);
     this.match.set(null);
+    this.bufferedSubmissionId.set(null);
 
     this.sync.syncPlayingMatches().subscribe({
       next: (list) => {
         const found = (list || []).find(m => m.match.id === this.matchId);
         this.match.set(found ?? null);
         this.loading.set(false);
+
+        // Check if there's already a pending submission for this match
+        this.checkExistingPendingSubmission();
+
         // Send an initial snapshot so displays can align immediately
         this.onScoreUpdate('init', 'whiteBallsScored', this.counters.whiteBallsScored());
       },
@@ -118,6 +150,30 @@ export class ScoreTracking implements OnInit, OnDestroy {
         this.loading.set(false);
       }
     });
+  }
+
+  private checkExistingPendingSubmission(): void {
+    const existing = this.bufferService.getPendingForMatch(this.matchId, this.color);
+    if (existing) {
+      // Load the existing data into the form
+      this.loadFromBuffer(existing);
+      this.bufferedSubmissionId.set(existing.id);
+      this.submitMessage.set('Loaded existing pending submission for this match');
+      setTimeout(() => this.submitMessage.set(''), 3000);
+    }
+  }
+
+  private loadFromBuffer(submission: BufferedScoreSubmission): void {
+    this.counters.whiteBallsScored.set(submission.payload.whiteBallsScored);
+    this.counters.goldenBallsScored.set(submission.payload.goldenBallsScored);
+    this.counters.partialParking.set(submission.payload.partialParking);
+    this.counters.fullParking.set(submission.payload.fullParking);
+    this.counters.penaltyCount.set(submission.payload.penaltyCount);
+    this.counters.yellowCardCount.set(submission.payload.yellowCardCount);
+    this.allianceBarrierPushed.set(submission.payload.allianceBarrierPushed);
+    this.opponentBarrierPushed.set(submission.payload.opponentBarrierPushed);
+    this.selectedImbalance.set(submission.payload.imbalanceCategory);
+    this.redCard.set(submission.payload.redCard);
   }
 
   titleText(): string {
@@ -167,6 +223,35 @@ export class ScoreTracking implements OnInit, OnDestroy {
     this.redCard.set(false);
     this.allianceBarrierPushed.set(false);
     this.opponentBarrierPushed.set(false);
+    this.bufferedSubmissionId.set(null);
+  }
+
+  setCounterValue(key: CounterKey, event: Event) {
+    const input = event.target as HTMLInputElement;
+    let value = parseInt(input.value, 10);
+
+    if (isNaN(value) || value < 0) value = 0;
+
+    // Apply max limits
+    switch (key) {
+      case 'whiteBallsScored':
+      case 'goldenBallsScored':
+        if (value > 100) value = 100;
+        break;
+      case 'partialParking':
+      case 'fullParking':
+        if (value > 2) value = 2;
+        // Check total parking doesn't exceed 2
+        const otherKey = key === 'partialParking' ? 'fullParking' : 'partialParking';
+        const otherValue = this.counters[otherKey]();
+        if (value + otherValue > 2) {
+          value = 2 - otherValue;
+        }
+        break;
+    }
+
+    this.counters[key].set(value);
+    this.onScoreUpdate('reset', key, value);
   }
 
   canDecrease(key: CounterKey): boolean {
@@ -178,7 +263,7 @@ export class ScoreTracking implements OnInit, OnDestroy {
     switch (key) {
       case 'whiteBallsScored':
       case 'goldenBallsScored':
-        return currentValue < 50; // Max 50 balls each
+        return currentValue < 100; // Max 100 balls each
       case 'partialParking':
       case 'fullParking':
         // Total parking cannot exceed 2 (since there are 2 robots)
@@ -228,6 +313,47 @@ export class ScoreTracking implements OnInit, OnDestroy {
     return m ? m.blueTeams.map(t => t.teamId).join(', ') : '';
   }
 
+  /**
+   * Calculate the total score based on current counters
+   * Matches server-side calculation in FanrocScore.java
+   */
+  calculateTotalScore(): number {
+    if (this.redCard()) {
+      return 0;
+    }
+
+    // Biological points (balls scored)
+    const biologicalPoints = (this.counters.goldenBallsScored() * 3) + this.counters.whiteBallsScored();
+
+    // Barrier points (10 points each)
+    const barrierPoints = (this.allianceBarrierPushed() ? 10 : 0) + (this.opponentBarrierPushed() ? 10 : 0);
+
+    // Calculate coefficient with barrier penalty (matches server logic)
+    const imbalanceMultipliers = [2.0, 1.5, 1.3];
+    let coefficient = imbalanceMultipliers[this.selectedImbalance()] || 1.3;
+    if (!this.allianceBarrierPushed()) {
+      coefficient -= 0.2; // Server subtracts 0.2 if alliance barrier not pushed
+    }
+
+    // End game points (parking)
+    const endGamePoints = (this.counters.partialParking() * 5) + (this.counters.fullParking() * 10);
+
+    // Fleet bonus (both robots fully parked)
+    const fleetBonus = this.counters.fullParking() >= 2 ? 10 : 0;
+
+    // Penalties
+    const penalties = (this.counters.penaltyCount() * 5) + (this.counters.yellowCardCount() * 10);
+
+    // Calculate base score (matches server: Math.round)
+    const baseScore = (biologicalPoints + barrierPoints) * coefficient;
+    const totalScore = Math.round(baseScore + endGamePoints + fleetBonus - penalties);
+
+    return Math.max(0, totalScore);
+  }
+
+  /**
+   * Submit score and add to buffer
+   */
   submitScore() {
     if (!this.match()) {
       this.submitMessage.set('No match loaded – cannot submit.');
@@ -238,13 +364,30 @@ export class ScoreTracking implements OnInit, OnDestroy {
     this.submitMessage.set('');
 
     const payload = this.buildScorePayload();
+
+    // Add to buffer first
+    const m = this.match()!;
+    const teamIds = this.color === 'red'
+      ? m.redTeams.map(t => t.teamId)
+      : m.blueTeams.map(t => t.teamId);
+
+    this.bufferService.addToBuffer({
+      matchId: this.matchId,
+      allianceId: this.allianceId,
+      color: this.color,
+      matchCode: m.match.matchCode || this.matchId,
+      teamIds,
+      payload,
+      calculatedScore: this.calculateTotalScore()
+    });
+
     this.refereeService.submitFinalScore(this.color, this.allianceId, payload).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        this.submitMessage.set('Score submitted successfully.');
-        setTimeout(() => this.submitMessage.set(''), 4000);
-
-        this.location.back();
+        this.submitMessage.set('Score submitted and awaiting approval by scorekeeper.');
+        setTimeout(() => this.submitMessage.set(''), 5000);
+        this.toastService.show('Score submitted successfully', 'success');
+        this.router.navigate(['/referee']);
       },
       error: (err) => {
         this.submitting.set(false);
@@ -253,6 +396,60 @@ export class ScoreTracking implements OnInit, OnDestroy {
       }
     });
   }
+
+  /**
+   * Open the commit modal
+   */
+  openCommitModal() {
+    this.showCommitModal.set(true);
+  }
+
+  /**
+   * Close the commit modal
+   */
+  closeCommitModal() {
+    this.showCommitModal.set(false);
+  }
+
+  /**
+   * Submit a specific buffered submission
+   */
+  submitBufferedSubmission(submissionId: string) {
+    const submission = this.bufferService.buffer().find(s => s.id === submissionId);
+    if (!submission) return;
+
+
+    this.refereeService.submitFinalScore(submission.color, submission.allianceId, submission.payload).subscribe({
+      next: () => {
+        this.bufferService.markAsSubmitted(submissionId);
+      },
+      error: (err) => {
+        this.bufferService.markAsError(submissionId, err?.error?.message || 'Unknown error');
+      }
+    });
+  }
+
+  /**
+   * Submit all pending buffered submissions
+   */
+  submitAllPending() {
+    const pending = this.bufferService.getPendingSubmissions();
+    pending.forEach(submission => {
+      this.submitBufferedSubmission(submission.id);
+    });
+  }
+
+  /**
+   * Remove a submission from the buffer
+   */
+  removeFromBuffer(submissionId: string) {
+    this.bufferService.removeFromBuffer(submissionId);
+    if (this.bufferedSubmissionId() === submissionId) {
+      this.bufferedSubmissionId.set(null);
+    }
+  }
+
+
 
   /**
    * Handle score updates by broadcasting a full snapshot, so receivers can stay in sync.

@@ -61,8 +61,8 @@ export const CUSTOM_SEASON_CONFIG: ScoresheetConfig = {
                     title: 'End Game',
                     type: 'fields',
                     fields: [
-                        { key: 'partialParking', label: 'Partial Parking', type: 'number', min: 0 },
-                        { key: 'fullParking', label: 'Full Parking', type: 'number', min: 0 }
+                        { key: 'partialParking', label: 'Partial Parking (5 pts each)', type: 'number', min: 0, max: 2 },
+                        { key: 'fullParking', label: 'Full Parking (10 pts each)', type: 'number', min: 0, max: 2 }
                     ]
                 },
                 {
@@ -80,9 +80,9 @@ export const CUSTOM_SEASON_CONFIG: ScoresheetConfig = {
                                 { value: 2, label: 'Large', description: '1.3x bonus - 4+ balls difference' }
                             ]
                         },
-                        { key: 'penaltyCount', label: 'Minor Penalty Violations', type: 'number', min: 0 },
-                        { key: 'yellowCardCount', label: 'Yellow Card Violations', type: 'number', min: 0 },
-                        { key: 'redCard', label: 'Red Card', type: 'boolean' }
+                        { key: 'penaltyCount', label: 'Minor Penalty Violations (-5 pts each)', type: 'number', min: 0, max: 99 },
+                        { key: 'yellowCardCount', label: 'Yellow Card Violations (-10 pts each)', type: 'number', min: 0, max: 99 },
+                        { key: 'redCard', label: 'Red Card (Zeroes entire score)', type: 'boolean' }
                     ]
                 }
             ]

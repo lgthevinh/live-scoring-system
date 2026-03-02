@@ -1,19 +1,17 @@
-Create schedule for 10 teams playing 3 rounds in 8 matches
+Create schedule for 6 teams playing 3 rounds in 5 matches
 with a minimum match separation of 1 running 100000 iterations.
 
-   0:00   91.19% complete (10 updates), less than a minute to go      0:00   100.00% complete (10 updates), operation complete         
-Results for 10 teams playing 3 rounds in 8 matches
+   0:00   100.00% complete (6 updates), operation complete         balancing station appearances (Sykes method) used 0.000002 seconds.
+
+Results for 6 teams playing 3 rounds in 5 matches
 
 Match Schedule
 --------------
-  1:   10     3     2     9 
-  2:    6     1     7     8 
-  3:    4     2     5     6 
-  4:    9    10     1     4 
-  5:    7     5     3     8 
-  6:    5     3     1    10 
-  7:    8     2     4     7 
-  8:    6     8*    9     5*
+  1:    2     6     1     5 
+  2:    4     1     3     2 
+  3:    3     4     5     6 
+  4:    5     2     6     3 
+  5:    1     6*    4     5*
 
 
 Schedule Statistics
@@ -34,30 +32,26 @@ Schedule Statistics
 
  team   #   d    part    opp    both    r/b <->   s1 s2 4+ repeats
  ----  --  --   -----   -----   -----   --- ---   -- -- ------------
-    1:  3   2 |  3  1 |  6  1 |  8  2 |  1b   1 |  2  1
-    2:  3   2 |  3  1 |  6  1 |  8  2 |  1r   1 |  1  2
-    3:  3   1 |  3  1 |  6  1 |  7  2 |  1r   2 |  1  2
-    4:  3   1 |  3  1 |  6  1 |  8  2 |  1b   1 |  2  1
-    5:  3+  1 |  3  1 |  6  1 |  8  2 |  1r   1 |  2  1
-    6:  3   1 |  3  1 |  6  1 |  7  2 |  1r   2 |  2  1
-    7:  3   2 |  3  1 |  5  2 |  7  3 |  1b   2 |  2  1
-    8:  3+  1 |  3  1 |  5  2 |  7  3 |  1b   1 |  1  2
-    9:  3   3 |  3  1 |  6  1 |  8  2 |  1b   2 |  2  1
-   10:  3   2 |  3  1 |  6  1 |  6  2 |  1r   1 |  1  2
+    1:  3   1 |  3  1 |  5  2 |  5  2 |  1r   1 |  2  1
+    2:  3   1 |  3  1 |  5  2 |  5  2 |  1r   2 |  1  2
+    3:  3   1 |  3  1 |  5  2 |  5  2 |  1b   2 |  2  1
+    4:  3   1 |  3  1 |  5  2 |  5  2 |  1r   1 |  2  1
+    5:  3+  1 |  3  1 |  4  2 |  5  3 |  1b   1 |  2  1
+    6:  3+  1 |  3  1 |  5  2 |  5  3 |  1b   1 |  1  2
 ------------------------------------------------------------
- best:  3   3 |  3  1 |  6  1 |  8  2 |  1    1 |  2  2
-worst:  4   1 |  3  1 |  5  2 |  6  3 |  1    2 |  1  1
+ best:  3   1 |  3  1 |  5  2 |  5  2 |  1    1 |  2  2
+worst:  4   1 |  3  1 |  4  2 |  5  3 |  1    2 |  1  1
 ------------------------------------------------------------
 station appearance count histogram:
 0: 0
-1: 10
-2: 10
+1: 6
+2: 6
 3: 0
 ------------------------------------------------------------
 alliance swap count histogram:
-2: 4
-1: 6
+2: 2
+1: 4
 0: 0
 
-elapsed time: 0.28 seconds
+elapsed time: 0.094604 seconds
 

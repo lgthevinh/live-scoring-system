@@ -11,7 +11,7 @@
         <a href="#" class="nav-link" [class.active]="selectedTab() === 'schedule'"
           (click)="$event.preventDefault(); setTab('schedule')">
           <i class="bi bi-list-ul me-2"></i>
-          Schedule
+          Schedule 
         </a>
       </li>
       <li>
@@ -141,7 +141,8 @@
                   <button class="btn btn-warning btn-sm me-2" (click)="activateMatch()" [disabled]="!loaded()">Active Match</button>
                   <button class="btn btn-outline-secondary btn-sm me-2" (click)="showCurrentMatch()" [disabled]="!active()">Show Match</button>
                   <button class="btn btn-primary btn-sm me-2" (click)="startMatch()" [disabled]="!active()">Start</button>
-                  <button class="btn btn-outline-danger btn-sm" (click)="abortMatch()" [disabled]="!active()">Abort</button>
+                  <button class="btn btn-outline-danger btn-sm me-2" (click)="abortMatch()" [disabled]="!active()">Abort</button>
+
                 </div>
               </div>
               <div class="row g-2">
@@ -163,8 +164,14 @@
       <div class="card my-3">
         <div class="card-body py-2 d-flex justify-content-between align-items-center">
           <div class="fw-semibold">{{ selectedTabTitle() }}</div>
-          <button class="btn btn-outline-secondary btn-sm" (click)="commitAndPostLastMatch()">Commit & Post Last
-            Match</button>
+          <button class="btn btn-outline-secondary btn-sm position-relative" (click)="openCommitModal()">
+            <i class="bi bi-collection me-1"></i>
+            Commit & Post Last Match
+            <span *ngIf="bufferService.pendingCount() > 0"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+              {{ bufferService.pendingCount() }}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -200,6 +207,8 @@
                 <th>Blue 1</th>
                 <th>Blue 2</th>
                 <th>Blue 3</th>
+                <th class="text-center bg-danger text-white">Red Score</th>
+                <th class="text-center bg-primary text-white">Blue Score</th>
                 <th class="text-center" style="width: 90px;">Load</th>
                 <th class="text-center" style="width: 120px;">Enter Scores</th>
               </tr>
@@ -216,6 +225,24 @@
                 <td [class.surrogate-team]="isSurrogate(m, m.blueTeams[0]?.teamId)">{{ m.blueTeams[0]?.teamId }}</td>
                 <td [class.surrogate-team]="isSurrogate(m, m.blueTeams[1]?.teamId)">{{ m.blueTeams[1]?.teamId }}</td>
                 <td [class.surrogate-team]="isSurrogate(m, m.blueTeams[2]?.teamId)">{{ m.blueTeams[2]?.teamId }}</td>
+                <td class="text-center fw-bold text-danger">
+                  @if (m.redScore == null || m.redScore.status === 0) {
+                    -
+                  } @else if (m.redScore.approved === true) {
+                    {{ m.redScore.totalScore }}
+                  } @else {
+                    <span class="badge bg-warning text-dark">Pending</span>
+                  }
+                </td>
+                <td class="text-center fw-bold text-primary">
+                  @if (m.blueScore == null || m.blueScore.status === 0) {
+                    -
+                  } @else if (m.blueScore.approved === true) {
+                    {{ m.blueScore.totalScore }}
+                  } @else {
+                    <span class="badge bg-warning text-dark">Pending</span>
+                  }
+                </td>
                 <td class="text-center">
                   <button class="btn btn-outline-primary btn-sm px-2" (click)="playMatch(m)">Load</button>
                 </td>
@@ -272,7 +299,7 @@
             </div>
           </div>
 
-          <app-scoresheet [match]="editingMatch()" [editable]="true" (redScoreChange)="onRedScoreChange($event)"
+          <app-scoresheet [match]="editingMatch()" [editable]="true" [redScoreData]="redScoreData" [blueScoreData]="blueScoreData" (redScoreChange)="onRedScoreChange($event)"
             (blueScoreChange)="onBlueScoreChange($event)">
           </app-scoresheet>
           }
@@ -357,6 +384,352 @@
         </div>
       </div>
       }
+    </div>
+  </div>
+</div>
+
+<!-- Commit Manager Modal -->
+<div *ngIf="showCommitModal()" class="modal-backdrop" (click)="closeCommitModal()">
+  <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-collection me-2"></i>
+          Commit Manager - Pending Submissions & Approvals
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeCommitModal()"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Section: Buffered Submissions -->
+        <div *ngIf="bufferService.pendingCount() > 0 || bufferService.errorSubmissions().length > 0" class="mb-4">
+          <h6 class="text-secondary mb-3">
+            <i class="bi bi-collection me-2"></i>Buffered Submissions ({{ bufferService.pendingCount() }})
+          </h6>
+          <div class="commit-list">
+            <div *ngFor="let submission of bufferService.buffer()"
+                 [class.border-danger]="submission.status === 'error'"
+                 class="commit-item card mb-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <span [class.bg-danger]="submission.color === 'red'"
+                            [class.bg-primary]="submission.color === 'blue'"
+                            class="badge fs-6">{{ submission.color | titlecase }}</span>
+                      <strong class="fs-5">{{ submission.matchCode }}</strong>
+                      <span class="text-muted small">
+                        <i class="bi bi-clock me-1"></i>{{ submission.timestamp | date:'HH:mm' }}
+                      </span>
+                      <span *ngIf="submission.status === 'error'" class="badge bg-danger">Error</span>
+                      <span *ngIf="submission.status === 'pending'" class="badge bg-info">Pending</span>
+                      <span *ngIf="submission.status === 'submitted'" class="badge bg-success">Committed</span>
+                    </div>
+                    <div class="text-muted">
+                      Teams: {{ submission.teamIds.join(', ') }}
+                    </div>
+                     <div class="mt-2">
+                       <span class="fw-bold fs-5" [class.text-success]="submission.calculatedScore > 0">
+                         Score: {{ submission.calculatedScore }}
+                       </span>
+                     </div>
+                     <div *ngIf="submission.tempScoreData" class="mt-2 alert alert-info py-1">
+                       <small><i class="bi bi-clock-history me-1"></i>Temp Score Available</small>
+                       <div class="row g-1 mt-1">
+                         <div class="col-6"><small>White: {{ submission.tempScoreData.whiteBallsScored }}</small></div>
+                         <div class="col-6"><small>Golden: {{ submission.tempScoreData.goldenBallsScored }}</small></div>
+                       </div>
+                     </div>
+                    <div *ngIf="submission.status === 'error'" class="text-danger mt-2">
+                      <i class="bi bi-exclamation-triangle me-1"></i>{{ submission.errorMessage }}
+                    </div>
+                  </div>
+                  <div class="btn-group-vertical">
+                    <button *ngIf="submission.status === 'pending'"
+                            (click)="submitBufferedSubmission(submission.id)"
+                            class="btn btn-success"
+                            title="Commit">
+                      <i class="bi bi-check-lg me-1"></i> Commit
+                    </button>
+                    <button *ngIf="submission.status === 'error'"
+                            (click)="submitBufferedSubmission(submission.id)"
+                            class="btn btn-warning"
+                            title="Retry">
+                      <i class="bi bi-arrow-clockwise me-1"></i> Retry
+                    </button>
+                    <button (click)="removeFromBuffer(submission.id)"
+                            class="btn btn-outline-danger"
+                            title="Remove">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Backend Temp Scores -->
+        <div *ngIf="hasTempScores()" class="mb-4">
+          <h6 class="text-secondary mb-3">
+            <i class="bi bi-clock-history me-2"></i>Pending Temp Scores ({{ redTempScores().length + blueTempScores().length }})
+          </h6>
+
+          <!-- Red Alliance Temp Scores -->
+          <div *ngIf="redTempScores().length > 0" class="mb-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-danger fs-6">Red Alliance</span>
+              <span class="text-muted small">{{ redTempScores().length }} pending</span>
+            </div>
+            <div *ngFor="let tempScore of redTempScores()" class="card border-danger mb-2">
+              <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="row g-2">
+                      <div class="col-6"><small>White: {{ tempScore.scoreData.whiteBallsScored }}</small></div>
+                      <div class="col-6"><small>Golden: {{ tempScore.scoreData.goldenBallsScored }}</small></div>
+                      <div class="col-6"><small>Partial: {{ tempScore.scoreData.partialParking }}</small></div>
+                      <div class="col-6"><small>Full: {{ tempScore.scoreData.fullParking }}</small></div>
+                    </div>
+                    <div class="mt-1"><small class="text-muted">By: {{ tempScore.submittedBy }} at {{ tempScore.submittedAt | date:'HH:mm' }}</small></div>
+                  </div>
+                  <div class="btn-group-vertical btn-group-sm">
+                    <button (click)="openTempScoreCommitModal(tempScore.tempScoreId, 'red')"
+                            class="btn btn-success"
+                            title="Commit">
+                      <i class="bi bi-check-lg"></i>
+                    </button>
+                    <button (click)="openTempScoreRejectModal(tempScore.tempScoreId, 'red')"
+                            class="btn btn-outline-danger"
+                            title="Reject">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blue Alliance Temp Scores -->
+          <div *ngIf="blueTempScores().length > 0">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-primary fs-6">Blue Alliance</span>
+              <span class="text-muted small">{{ blueTempScores().length }} pending</span>
+            </div>
+            <div *ngFor="let tempScore of blueTempScores()" class="card border-primary mb-2">
+              <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="row g-2">
+                      <div class="col-6"><small>White: {{ tempScore.scoreData.whiteBallsScored }}</small></div>
+                      <div class="col-6"><small>Golden: {{ tempScore.scoreData.goldenBallsScored }}</small></div>
+                      <div class="col-6"><small>Partial: {{ tempScore.scoreData.partialParking }}</small></div>
+                      <div class="col-6"><small>Full: {{ tempScore.scoreData.fullParking }}</small></div>
+                    </div>
+                    <div class="mt-1"><small class="text-muted">By: {{ tempScore.submittedBy }} at {{ tempScore.submittedAt | date:'HH:mm' }}</small></div>
+                  </div>
+                  <div class="btn-group-vertical btn-group-sm">
+                    <button (click)="openTempScoreCommitModal(tempScore.tempScoreId, 'blue')"
+                            class="btn btn-success"
+                            title="Commit">
+                      <i class="bi bi-check-lg"></i>
+                    </button>
+                    <button (click)="openTempScoreRejectModal(tempScore.tempScoreId, 'blue')"
+                            class="btn btn-outline-danger"
+                            title="Reject">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="bufferService.pendingCount() === 0 && bufferService.errorSubmissions().length === 0 && !hasTempScores()"
+             class="text-center text-muted py-5">
+          <i class="bi bi-inbox fs-1"></i>
+          <p class="mb-0 mt-3">No pending submissions</p>
+          <small>Scores from referees will appear here for committing</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeCommitModal()">Close</button>
+        <button *ngIf="bufferService.buffer().length > 0"
+                type="button"
+                class="btn btn-outline-danger"
+                (click)="bufferService.clearAll()">
+          <i class="bi bi-trash me-2"></i>Clear All
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Score Override Confirmation Modal -->
+<div *ngIf="showOverrideConfirmModal()" class="modal-backdrop" (click)="closeOverrideConfirmModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          Confirm Score Override
+        </h5>
+        <button type="button" class="btn-close" (click)="closeOverrideConfirmModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-circle me-2"></i>
+          <strong>Warning:</strong> You are about to override existing score data.
+        </div>
+        <p>
+          The following alliance(s) already have scores submitted:
+        </p>
+        <ul class="list-group mb-3">
+          <li *ngFor="let alliance of pendingOverrideAlliances" class="list-group-item">
+            <span [class.text-danger]="alliance === 'Red'" [class.text-primary]="alliance === 'Blue'">
+              <i class="bi bi-shield-fill me-2"></i>{{ alliance }} Alliance
+            </span>
+          </li>
+        </ul>
+        <p class="text-muted">
+          Overriding will replace the existing scores with your new values. This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeOverrideConfirmModal()">Cancel</button>
+        <button type="button" class="btn btn-warning" (click)="confirmOverrideSave()">
+          <i class="bi bi-check-lg me-1"></i>Confirm Override
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Temp Score Commit Modal -->
+<div *ngIf="showTempScoreCommitModal()" class="modal-backdrop" (click)="closeTempScoreCommitModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-check-circle me-2"></i>
+          Commit Temp Score
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeTempScoreCommitModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p>
+          Are you sure you want to commit this {{ pendingTempScoreAlliance === 'red' ? 'Red' : 'Blue' }} temp score?
+        </p>
+        @if (pendingTempScoreId) {
+          @if (pendingTempScoreAlliance === 'red') {
+            @if (getTempScoreById(pendingTempScoreId, 'red'); as tempScore) {
+              <div class="card border-danger">
+                <div class="card-body">
+                  <h6 class="card-title">Red Alliance Temp Score</h6>
+                  <div class="row g-2">
+                    <div class="col-6"><small>White Balls: {{ tempScore.scoreData.whiteBallsScored }}</small></div>
+                    <div class="col-6"><small>Golden Balls: {{ tempScore.scoreData.goldenBallsScored }}</small></div>
+                    <div class="col-6"><small>Partial Park: {{ tempScore.scoreData.partialParking }}</small></div>
+                    <div class="col-6"><small>Full Park: {{ tempScore.scoreData.fullParking }}</small></div>
+                    <div class="col-6"><small>Penalties: {{ tempScore.scoreData.penaltyCount }}</small></div>
+                    <div class="col-6"><small>Yellow Cards: {{ tempScore.scoreData.yellowCardCount }}</small></div>
+                  </div>
+                  <div class="mt-2"><small class="text-muted">Submitted by: {{ tempScore.submittedBy }}</small></div>
+                </div>
+              </div>
+            }
+          }
+          @if (pendingTempScoreAlliance === 'blue') {
+            @if (getTempScoreById(pendingTempScoreId, 'blue'); as tempScore) {
+              <div class="card border-primary">
+                <div class="card-body">
+                  <h6 class="card-title">Blue Alliance Temp Score</h6>
+                  <div class="row g-2">
+                    <div class="col-6"><small>White Balls: {{ tempScore.scoreData.whiteBallsScored }}</small></div>
+                    <div class="col-6"><small>Golden Balls: {{ tempScore.scoreData.goldenBallsScored }}</small></div>
+                    <div class="col-6"><small>Partial Park: {{ tempScore.scoreData.partialParking }}</small></div>
+                    <div class="col-6"><small>Full Park: {{ tempScore.scoreData.fullParking }}</small></div>
+                    <div class="col-6"><small>Penalties: {{ tempScore.scoreData.penaltyCount }}</small></div>
+                    <div class="col-6"><small>Yellow Cards: {{ tempScore.scoreData.yellowCardCount }}</small></div>
+                  </div>
+                  <div class="mt-2"><small class="text-muted">Submitted by: {{ tempScore.submittedBy }}</small></div>
+                </div>
+              </div>
+            }
+          }
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeTempScoreCommitModal()">Cancel</button>
+        <button type="button" class="btn btn-success" (click)="confirmCommitTempScore()">
+          <i class="bi bi-check-lg me-1"></i>Commit Temp Score
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Temp Score Reject Modal -->
+<div *ngIf="showTempScoreRejectModal()" class="modal-backdrop" (click)="closeTempScoreRejectModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-x-circle me-2"></i>
+          Reject Temp Score
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeTempScoreRejectModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p>
+          Are you sure you want to reject this {{ pendingTempScoreAlliance === 'red' ? 'Red' : 'Blue' }} temp score?
+        </p>
+        @if (pendingTempScoreId) {
+          @if (pendingTempScoreAlliance === 'red') {
+            @if (getTempScoreById(pendingTempScoreId, 'red'); as tempScore) {
+              <div class="card border-danger mb-3">
+                <div class="card-body">
+                  <h6 class="card-title">Red Alliance Temp Score</h6>
+                  <div class="row g-2">
+                    <div class="col-6"><small>White Balls: {{ tempScore.scoreData.whiteBallsScored }}</small></div>
+                    <div class="col-6"><small>Golden Balls: {{ tempScore.scoreData.goldenBallsScored }}</small></div>
+                    <div class="col-6"><small>Partial Park: {{ tempScore.scoreData.partialParking }}</small></div>
+                    <div class="col-6"><small>Full Park: {{ tempScore.scoreData.fullParking }}</small></div>
+                  </div>
+                  <div class="mt-2"><small class="text-muted">Submitted by: {{ tempScore.submittedBy }}</small></div>
+                </div>
+              </div>
+            }
+          }
+          @if (pendingTempScoreAlliance === 'blue') {
+            @if (getTempScoreById(pendingTempScoreId, 'blue'); as tempScore) {
+              <div class="card border-primary mb-3">
+                <div class="card-body">
+                  <h6 class="card-title">Blue Alliance Temp Score</h6>
+                  <div class="row g-2">
+                    <div class="col-6"><small>White Balls: {{ tempScore.scoreData.whiteBallsScored }}</small></div>
+                    <div class="col-6"><small>Golden Balls: {{ tempScore.scoreData.goldenBallsScored }}</small></div>
+                    <div class="col-6"><small>Partial Park: {{ tempScore.scoreData.partialParking }}</small></div>
+                    <div class="col-6"><small>Full Park: {{ tempScore.scoreData.fullParking }}</small></div>
+                  </div>
+                  <div class="mt-2"><small class="text-muted">Submitted by: {{ tempScore.submittedBy }}</small></div>
+                </div>
+              </div>
+            }
+          }
+        }
+        <div class="form-group">
+          <label for="rejectReason" class="form-label">Reason for rejection (optional):</label>
+          <textarea class="form-control" id="rejectReason" rows="2" [(ngModel)]="tempScoreRejectReason" placeholder="Enter reason for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeTempScoreRejectModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" (click)="confirmRejectTempScore()">
+          <i class="bi bi-x-lg me-1"></i>Reject Temp Score
+        </button>
+      </div>
     </div>
   </div>
 </div>

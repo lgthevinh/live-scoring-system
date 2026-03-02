@@ -175,36 +175,70 @@ public class ScoreHandler {
 
     public void submitScore(Score score, boolean isForceUpdate, RequestCallback<Score> callback) {
         try {
-            score.calculatePenalties();
-            score.calculateTotalScore();
-
             String allianceId = score.getAllianceId();
-            // 1. Retrieve the existing score object.
-            Score existingScore = dao.query(Score.class, "id", allianceId)[0];
-            if (existingScore == null) {
-                callback.onFailure(ErrorCode.NOT_FOUND, "Cannot submit score, match/alliance not found: " + allianceId);
-                return;
-            }
+            String rawData = score.getRawScoreData();
+            
+            ILog.d("ScoreHandler", "=== SUBMIT SCORE START ===");
+            ILog.d("ScoreHandler", "AllianceId: " + allianceId);
+            ILog.d("ScoreHandler", "RawScoreData: " + rawData);
+            ILog.d("ScoreHandler", "Input totalScore: " + score.getTotalScore());
+            ILog.d("ScoreHandler", "Input penaltiesScore: " + score.getPenaltiesScore());
+            
+            // Create a new score object using factory (ensures correct type like FanrocScore)
+            Score scoreToSave = factoryScore();
+            scoreToSave.setAllianceId(allianceId);
+            
+            ILog.d("ScoreHandler", "Created score type: " + scoreToSave.getClass().getName());
+            
+            // Copy the data from the submitted score
+            scoreToSave.fromJson(rawData);
+            scoreToSave.setRawScoreData(rawData);
 
-            if (existingScore.getStatus() == ScoreStatus.SCORED && !isForceUpdate) {
+            // Copy the approved flag from the input score
+            scoreToSave.setApproved(score.isApproved());
+            ILog.d("ScoreHandler", "Input isApproved: " + score.isApproved() + ", set on scoreToSave: " + scoreToSave.isApproved());
+
+            ILog.d("ScoreHandler", "After fromJson - score type: " + scoreToSave.getClass().getName());
+            ILog.d("ScoreHandler", "After fromJson - rawData: " + scoreToSave.getRawScoreData());
+            
+            scoreToSave.calculatePenalties();
+            scoreToSave.calculateTotalScore();
+            scoreToSave.setStatus(ScoreStatus.SCORED);
+            
+            ILog.d("ScoreHandler", "After calculate - totalScore: " + scoreToSave.getTotalScore());
+            ILog.d("ScoreHandler", "After calculate - penaltiesScore: " + scoreToSave.getPenaltiesScore());
+            
+            // Check if score already exists
+            Score existingScore = dao.query(Score.class, "id", allianceId)[0];
+            if (existingScore != null && existingScore.getStatus() == ScoreStatus.SCORED && !isForceUpdate) {
+                ILog.d("ScoreHandler", "Score already submitted and forceUpdate is false");
                 callback.onFailure(ErrorCode.UPDATE_FAILED, "Score already submitted for alliance: " + allianceId);
                 return;
             }
 
-            // 2. Call the existing save method to persist the changes.
-            updateAndSaveScore(score, new RequestCallback<Void>() {
+            // If we're force-updating an existing approved score, preserve the approved status
+            if (existingScore != null && existingScore.isApproved()) {
+                scoreToSave.setApproved(true);
+                ILog.d("ScoreHandler", "Preserving approved status from existing score");
+            }
+
+            // Save the score using the correct type
+            updateAndSaveScore(scoreToSave, new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void result, String message) {
-                    callback.onSuccess(score, "Score submitted and calculated successfully.");
+                    ILog.d("ScoreHandler", "=== SUBMIT SCORE SUCCESS ===");
+                    callback.onSuccess(scoreToSave, "Score submitted and calculated successfully.");
                 }
 
                 @Override
                 public void onFailure(int errorCode, String errorMessage) {
+                    ILog.e("ScoreHandler", "=== SUBMIT SCORE FAILED ===" + errorMessage);
                     callback.onFailure(errorCode, errorMessage);
                 }
             });
         } catch (Exception e) {
             e.printStackTrace();
+            ILog.e("ScoreHandler", "=== SUBMIT SCORE EXCEPTION ===" + e.getMessage());
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to submit score: " + e.getMessage());
         }
     }
@@ -217,8 +251,14 @@ public class ScoreHandler {
      */
     public void updateAndSaveScore(Score score, RequestCallback<Void> callback) {
         try {
+            System.out.println("=== UPDATE AND SAVE SCORE ===");
+            System.out.println("AllianceId: " + score.getAllianceId());
+            System.out.println("TotalScore: " + score.getTotalScore());
+            System.out.println("Status: " + score.getStatus());
+            
             // 1. Get the raw data from the entity itself.
             String jsonRawScoreData = score.getRawScoreData();
+            System.out.println("Raw JSON to be saved: " + jsonRawScoreData);
 
             // 2. Update score record in the database.
             dao.insertOrUpdate(Score.class, score);
@@ -247,5 +287,115 @@ public class ScoreHandler {
 
     public static void setScoreClass(Class<? extends Score> scoreClass) {
         ScoreHandler.scoreClass = scoreClass;
+    }
+
+    /**
+     * Retrieves all scores with AWAITING_APPROVAL status for a match.
+     *
+     * @param matchId  The unique ID of the match (e.g., "Q1").
+     * @param callback Callback to return pending scores structured as {red: Score, blue: Score} or an error.
+     */
+    public void getPendingScores(String matchId, RequestCallback<java.util.Map<String, Score>> callback) {
+        try {
+            String redAllianceId = matchId + "_R";
+            String blueAllianceId = matchId + "_B";
+
+            Score redScore = dao.query(Score.class, "id", redAllianceId)[0];
+            Score blueScore = dao.query(Score.class, "id", blueAllianceId)[0];
+
+            java.util.Map<String, Score> result = new java.util.HashMap<>();
+
+            if (redScore != null && !redScore.isApproved()) {
+                String redJsonData = daoFile.readJsonFile("/scores/" + redAllianceId + ".json");
+                redScore.setRawScoreData(redJsonData != null ? redJsonData : "{}");
+                result.put("red", redScore);
+            }
+
+            if (blueScore != null && !blueScore.isApproved()) {
+                String blueJsonData = daoFile.readJsonFile("/scores/" + blueAllianceId + ".json");
+                blueScore.setRawScoreData(blueJsonData != null ? blueJsonData : "{}");
+                result.put("blue", blueScore);
+            }
+
+            callback.onSuccess(result, "Pending scores retrieved successfully for match: " + matchId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve pending scores: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Approves a pending score by changing its status to SCORED.
+     *
+     * @param allianceId The unique ID of the alliance (e.g., "Q1_R").
+     * @param callback   Callback to return the approved Score object or an error.
+     */
+    public void approveScore(String allianceId, RequestCallback<Score> callback) {
+        try {
+            System.out.println("=== APPROVE SCORE CALLED ===");
+            System.out.println("AllianceId: " + allianceId);
+            
+            Score[] scores = dao.query(Score.class, "id", allianceId);
+            System.out.println("Scores found: " + (scores != null ? scores.length : 0));
+            
+            if (scores == null || scores.length == 0) {
+                callback.onFailure(ErrorCode.NOT_FOUND, "Score not found for alliance: " + allianceId);
+                return;
+            }
+            
+            Score score = scores[0];
+            System.out.println("Before approve - isApproved: " + score.isApproved());
+            System.out.println("Before approve - status: " + score.getStatus());
+            System.out.println("Before approve - totalScore: " + score.getTotalScore());
+            
+            score.setApproved(true);
+            System.out.println("After setApproved(true): " + score.isApproved());
+            
+            dao.insertOrUpdate(Score.class, score);
+            System.out.println("After insertOrUpdate - saved to database");
+
+            callback.onSuccess(score, "Score approved successfully for alliance: " + allianceId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to approve score: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Rejects a pending score by resetting its status to NOT_SCORED.
+     *
+     * @param allianceId The unique ID of the alliance (e.g., "Q1_R").
+     * @param callback   Callback to return true if rejection was successful, or an error.
+     */
+    public void rejectScore(String allianceId, RequestCallback<Boolean> callback) {
+        try {
+            Score score = dao.query(Score.class, "id", allianceId)[0];
+            if (score == null) {
+                callback.onFailure(ErrorCode.NOT_FOUND, "Score not found for alliance: " + allianceId);
+                return;
+            }
+
+            if (score.isApproved()) {
+                callback.onFailure(ErrorCode.UPDATE_FAILED, "Score is not awaiting approval for alliance: " + allianceId);
+                return;
+            }
+
+            score.setApproved(false);
+            score.setStatus(ScoreStatus.NOT_SCORED);
+            score.setTotalScore(0);
+            score.setPenaltiesScore(0);
+
+            Score emptyScore = factoryScore();
+            emptyScore.setAllianceId(allianceId);
+            String emptyJsonData = emptyScore.getRawScoreData();
+
+            dao.insertOrUpdate(Score.class, score);
+            daoFile.writeJsonFile("/scores/" + allianceId + ".json", emptyJsonData);
+
+            callback.onSuccess(true, "Score rejected successfully for alliance: " + allianceId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to reject score: " + e.getMessage());
+        }
     }
 }

@@ -17,6 +17,46 @@
     {{ error() }}
   </div>
 
+  <!-- Calculated Score Preview -->
+  <div class="score-preview-card mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="calculated-score">
+        <span class="score-label">Calculated Score:</span>
+        <span class="score-value" [class.zero-score]="calculatedScore() === 0" [class.positive]="calculatedScore() > 0">
+          {{ calculatedScore() }}
+        </span>
+      </div>
+    </div>
+    <div class="score-calculation mt-2" *ngIf="!redCard()">
+      <div class="calc-row">
+        <span class="calc-label">Base:</span>
+        <span class="calc-value">({{ biologicalPoints() }} + {{ barrierPoints() }}) × {{ coefficient() }}</span>
+        <span class="calc-result">= {{ (biologicalPoints() + barrierPoints()) * coefficient() | number:'1.0-1' }}</span>
+      </div>
+      <div class="calc-row" *ngIf="endGamePoints() > 0">
+        <span class="calc-label">End Game:</span>
+        <span class="calc-value">+{{ endGamePoints() }}</span>
+      </div>
+      <div class="calc-row" *ngIf="fleetBonus() > 0">
+        <span class="calc-label fleet-bonus-text">Fleet Bonus:</span>
+        <span class="calc-value fleet-bonus-text">+{{ fleetBonus() }}</span>
+      </div>
+      <div class="calc-row" *ngIf="penaltyPoints() > 0">
+        <span class="calc-label penalty-text">Penalties:</span>
+        <span class="calc-value penalty-text">-{{ penaltyPoints() }}</span>
+      </div>
+      <div class="calc-divider"></div>
+      <div class="calc-row calc-total">
+        <span class="calc-label">Total:</span>
+        <span class="calc-value">{{ calculatedScore() }}</span>
+      </div>
+    </div>
+    <div class="red-card-warning" *ngIf="redCard()">
+      <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+      <span class="text-danger fw-bold">Red Card Active - Score will be zero!</span>
+    </div>
+  </div>
+
   <div *ngIf="match()">
     <!-- Match summary -->
     <div class="summary card mb-3">
@@ -46,16 +86,23 @@
                 White Balls (1 pt each)
               </span>
             </div>
-            <div class="counter-controls">
+            <div class="counter-controls enhanced">
               <button (click)="dec('whiteBallsScored')"
-                      [disabled]="submitting()"
+                      [disabled]="submitting() || counters.whiteBallsScored() <= 0"
                       class="btn-counter btn-counter-minus"
                       title="Decrease">
                 <i class="bi bi-dash-lg"></i>
               </button>
-              <div class="counter-display">
-                <span class="counter-value">{{ counters.whiteBallsScored() }}</span>
-                <span class="counter-total">{{ counters.whiteBallsScored() }}</span>
+              <div class="counter-display-with-input">
+                <input type="number"
+                       class="counter-input"
+                       [value]="counters.whiteBallsScored()"
+                       (change)="setCounterValue('whiteBallsScored', $event)"
+                       min="0"
+                       max="100">
+                <span class="counter-points" *ngIf="counters.whiteBallsScored() > 0">
+                  +{{ counters.whiteBallsScored() }} pts
+                </span>
               </div>
               <button (click)="inc('whiteBallsScored')"
                       [disabled]="!canIncrement('whiteBallsScored') || submitting()"
@@ -63,6 +110,9 @@
                       title="Increase">
                 <i class="bi bi-plus-lg"></i>
               </button>
+            </div>
+            <div class="limit-indicator">
+              <small class="text-muted">Max: 100</small>
             </div>
           </div>
 
@@ -74,16 +124,23 @@
                 Golden Balls (3 pts each)
               </span>
             </div>
-            <div class="counter-controls">
+            <div class="counter-controls enhanced">
               <button (click)="dec('goldenBallsScored')"
-                      [disabled]="submitting()"
+                      [disabled]="submitting() || counters.goldenBallsScored() <= 0"
                       class="btn-counter btn-counter-minus"
                       title="Decrease">
                 <i class="bi bi-dash-lg"></i>
               </button>
-              <div class="counter-display">
-                <span class="counter-value">{{ counters.goldenBallsScored() }}</span>
-                <span class="counter-total">{{ counters.goldenBallsScored() * 3 }}</span>
+              <div class="counter-display-with-input">
+                <input type="number"
+                       class="counter-input"
+                       [value]="counters.goldenBallsScored()"
+                       (change)="setCounterValue('goldenBallsScored', $event)"
+                       min="0"
+                       max="100">
+                <span class="counter-points" *ngIf="counters.goldenBallsScored() > 0">
+                  +{{ counters.goldenBallsScored() * 3 }} pts
+                </span>
               </div>
               <button (click)="inc('goldenBallsScored')"
                       [disabled]="!canIncrement('goldenBallsScored') || submitting()"
@@ -91,6 +148,9 @@
                       title="Increase">
                 <i class="bi bi-plus-lg"></i>
               </button>
+            </div>
+            <div class="limit-indicator">
+              <small class="text-muted">Max: 100</small>
             </div>
           </div>
         </div>
@@ -158,16 +218,23 @@
                 Partial Parking (5 pts each)
               </span>
             </div>
-            <div class="counter-controls">
+            <div class="counter-controls enhanced">
               <button (click)="dec('partialParking')"
-                      [disabled]="submitting()"
+                      [disabled]="submitting() || counters.partialParking() <= 0"
                       class="btn-counter btn-counter-minus"
                       title="Decrease">
                 <i class="bi bi-dash-lg"></i>
               </button>
-              <div class="counter-display">
-                <span class="counter-value">{{ counters.partialParking() }}</span>
-                <span class="counter-total">{{ counters.partialParking() * 5 }}</span>
+              <div class="counter-display-with-input">
+                <input type="number"
+                       class="counter-input"
+                       [value]="counters.partialParking()"
+                       (change)="setCounterValue('partialParking', $event)"
+                       min="0"
+                       max="2">
+                <span class="counter-points" *ngIf="counters.partialParking() > 0">
+                  +{{ counters.partialParking() * 5 }} pts
+                </span>
               </div>
               <button (click)="inc('partialParking')"
                       [disabled]="!canIncrement('partialParking') || submitting()"
@@ -175,6 +242,9 @@
                       title="Increase">
                 <i class="bi bi-plus-lg"></i>
               </button>
+            </div>
+            <div class="limit-indicator">
+              <small class="text-muted">Max: 2 (Total parking max: 2)</small>
             </div>
           </div>
 
@@ -186,16 +256,24 @@
                 Full Parking (10 pts each)
               </span>
             </div>
-            <div class="counter-controls">
+            <div class="counter-controls enhanced">
               <button (click)="dec('fullParking')"
-                      [disabled]="submitting()"
+                      [disabled]="submitting() || counters.fullParking() <= 0"
                       class="btn-counter btn-counter-minus"
                       title="Decrease">
                 <i class="bi bi-dash-lg"></i>
               </button>
-              <div class="counter-display">
-                <span class="counter-value">{{ counters.fullParking() }}</span>
-                <span class="counter-total">{{ counters.fullParking() * 10 }}</span>
+              <div class="counter-display-with-input">
+                <input type="number"
+                       class="counter-input"
+                       [value]="counters.fullParking()"
+                       (change)="setCounterValue('fullParking', $event)"
+                       min="0"
+                       max="2">
+                <span class="counter-points" *ngIf="counters.fullParking() > 0">
+                  +{{ counters.fullParking() * 10 }} pts
+                  <span *ngIf="counters.fullParking() >= 2" class="fleet-bonus-text">+10 bonus</span>
+                </span>
               </div>
               <button (click)="inc('fullParking')"
                       [disabled]="!canIncrement('fullParking') || submitting()"
@@ -204,12 +282,14 @@
                 <i class="bi bi-plus-lg"></i>
               </button>
             </div>
-            @if (counters.fullParking() >= 2) {
-              <div class="fleet-bonus">
-                <i class="bi bi-trophy-fill text-warning me-2"></i>
-                <span class="text-warning fw-bold">Fleet Bonus: +10 points!</span>
-              </div>
-            }
+            <div class="limit-indicator">
+              <small class="text-muted">
+                Max: 2
+                <span *ngIf="counters.fullParking() >= 2" class="fleet-bonus-badge ms-2">
+                  <i class="bi bi-trophy-fill text-warning me-1"></i>Fleet Bonus Active!
+                </span>
+              </small>
+            </div>
           </div>
         </div>
 
@@ -264,16 +344,22 @@
                 Minor Penalty Violations (-5 pts each)
               </span>
                 </div>
-                <div class="counter-controls">
+                <div class="counter-controls enhanced">
                   <button (click)="dec('penaltyCount')"
                           [disabled]="counters['penaltyCount']() <= 0 || submitting()"
                           class="btn-counter btn-counter-minus"
                           title="Decrease">
                     <i class="bi bi-dash-lg"></i>
                   </button>
-                  <div class="counter-display">
-                    <span class="counter-value">{{ counters.penaltyCount() }}</span>
-                    <span class="counter-total">-{{ counters.penaltyCount() * 5 }}</span>
+                  <div class="counter-display-with-input">
+                    <input type="number"
+                           class="counter-input"
+                           [value]="counters.penaltyCount()"
+                           (change)="setCounterValue('penaltyCount', $event)"
+                           min="0">
+                    <span class="counter-points penalty-text" *ngIf="counters.penaltyCount() > 0">
+                      -{{ counters.penaltyCount() * 5 }} pts
+                    </span>
                   </div>
                   <button (click)="inc('penaltyCount')"
                           [disabled]="submitting()"
@@ -293,16 +379,22 @@
                 Yellow Card Violations (-10 pts each)
               </span>
                 </div>
-                <div class="counter-controls">
+                <div class="counter-controls enhanced">
                   <button (click)="dec('yellowCardCount')"
                           [disabled]="counters['yellowCardCount']() <= 0 || submitting()"
                           class="btn-counter btn-counter-minus"
                           title="Decrease">
                     <i class="bi bi-dash-lg"></i>
                   </button>
-                  <div class="counter-display">
-                    <span class="counter-value">{{ counters.yellowCardCount() }}</span>
-                    <span class="counter-total">-{{ counters.yellowCardCount() * 10 }}</span>
+                  <div class="counter-display-with-input">
+                    <input type="number"
+                           class="counter-input"
+                           [value]="counters.yellowCardCount()"
+                           (change)="setCounterValue('yellowCardCount', $event)"
+                           min="0">
+                    <span class="counter-points penalty-text" *ngIf="counters.yellowCardCount() > 0">
+                      -{{ counters.yellowCardCount() * 10 }} pts
+                    </span>
                   </div>
                   <button (click)="inc('yellowCardCount')"
                           [disabled]="submitting()"

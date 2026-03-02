@@ -11,6 +11,7 @@ import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.time.TimeBlock;
 import org.thingai.app.scoringservice.handler.MatchMakerHandler;
 import org.thingai.base.dao.Dao;
+import org.thingai.platform.dao.DaoFile;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;
 
@@ -28,11 +29,13 @@ public class MatchHandler {
     private static final String TAG = "MatchHandler";
 
     private Dao dao;
+    private DaoFile daoFile;
 
     private final MatchMakerHandler matchMakerHandler = new MatchMakerHandler();
 
-    public MatchHandler(Dao dao) {
+    public MatchHandler(Dao dao, DaoFile daoFile) {
         this.dao = dao;
+        this.daoFile = daoFile;
 
         String osName = System.getProperty("os.name").toLowerCase();
         Path binary = Paths.get("binary");
@@ -214,6 +217,30 @@ public class MatchHandler {
                 surrogateMap.put(at.getTeamId(), at.isSurrogate());
             }
             MatchDetailDto detailDto = new MatchDetailDto(match, redTeams, blueTeams, surrogateMap);
+
+            // Load scores from database
+            Score[] redScores = dao.query(Score.class, new String[]{"id"}, new String[]{redAllianceId});
+            Score[] blueScores = dao.query(Score.class, new String[]{"id"}, new String[]{blueAllianceId});
+
+            if (redScores != null && redScores.length > 0) {
+                detailDto.setRedScore(redScores[0]);
+            }
+            if (blueScores != null && blueScores.length > 0) {
+                detailDto.setBlueScore(blueScores[0]);
+            }
+
+            String redTempScoreData = daoFile.readJsonFile("/temp_scores/" + redAllianceId + ".json");
+            String blueTempScoreData = daoFile.readJsonFile("/temp_scores/" + blueAllianceId + ".json");
+
+            if (redTempScoreData != null && !redTempScoreData.isEmpty()) {
+                detailDto.setHasRedTempScore(true);
+                detailDto.setRedTempScoreRawData(redTempScoreData);
+            }
+            if (blueTempScoreData != null && !blueTempScoreData.isEmpty()) {
+                detailDto.setHasBlueTempScore(true);
+                detailDto.setBlueTempScoreRawData(blueTempScoreData);
+            }
+
             callback.onSuccess(detailDto, "Match detail retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve match detail: " + e.getMessage());
@@ -306,9 +333,53 @@ public class MatchHandler {
                 if (withScore) {
                     String redAllianceScoreId = match.getMatchCode() + "_R";
                     String blueAllianceScoreId = match.getMatchCode() + "_B";
-                    Score redScore = dao.query(Score.class, new String[]{"id"}, new String[]{redAllianceScoreId})[0];
-                    Score blueScore = dao.query(Score.class, new String[]{"id"}, new String[]{blueAllianceScoreId})[0];
-                    detailsList.add(new MatchDetailDto(match, redTeams, blueTeams, redScore, blueScore, surrogateMap));
+                    System.out.println("[DEBUG] getMatchDetail: Looking for scores with IDs: red=" + redAllianceScoreId + ", blue=" + blueAllianceScoreId);
+                    
+                    Score[] redScores = dao.query(Score.class, "id", redAllianceScoreId);
+                    Score[] blueScores = dao.query(Score.class, "id", blueAllianceScoreId);
+                    
+                    System.out.println("[DEBUG] getMatchDetail: Found redScores=" + (redScores != null ? redScores.length : "null") + 
+                                       ", blueScores=" + (blueScores != null ? blueScores.length : "null"));
+                    
+                    Score redScore = (redScores != null && redScores.length > 0) ? redScores[0] : null;
+                    Score blueScore = (blueScores != null && blueScores.length > 0) ? blueScores[0] : null;
+
+                    // Load raw score data from JSON files and recalculate
+                    if (redScore != null) {
+                        String redJsonData = daoFile.readJsonFile("/scores/" + redAllianceScoreId + ".json");
+                        if (redJsonData != null) {
+                            redScore.setRawScoreData(redJsonData);
+                            redScore.fromJson(redJsonData);
+                            redScore.calculatePenalties();
+                            redScore.calculateTotalScore();
+                        }
+                    }
+                    if (blueScore != null) {
+                        String blueJsonData = daoFile.readJsonFile("/scores/" + blueAllianceScoreId + ".json");
+                        if (blueJsonData != null) {
+                            blueScore.setRawScoreData(blueJsonData);
+                            blueScore.fromJson(blueJsonData);
+                            blueScore.calculatePenalties();
+                            blueScore.calculateTotalScore();
+                        }
+                    }
+
+                    MatchDetailDto detailDto = new MatchDetailDto(match, redTeams, blueTeams, redScore, blueScore, surrogateMap);
+
+                    // Load temp scores from /temp_scores/ folder
+                    String redTempScoreData = daoFile.readJsonFile("/temp_scores/" + redAllianceScoreId + ".json");
+                    String blueTempScoreData = daoFile.readJsonFile("/temp_scores/" + blueAllianceScoreId + ".json");
+
+                    if (redTempScoreData != null && !redTempScoreData.isEmpty()) {
+                        detailDto.setHasRedTempScore(true);
+                        detailDto.setRedTempScoreRawData(redTempScoreData);
+                    }
+                    if (blueTempScoreData != null && !blueTempScoreData.isEmpty()) {
+                        detailDto.setHasBlueTempScore(true);
+                        detailDto.setBlueTempScoreRawData(blueTempScoreData);
+                    }
+
+                    detailsList.add(detailDto);
                     continue;
                 }
 
@@ -635,7 +706,22 @@ public class MatchHandler {
                 surrogateMap.put(at.getTeamId(), true);
             }
         }
-        return new MatchDetailDto(match, redTeams, blueTeams, surrogateMap);
+        MatchDetailDto detailDto = new MatchDetailDto(match, redTeams, blueTeams, surrogateMap);
+
+        // Load temp scores from /temp_scores/ folder
+        String redTempScoreData = daoFile.readJsonFile("/temp_scores/" + redAllianceId + ".json");
+        String blueTempScoreData = daoFile.readJsonFile("/temp_scores/" + blueAllianceId + ".json");
+
+        if (redTempScoreData != null && !redTempScoreData.isEmpty()) {
+            detailDto.setHasRedTempScore(true);
+            detailDto.setRedTempScoreRawData(redTempScoreData);
+        }
+        if (blueTempScoreData != null && !blueTempScoreData.isEmpty()) {
+            detailDto.setHasBlueTempScore(true);
+            detailDto.setBlueTempScoreRawData(blueTempScoreData);
+        }
+
+        return detailDto;
     }
 
     // Utility methods

@@ -13,12 +13,19 @@ public class CorsConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**") // Apply to all paths
-                        .allowedOriginPatterns("*")
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // Allowed HTTP methods
-                        .allowedHeaders("*") // Allowed headers
-                        .allowCredentials(true) // Allow sending cookies and authentication headers
-                        .maxAge(3600); // Max age for pre-flight requests in seconds
+                // For development, allow common local development origins
+                // For production, configure specific allowed origins based on environment
+                String allowedOrigins = System.getProperty("cors.allowed.origins",
+                    "http://localhost:4200,http://localhost:8080,http://127.0.0.1:4200,http://127.0.0.1:8080");
+                
+                String[] origins = allowedOrigins.split(",");
+                
+                registry.addMapping("/**")
+                        .allowedOrigins(origins)
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedHeaders("*")
+                        .allowCredentials(true)
+                        .maxAge(3600);
             }
         };
     }

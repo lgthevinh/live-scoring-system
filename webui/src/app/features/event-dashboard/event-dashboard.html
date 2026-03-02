@@ -57,15 +57,26 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let event of events()">
+          <tr *ngFor="let event of events()" [class.table-success]="currentEventCode() === event.eventCode">
             <td>{{event.eventCode}}</td>
             <td>{{event.name}}</td>
             <td>{{event.location}}</td>
             <td>{{event.date}}</td>
             <td>
-              <button class="btn btn-sm btn-outline-info me-2" (click)="setSystemEvent(event)">Set Active</button>
-              <button class="btn btn-sm btn-outline-primary me-2" (click)="openEditForm(event)">Edit</button>
-              <button class="btn btn-sm btn-outline-danger" (click)="deleteEvent(event)">Delete</button>
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <button 
+                    class="btn btn-sm me-2" 
+                    [class.btn-success]="currentEventCode() === event.eventCode"
+                    [class.btn-outline-info]="currentEventCode() !== event.eventCode"
+                    [disabled]="currentEventCode() === event.eventCode"
+                    (click)="setSystemEvent(event)">
+                    {{ currentEventCode() === event.eventCode ? 'Active' : 'Set Active' }}
+                  </button>
+                  <button class="btn btn-sm btn-outline-primary" (click)="openEditForm(event)">Edit</button>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" (click)="deleteEvent(event)">Delete</button>
+              </div>
             </td>
           </tr>
           <tr *ngIf="events().length === 0">
@@ -75,15 +86,8 @@
       </table>
     </div>
 
-<div *ngIf="activeTab === 'Event Tools'">
-      <h3 class="fw-semibold">Event Administration</h3>
-      <ol>
-        <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/event-dashboard/create-account">Manage Event
-            Accounts</a></li>
-      </ol>
-
-      <h3 class="fw-semibold">Event manager</h3>
-      <ol>
+<div *ngIf="activeTab === 'Event Manager'">
+   <ol>
         <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/event-dashboard/manage-team">Add/Edit Teams</a>
         </li>
         <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/event-dashboard/generate-schedule">Generate
@@ -94,7 +98,7 @@
     <div *ngIf="activeTab === 'Account Management'">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5>User Accounts</h5>
-        <button class="btn btn-primary btn-sm" routerLink="/event-dashboard/create-account">+ New Account</button>
+        <button class="btn btn-primary btn-sm" (click)="openAccountModal()" style="cursor: pointer;">+ New Account</button>
       </div>
 
       <table class="table table-striped table-hover">
@@ -102,22 +106,80 @@
           <tr>
             <th>Username</th>
             <th>Role</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let user of users()">
-            <td>{{ user.username }}</td>
+          <tr *ngFor="let account of accounts">
+            <td>{{ account.username }}</td>
             <td>
-              <span class="badge" [class.bg-primary]="user.role === 1" [class.bg-info]="user.role === 2" [class.bg-success]="user.role === 3">
-                {{ getRoleName(user.role) }}
+              <span class="badge text-white" [class.bg-primary]="account.role === AccountRoleType.EVENT_ADMIN"
+                    [class.bg-info]="account.role === AccountRoleType.SCOREKEEPER"
+                    [class.bg-secondary]="account.role === AccountRoleType.HEAD_REFEREE"
+                    [class.bg-warning]="account.role === AccountRoleType.SCORING_REFEREE"
+                    [class.bg-dark]="account.role === AccountRoleType.EMCEE">
+                {{ getRoleName(account.role) }}
               </span>
             </td>
+                      <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger" (click)="deleteAccount(account.username)" style="cursor: pointer;">Delete</button>
+                      </td>
           </tr>
-          <tr *ngIf="users().length === 0">
-            <td colspan="2" class="text-center">No accounts found.</td>
+          <tr *ngIf="accounts.length === 0">
+            <td colspan="3" class="text-center">No accounts found.</td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Account Modal -->
+    <div class="modal fade show d-block" *ngIf="showAccountModal" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">Create New Account</h5>
+            <button type="button" class="btn-close btn-close-white" (click)="closeAccountModal()"></button>
+          </div>
+          <div class="modal-body">
+            <form (ngSubmit)="onAccountSubmit()">
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" placeholder="Enter username"
+                       [(ngModel)]="accountForm.username" name="username" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input [type]="passwordVisible ? 'text' : 'password'" class="form-control" id="password" placeholder="Password"
+                       [(ngModel)]="accountForm.password" name="password" required>
+              </div>
+              <div class="mb-3">
+                <label for="reEnterPassword" class="form-label">Re-enter Password</label>
+                <input [type]="passwordVisible ? 'text' : 'password'" class="form-control" id="reEnterPassword" placeholder="Re-enter Password"
+                       [(ngModel)]="accountForm.reEnterPassword" name="reEnterPassword" required>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="showPassword" (click)="togglePasswordVisibility()">
+                <label class="form-check-label" for="showPassword">Show Password</label>
+              </div>
+              <div class="mb-3">
+                <label for="role" class="form-label">Select role:</label>
+                <select class="form-select" id="role" [(ngModel)]="accountForm.role" name="role" required>
+                  <option [value]="0">Select role</option>
+                  <option [value]="AccountRoleType.EVENT_ADMIN">Event Admin</option>
+                  <option [value]="AccountRoleType.SCOREKEEPER">Scorekeeper</option>
+                  <option [value]="AccountRoleType.HEAD_REFEREE">Head Referee</option>
+                  <option [value]="AccountRoleType.SCORING_REFEREE">Scoring Referee</option>
+                  <option [value]="AccountRoleType.EMCEE">Emcee</option>
+                </select>
+              </div>
+              <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-secondary" (click)="closeAccountModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="cursor: pointer;">Create Account</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>

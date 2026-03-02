@@ -91,10 +91,12 @@ export class MatchResults implements OnInit {
     this.selectedAlliance.set(null);
   }
 
-  // Text for result cell, e.g., "28-12 R"
   formatResult(match: MatchDetailDto): string {
-    const redScore = match?.redScore?.totalScore ?? 0;
-    const blueScore = match?.blueScore?.totalScore ?? 0;
+    const redApproved = match?.redScore?.approved;
+    const blueApproved = match?.blueScore?.approved;
+    const redScore = redApproved ? (match?.redScore?.totalScore ?? 0) : 0;
+    const blueScore = blueApproved ? (match?.blueScore?.totalScore ?? 0) : 0;
+    if (!redApproved || !blueApproved) return 'Pending';
     if (redScore > blueScore) return `${redScore} - ${blueScore} R`;
     if (blueScore > redScore) return `${redScore} - ${blueScore} B`;
     return `${redScore}-${blueScore}`;
@@ -105,19 +107,23 @@ export class MatchResults implements OnInit {
     return !match?.match?.matchEndTime;
   }
 
-  // Winner side for coloring the result tile
   winner(match: MatchDetailDto): 'red' | 'blue' | null {
     if (this.isUnplayed(match)) return null;
+    const redApproved = match?.redScore?.approved;
+    const blueApproved = match?.blueScore?.approved;
+    if (!redApproved || !blueApproved) return null;
     const redScore = match?.redScore?.totalScore ?? 0;
     const blueScore = match?.blueScore?.totalScore ?? 0;
     if (redScore > blueScore) return 'red';
     if (blueScore > redScore) return 'blue';
-    return null; // tie or equal
+    return null;
   }
 
-  // Check if match is a tie
   isTie(match: MatchDetailDto): boolean {
     if (this.isUnplayed(match)) return false;
+    const redApproved = match?.redScore?.approved;
+    const blueApproved = match?.blueScore?.approved;
+    if (!redApproved || !blueApproved) return false;
     const redScore = match?.redScore?.totalScore ?? 0;
     const blueScore = match?.blueScore?.totalScore ?? 0;
     return redScore === blueScore;

@@ -44,35 +44,58 @@ public class FanrocScore extends Score implements IScoreConfig {
 
     @Override
     public void calculateTotalScore() {
+        System.out.println("=== CALCULATING TOTAL SCORE ===");
+        System.out.println("whiteBalls: " + whiteBallsScored);
+        System.out.println("goldenBalls: " + goldenBallsScored);
+        System.out.println("allianceBarrier: " + allianceBarrierPushed);
+        System.out.println("opponentBarrier: " + opponentBarrierPushed);
+        System.out.println("partialParking: " + partialParking);
+        System.out.println("fullParking: " + fullParking);
+        System.out.println("imbalanceCategory: " + imbalanceCategory);
+        System.out.println("penaltyCount: " + penaltyCount);
+        System.out.println("yellowCardCount: " + yellowCardCount);
+        System.out.println("redCard: " + redCard);
+        
         // If red card, score is 0
         if (redCard) {
             totalScore = 0;
             penaltiesScore = 0;
+            System.out.println("Red card active - score set to 0");
             return;
         }
 
         // Biological points = robot-scored balls + human-scored balls
         int biologicalPoints = (goldenBallsScored * 3) + whiteBallsScored;
+        System.out.println("biologicalPoints: " + biologicalPoints);
 
         // Barrier points: 10 points for each barrier pushed
         int barrierPoints = (allianceBarrierPushed ? 10 : 0) + (opponentBarrierPushed ? 10 : 0);
+        System.out.println("barrierPoints: " + barrierPoints);
 
         // End game points
         int endGamePoints = (partialParking * 5) + (fullParking * 10);
+        System.out.println("endGamePoints (before fleet): " + endGamePoints);
 
         // Fleet bonus: 10 points if both robots fully parked
         if (fullParking >= 2) {
             endGamePoints += 10;
+            System.out.println("Fleet bonus added!");
         }
 
         // Adjusted balancing coefficient
         double coeff = getBalancingCoefficient();
+        System.out.println("coefficient: " + coeff);
 
         // Calculate base score
         double baseScore = (biologicalPoints + barrierPoints) * coeff;
+        System.out.println("baseScore: " + baseScore);
+
+        int penalties = (penaltyCount * 5) + (yellowCardCount * 10);
+        System.out.println("penalties: " + penalties);
 
         // Total score includes penalties
-        totalScore = (int) Math.round(baseScore + endGamePoints - (penaltyCount * 5) - (yellowCardCount * 10));
+        totalScore = (int) Math.round(baseScore + endGamePoints - penalties);
+        System.out.println("FINAL totalScore: " + totalScore);
     }
 
     @Override
@@ -82,9 +105,11 @@ public class FanrocScore extends Score implements IScoreConfig {
 
     @Override
     public void fromJson(String json) {
+        System.out.println("=== FANROCSCORE FROMJSON ===");
+        System.out.println("Input JSON: " + json);
         Gson gson = new Gson();
         FanrocScore temp = gson.fromJson(json, FanrocScore.class);
-        // New fields
+        // New fields - DO NOT copy id or status!
         this.whiteBallsScored = temp.whiteBallsScored;
         this.goldenBallsScored = temp.goldenBallsScored;
         this.allianceBarrierPushed = temp.allianceBarrierPushed;
@@ -99,12 +124,33 @@ public class FanrocScore extends Score implements IScoreConfig {
         this.ballsCollected = temp.ballsCollected;
         this.ballsScored = temp.ballsScored;
         this.foulsCommitted = temp.foulsCommitted;
+        // DO NOT copy: id, status, totalScore, penaltiesScore, rawScoreData
+        System.out.println("Parsed whiteBalls: " + this.whiteBallsScored);
+        System.out.println("After fromJson - allianceId: " + this.getAllianceId());
     }
 
     @Override
     public String getRawScoreData() {
+        // Use Gson with exposed fields to ensure private fields are serialized
         Gson gson = new Gson();
-        return gson.toJson(this);
+        // Create a map with only the scoring fields (exclude id, status, totalScore, penaltiesScore, rawScoreData)
+        java.util.Map<String, Object> scoreData = new java.util.HashMap<>();
+        scoreData.put("whiteBallsScored", this.whiteBallsScored);
+        scoreData.put("goldenBallsScored", this.goldenBallsScored);
+        scoreData.put("allianceBarrierPushed", this.allianceBarrierPushed);
+        scoreData.put("opponentBarrierPushed", this.opponentBarrierPushed);
+        scoreData.put("imbalanceCategory", this.imbalanceCategory);
+        scoreData.put("partialParking", this.partialParking);
+        scoreData.put("fullParking", this.fullParking);
+        scoreData.put("penaltyCount", this.penaltyCount);
+        scoreData.put("yellowCardCount", this.yellowCardCount);
+        scoreData.put("redCard", this.redCard);
+        // Legacy fields
+        scoreData.put("ballsCollected", this.ballsCollected);
+        scoreData.put("ballsScored", this.ballsScored);
+        scoreData.put("foulsCommitted", this.foulsCommitted);
+        
+        return gson.toJson(scoreData);
     }
 
     @Override

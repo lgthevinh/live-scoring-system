@@ -7,6 +7,10 @@ buildscript {
     }
 }
 
+import com.github.gradle.node.npm.task.NpmInstallTask
+import com.github.gradle.node.npm.task.NpmTask
+import proguard.gradle.ProGuardTask
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.4'
@@ -17,7 +21,7 @@ plugins {
 }
 
 group = 'org.thingai.app.scoringsystem'
-version = '1.5'
+version = '1.6'
 description = 'Scoring System for Robotics Competitions'
 
 application {
@@ -64,7 +68,7 @@ sourceSets {
         compileClasspath += sourceSets.main.output
         runtimeClasspath += output + sourceSets.main.output
 
-        // Option B: if launcher needs main’s external deps too, use resolvable classpaths:
+        // Option B: if launcher needs main's external deps too, use resolvable classpaths:
         // compileClasspath += sourceSets.main.output + configurations.getByName('compileClasspath')
         // runtimeClasspath += output + sourceSets.main.output + configurations.getByName('runtimeClasspath')
     }
@@ -170,6 +174,12 @@ tasks.register('packageLinux') {
     dependsOn tasks.named('linuxDistZip')
 }
 
+tasks.register('packageAll') {
+    group = 'distribution'
+    description = 'Build all distribution packages (generic + Windows + macOS + Linux)'
+    dependsOn 'windowsDistZip', 'macDistZip', 'linuxDistZip'
+}
+
 /* ==== Frontend build config ==== */
 def webUiDir = "${projectDir}/webui"
 def webUiDistDir = "${webUiDir}/dist/webui/browser"      // Angular application builder outputs to dist/<app>/browser
@@ -200,13 +210,40 @@ tasks.register('copyWebUi', Copy) {
     // Copy after an npm build
     enabled = hasWebUi && !skipWebuiBuild
     dependsOn 'npmBuild'
+
+    // Always run this task, never mark as UP-TO-DATE
+    outputs.upToDateWhen { false }
+
+    // Clean destinations before copying to avoid stale files
+    doFirst {
+        delete "${buildDir}/resources/main/static"
+        delete "${projectDir}/src/main/resources/static"
+    }
+
     from(webUiDistDir) { include '**/*' }
     into("${buildDir}/resources/main/static")
+
+    // Also copy to src/main/resources/static for bootRun development
+    doLast {
+        copy {
+            from(webUiDistDir) { include '**/*' }
+            into("${projectDir}/src/main/resources/static")
+        }
+    }
 }
 
 tasks.register('copyWebUiIfPresent', Copy) {
     // Fallback: if we skip build but dist exists, still package UI
     enabled = hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()
+
+    // Always run this task, never mark as UP-TO-DATE
+    outputs.upToDateWhen { false }
+
+    // Clean destination before copying to avoid stale files
+    doFirst {
+        delete "${buildDir}/resources/main/static"
+    }
+
     from(webUiDistDir) { include '**/*' }
     into("${buildDir}/resources/main/static")
 }
@@ -239,9 +276,6 @@ tasks.named('bootRun') {
 }
 
 /* ==== Distribution ZIP (jar + bin + data + scripts) ==== */
-import com.github.gradle.node.npm.task.NpmInstallTask
-import com.github.gradle.node.npm.task.NpmTask
-import proguard.gradle.ProGuardTask
 
 tasks.register('proguard', ProGuardTask) {
     group = 'build'
