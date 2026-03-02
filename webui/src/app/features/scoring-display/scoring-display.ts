@@ -52,10 +52,28 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     private html5Audio: HTMLAudioElement | null = null;
     private isPlayingStartSound: boolean = false;
     private currentAudioSource: AudioBufferSourceNode | null = null;
+    private gainNode: GainNode | null = null;
+    private audioAnalyser: AnalyserNode | null = null;
     soundEnabled: WritableSignal<boolean> = signal(false); // Sound disabled by default (requires user gesture)
+    isSoundPlaying: WritableSignal<boolean> = signal(false);
+    audioLevels: WritableSignal<number[]> = signal(new Array(16).fill(0));
     showSoundPermissionPopup: WritableSignal<boolean> = signal(true); // Show popup by default
     outputDeviceId: WritableSignal<string> = signal('default'); // Output device ID
     availableAudioDevices: WritableSignal<Array<{deviceId: string, label: string}>> = signal([]);
+    volume: WritableSignal<number> = signal(100);
+
+    onVolumeChange(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const volPercent = parseFloat(input.value);
+        this.volume.set(volPercent);
+        const volAudio = volPercent / 100;
+        if (this.gainNode) {
+            this.gainNode.gain.value = volAudio;
+        }
+        if (this.html5Audio) {
+            this.html5Audio.volume = volAudio;
+        }
+    }
 
     fieldBindValue: number = 0;
 
@@ -396,7 +414,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             next: (msg) => {
                 console.log("=== FieldDisplay received SOUND command:", msg, "===");
                 // Handle STOP_SOUND command
-                if (msg.messageType === 'STOP_SOUND') {
+                if (msg.type === 'STOP_SOUND') {
                     this.stopMatchSound();
                     return;
                 }
@@ -519,7 +537,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     }
 
     // Stop match sound playback
-    private stopMatchSound(): void {
+    stopMatchSound(): void {
         console.log('=== Stopping match sound ===');
         // Stop HTML5 Audio
         if (this.html5Audio) {
@@ -536,6 +554,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             this.currentAudioSource = null;
         }
         this.isPlayingStartSound = false;
+        this.isSoundPlaying.set(false);
     }
 
     // Handle user response to sound permission popup
@@ -651,6 +670,11 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         // Try HTML5 Audio first (better for mobile)
         this.html5Audio = new Audio('assets/MatchSoundEffect.m4a');
         this.html5Audio.preload = 'auto';
+        this.html5Audio.onended = () => {
+            console.log('=== HTML5 Audio playback ended ===');
+            this.isPlayingStartSound = false;
+            this.isSoundPlaying.set(false);
+        };
         this.html5Audio.load();
         console.log('Sound preloaded using HTML5 Audio');
 
@@ -693,6 +717,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         }
 
         this.isPlayingStartSound = true;
+        this.isSoundPlaying.set(true);
 
         // If a specific device is selected, use AudioContext (HTML5 Audio doesn't support device selection)
         if (this.outputDeviceId() !== 'default') {
@@ -724,6 +749,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 return;
             } catch (e) {
                 console.warn('HTML5 Audio error:', e);
+                this.isSoundPlaying.set(false);
             }
         }
 
@@ -766,6 +792,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 this.currentAudioSource = source;
                 source.onended = () => {
                     this.isPlayingStartSound = false;
+                    this.isSoundPlaying.set(false);
                     this.currentAudioSource = null;
                 };
                 source.start(0);
@@ -773,6 +800,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             } catch (e) {
                 console.error('Failed to play with AudioContext:', e);
                 this.isPlayingStartSound = false;
+                this.isSoundPlaying.set(false);
             }
         } else {
             // Fallback: fetch and play on demand
@@ -788,6 +816,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                             this.currentAudioSource = source;
                             source.onended = () => {
                                 this.isPlayingStartSound = false;
+                                this.isSoundPlaying.set(false);
                                 this.currentAudioSource = null;
                             };
                             source.start(0);
@@ -798,6 +827,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 .catch(err => {
                     console.error('Failed to load and play sound:', err);
                     this.isPlayingStartSound = false;
+                    this.isSoundPlaying.set(false);
                 });
         }
     }

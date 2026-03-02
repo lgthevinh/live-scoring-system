@@ -1,5 +1,6 @@
 package org.thingai.app.scoringservice.handler;
 
+import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.BroadcastMessageType;
 import org.thingai.app.scoringservice.define.ErrorCode;
@@ -394,6 +395,7 @@ public class LiveScoreHandler {
             targetScore.calculatePenalties();
             targetScore.calculateTotalScore();
             targetScore.setStatus(ScoreStatus.SCORED);
+            targetScore.setApproved(true); // Auto-approve score overrides from match control
 
             scoreHandler.submitScore(targetScore, true, new RequestCallback<Score>() {
                 @Override
@@ -572,58 +574,74 @@ public class LiveScoreHandler {
     }
 
     public void handleScoreSubmission(boolean isRed, String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
-        // Check if allianceId matches current match
-        String currentAllianceId;
-        boolean isCommited;
-        if (isRed) {
-            if (currentRedScoreHolder == null) {
-                callback.onFailure(ErrorCode.CUSTOM_ERR, "No red score holder available - no active match?");
+        ILog.d(TAG, "=== HANDLE SCORE SUBMISSION ===");
+        ILog.d(TAG, "isRed: " + isRed + ", allianceId: " + allianceId);
+        ILog.d(TAG, "jsonScoreData: " + jsonScoreData);
+        // Check if we have an active match with score holders
+        Score activeScoreHolder = isRed ? currentRedScoreHolder : currentBlueScoreHolder;
+        boolean hasActiveMatch = activeScoreHolder != null;
+        
+        // If active match exists, verify alliance ID matches
+        if (hasActiveMatch) {
+            String currentAllianceId = activeScoreHolder.getAllianceId();
+            boolean isCommited = isRed ? isRedCommitable : isBlueCommitable;
+            
+            if (!allianceId.equals(currentAllianceId) && isCommited) {
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "Current alliance is not commitable");
                 return;
             }
-            currentAllianceId = currentRedScoreHolder.getAllianceId();
-            isCommited = isRedCommitable;
-        } else {
-            if (currentBlueScoreHolder == null) {
-                callback.onFailure(ErrorCode.CUSTOM_ERR, "No blue score holder available - no active match?");
-                return;
-            }
-            currentAllianceId = currentBlueScoreHolder.getAllianceId();
-            isCommited = isBlueCommitable;
         }
-
-        if (!allianceId.equals(currentAllianceId) && isCommited) {
-            callback.onFailure(ErrorCode.CUSTOM_ERR, "Current alliance is not commitable");
-            return;
-        }
-
+        
         try {
             Score submittedScore;
-
-            // Update current score holder
-            if (isRed) {
-                submittedScore = currentRedScoreHolder;
-                isRedCommitable = true;
+            
+            if (hasActiveMatch) {
+                // Use active match score holder
+                submittedScore = activeScoreHolder;
+                if (isRed) {
+                    isRedCommitable = true;
+                } else {
+                    isBlueCommitable = true;
+                }
             } else {
-                submittedScore = currentBlueScoreHolder;
-                isBlueCommitable = true;
+                // No active match - create new score from factory
+                submittedScore = ScoreHandler.factoryScore();
+                submittedScore.setAllianceId(allianceId);
             }
-
-            submittedScore.fromJson(jsonScoreData);
-            submittedScore.calculatePenalties();
-            submittedScore.calculateTotalScore();
-            submittedScore.setStatus(ScoreStatus.SCORED);
-
-            ILog.d(TAG, "Score submission received for alliance " + allianceId + ": Total=" + submittedScore.getTotalScore() + ", Penalties=" + submittedScore.getPenaltiesScore());
-
-            // Check if both scores are now committed - if so, set match end time
-            if (isRedCommitable && isBlueCommitable && currentMatch != null) {
-                updateMatchEndTime();
-            }
-
-            callback.onSuccess(true, "Score submission processed successfully");
+            
+            // Always save to temp score - scorekeeper will commit later
+            saveAsTempScore(allianceId, jsonScoreData, callback);
         } catch (Exception e) {
             e.printStackTrace();
             callback.onFailure(ErrorCode.CUSTOM_ERR, "Failed to process score submission: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Save score as temp score for scorekeeper review
+     */
+    private void saveAsTempScore(String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
+        // Get default submittedBy (could be enhanced to pass actual user)
+        String submittedBy = "referee";
+
+        // Use the temp score handler to save
+        TempScoreHandler tempHandler = ScoringService.tempScoreHandler();
+        if (tempHandler != null) {
+            tempHandler.saveTempScore(allianceId, jsonScoreData, submittedBy, new RequestCallback<String>() {
+                @Override
+                public void onSuccess(String tempScoreId, String message) {
+                    ILog.d(TAG, "Saved as temp score: " + tempScoreId);
+                    callback.onSuccess(true, "Score saved as temp - awaiting scorekeeper approval");
+                }
+
+                @Override
+                public void onFailure(int errorCode, String errorMessage) {
+                    ILog.e(TAG, "Failed to save temp score: " + errorMessage);
+                    callback.onFailure(errorCode, "Failed to save temp score: " + errorMessage);
+                }
+            });
+        } else {
+            callback.onFailure(ErrorCode.CUSTOM_ERR, "Temp score handler not available");
         }
     }
 

@@ -18,7 +18,7 @@ import java.net.UnknownHostException;
 @SpringBootApplication
 public class Main {
 
-    private static final String DEFAULT_VERSION = "1.5";
+    private static final String DEFAULT_VERSION = "1.6";
 
     public static void main(String[] args) {
         ScoringService scoringService = new ScoringService();
@@ -37,10 +37,12 @@ public class Main {
         SimpMessagingTemplate simpMessagingTemplate = context.getBean(SimpMessagingTemplate.class);
 
         scoringService.setSimpMessagingTemplate(simpMessagingTemplate);
-        scoringService.init();
-
-        scoringService.registerScoreClass(FanrocScore.class); // Register the scoring class for the season specific logic
+        
+        // Register scoring classes BEFORE init so they're available when handlers are created
+        scoringService.registerScoreClass(FanrocScore.class);
         scoringService.registerRankingStrategy(new FanrocRankingStrategy());
+        
+        scoringService.init();
         ILog.i("Main", "Service v" + DEFAULT_VERSION + " running on URL:" + " http://" + getIpAddress() + ":" + getActualPort(context));
     }
 

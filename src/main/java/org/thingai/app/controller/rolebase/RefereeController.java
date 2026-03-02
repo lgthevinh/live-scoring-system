@@ -7,13 +7,22 @@ import org.thingai.app.controller.utils.ResponseEntityUtil;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import java.util.concurrent.CompletableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Controller
 @RequestMapping("/api/ref")
 public class RefereeController {
 
+    private static final Logger logger = LoggerFactory.getLogger(RefereeController.class);
+
     @PostMapping("/submit/{color}/{allianceId}/final-score")
     public ResponseEntity<Object> submitFinalScore(@PathVariable String color, @PathVariable String allianceId, @RequestBody String jsonScoreData) {
+        logger.info("=== REFEREE CONTROLLER ===");
+        logger.info("Color: {}", color);
+        logger.info("AllianceId: {}", allianceId);
+        logger.info("JsonScoreData: {}", jsonScoreData);
+
         if (color == null || color.isEmpty()) {
             return ResponseEntity.badRequest().body("Color parameter is required");
         }

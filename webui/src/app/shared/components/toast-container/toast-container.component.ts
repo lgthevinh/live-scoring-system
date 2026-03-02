@@ -19,7 +19,14 @@ import { Observable } from 'rxjs';
             </span>
             <span class="toast-text">{{ toast.message }}</span>
           </div>
-          <button class="toast-close" (click)="removeToast(toast.id)">×</button>
+          <div class="toast-actions">
+            @if (toast.action) {
+              <button class="toast-action-btn" (click)="onActionClick(toast)">
+                {{ toast.action.label }} ({{ toast.remainingTime }}s)
+              </button>
+            }
+            <button class="toast-close" (click)="removeToast(toast.id)">×</button>
+          </div>
         </div>
       }
     </div>
@@ -80,6 +87,30 @@ import { Observable } from 'rxjs';
       font-weight: 500;
     }
     
+    .toast-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .toast-action-btn {
+      background: rgba(255,255,255,0.25);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    
+    .toast-action-btn:hover {
+      background: rgba(255,255,255,0.4);
+      cursor: pointer;
+    }
+    
     .toast-close {
       background: rgba(255,255,255,0.2);
       border: none;
@@ -98,6 +129,7 @@ import { Observable } from 'rxjs';
     
     .toast-close:hover {
       background: rgba(255,255,255,0.3);
+      cursor: pointer;
     }
     
     @keyframes slideIn {
@@ -133,5 +165,12 @@ export class ToastContainerComponent {
   
   removeToast(id: string): void {
     this.toastService.remove(id);
+  }
+  
+  onActionClick(toast: Toast): void {
+    if (toast.action?.onAction) {
+      toast.action.onAction();
+    }
+    this.toastService.remove(toast.id);
   }
 }
