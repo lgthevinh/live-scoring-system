@@ -19,6 +19,9 @@ public class AllianceTeam {
     @DaoColumn(name = "isSurrogate")
     private boolean isSurrogate;
 
+    @DaoColumn(name = "shownState")
+    private int shownState; // 0 = not shown, 1 = no robot, 2 = shown
+
     public String getAllianceId() {
         return allianceId;
     }
@@ -41,5 +44,13 @@ public class AllianceTeam {
 
     public void setSurrogate(boolean surrogate) {
         isSurrogate = surrogate;
+    }
+
+    public int getShownState() {
+        return shownState;
+    }
+
+    public void setShownState(int shownState) {
+        this.shownState = shownState;
     }
 }
