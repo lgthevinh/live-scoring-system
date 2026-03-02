@@ -3,17 +3,19 @@ import { Router, RouterOutlet, NavigationEnd, RouterModule } from '@angular/rout
 import { CommonModule } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
 import {filter, Observable} from 'rxjs';
+import { ToastContainerComponent } from './shared/components/toast-container/toast-container.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule, RouterModule],
+  imports: [RouterOutlet, CommonModule, RouterModule, ToastContainerComponent],
   templateUrl: './app.component.html'
 })
 export class App implements OnInit {
   isLoggedIn: WritableSignal<boolean> = signal(false);
   showNavbar = true;
   localIp: Observable<string> | undefined;
+  version = '1.7';
 
   constructor(protected authService: AuthService, private router: Router) {
 

@@ -295,7 +295,14 @@
             <h5 class="m-0">Editing Score: {{ editingMatch()?.match?.matchCode }}</h5>
             <div>
               <button class="btn btn-secondary me-2" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary" (click)="saveScores()">Save Scores</button>
+              <button class="btn btn-primary" (click)="saveScores()" [disabled]="isSaving()">
+                @if (isSaving()) {
+                  <span class="spinner-border spinner-border-sm me-1"></span>
+                  Saving...
+                } @else {
+                  Save Scores
+                }
+              </button>
             </div>
           </div>
 

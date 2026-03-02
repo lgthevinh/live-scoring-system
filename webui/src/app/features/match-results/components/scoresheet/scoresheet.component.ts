@@ -37,4 +37,9 @@ export class ScoresheetComponent {
             fieldNumber: this.match.match.fieldNumber
         };
     }
+
+    getMatchId(): string | null {
+        if (!this.match) return null;
+        return this.match.match.id;
+    }
 }
