@@ -3,9 +3,9 @@ package org.thingai.app.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.repository.TeamRepository;
 import org.thingai.base.dao.exceptions.DaoException;
 import org.thingai.base.dao.exceptions.DaoQueryException;
 
@@ -29,7 +29,7 @@ public class TeamController {
             String teamSchool = requestBody.get("teamSchool").toString();
             String teamRegion = requestBody.get("teamRegion").toString();
 
-            Team newTeam = ScoringService.teamRepository().insertTeam(teamId, teamName, teamSchool, teamRegion);
+            Team newTeam = TeamRepository.insertTeam(teamId, teamName, teamSchool, teamRegion);
             future.complete(ResponseEntity.status(HttpStatus.CREATED)
                     .body(Map.of(
                             "message", "Team created successfully",
@@ -50,7 +50,7 @@ public class TeamController {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
         try {
-            Team[] teams = ScoringService.teamRepository().listTeams();
+            Team[] teams = TeamRepository.listTeams();
             future.complete(ResponseEntity.ok(teams));
         } catch (DaoQueryException e) {
             future.complete(createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Failed to retrieve teams: " + e.getMessage()));
@@ -68,7 +68,7 @@ public class TeamController {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
         try {
-            Team team = ScoringService.teamRepository().getTeamById(id);
+            Team team = TeamRepository.getTeamById(id);
             if (team != null) {
                 future.complete(ResponseEntity.ok(team));
             } else {
@@ -90,7 +90,7 @@ public class TeamController {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
         try {
-            Team updatedTeam = ScoringService.teamRepository().updateTeam(team);
+            Team updatedTeam = TeamRepository.updateTeam(team);
             future.complete(ResponseEntity.ok(Map.of(
                     "message", "Team updated successfully",
                     "team", updatedTeam
@@ -111,7 +111,7 @@ public class TeamController {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
         try {
-            ScoringService.teamRepository().deleteTeam(id);
+            TeamRepository.deleteTeam(id);
             future.complete(ResponseEntity.ok(Map.of("message", "Team deleted successfully")));
         } catch (DaoQueryException e) {
             future.complete(createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Failed to delete team: " + e.getMessage()));
@@ -131,7 +131,7 @@ public class TeamController {
             Object teamsObj = requestBody.get("teams");
             if (teamsObj instanceof Iterable) {
                 Team[] teams = (Team[]) teamsObj;
-                ScoringService.teamRepository().insertTeams(teams);
+                TeamRepository.insertTeams(teams);
                 future.complete(ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Teams created successfully")));
             } else {
                 future.complete(createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Invalid teams data: 'teams' should be an array of team objects"));

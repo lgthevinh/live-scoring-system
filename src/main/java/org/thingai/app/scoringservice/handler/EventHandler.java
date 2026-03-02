@@ -22,7 +22,6 @@ public class EventHandler {
     private static final String TAG = "EventHandler";
 
     private final Dao systemDao;
-    private final EventRepository eventRepository;
     private final EventCallback eventCallback;
 
     private Dao eventDao;
@@ -30,10 +29,10 @@ public class EventHandler {
 
     private Event currentEvent;
 
-    public EventHandler(Dao dao, EventRepository eventRepository, EventCallback eventCallback) {
+    public EventHandler(Dao dao, EventCallback eventCallback) {
         this.systemDao = dao;
-        this.eventRepository = eventRepository;
         this.eventCallback = eventCallback;
+        EventRepository.initialize(dao);
 
         try {
             if (isCurrentEventSet()) {
@@ -60,7 +59,7 @@ public class EventHandler {
 
     public void createEvent(Event event, RequestCallback<Event> callback) {
         try {
-            eventRepository.insertEvent(event);
+            EventRepository.insertEvent(event);
             this.currentEvent = event;
             callback.onSuccess(event, "Event created successfully");
         } catch (Exception e) {
@@ -70,7 +69,7 @@ public class EventHandler {
 
     public void listEvents(RequestCallback<Event[]> callback) {
         try {
-            Event[] events = eventRepository.listEvents();
+            Event[] events = EventRepository.listEvents();
             callback.onSuccess(events, "Events retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error retrieving events: " + e.getMessage());
@@ -79,7 +78,7 @@ public class EventHandler {
 
     public void getEventByCode(String eventCode, RequestCallback<Event> callback) {
         try {
-            Event event = eventRepository.getEventByEventCode(eventCode);
+            Event event = EventRepository.getEventByEventCode(eventCode);
             if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
@@ -97,13 +96,13 @@ public class EventHandler {
                 return;
             }
 
-            Event event = eventRepository.getEventByEventCode(eventCode);
+            Event event = EventRepository.getEventByEventCode(eventCode);
             if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
 
-            eventRepository.deleteEvent(event.getUuid());
+            EventRepository.deleteEvent(event.getUuid());
 
             if (cleanDelete) {
                 File dbFile = new File(eventCode + ".db");
@@ -145,7 +144,7 @@ public class EventHandler {
                 currentEvent = event;
             }
 
-            eventRepository.updateEvent(event);
+            EventRepository.updateEvent(event);
             callback.onSuccess(true, "Event updated successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Error updating event: " + e.getMessage());
@@ -155,7 +154,7 @@ public class EventHandler {
     public void setSystemEvent(String eventCode, RequestCallback<Event> callback) {
         try {
             ILog.d(TAG, eventCode);
-            Event event = eventRepository.getEventByEventCode(eventCode);
+            Event event = EventRepository.getEventByEventCode(eventCode);
             if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
@@ -215,7 +214,7 @@ public class EventHandler {
         if (mapEntities.length > 0) {
             String eventCode = mapEntities[0].getValue();
             try {
-                Event event = eventRepository.getEventByEventCode(eventCode);
+                Event event = EventRepository.getEventByEventCode(eventCode);
                 if (event != null) {
                     this.currentEvent = event;
                     return true;

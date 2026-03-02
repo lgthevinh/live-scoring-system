@@ -4,35 +4,35 @@ import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.dao.Dao;
 
 public class MatchRepository {
-    private final Dao dao;
+    private static Dao dao;
 
-    public MatchRepository(Dao dao) {
-        this.dao = dao;
+    public static void initialize(Dao daoInstance) {
+        dao = daoInstance;
     }
 
-    public Match insertMatch(Match match) throws Exception {
+    public static Match insertMatch(Match match) throws Exception {
         dao.insert(match);
         return match;
     }
 
-    public Match updateMatch(Match match) throws Exception {
+    public static Match updateMatch(Match match) throws Exception {
         dao.insertOrUpdate(match);
         return match;
     }
 
-    public void deleteMatch(String matchId) throws Exception {
+    public static void deleteMatch(String matchId) throws Exception {
         dao.deleteByColumn(Match.class, "id", matchId);
     }
 
-    public void deleteAllMatch() throws Exception {
+    public static void deleteAllMatch() throws Exception {
         dao.deleteAll(Match.class);
     }
 
-    public Match[] listMatches() throws Exception {
+    public static Match[] listMatches() throws Exception {
         return dao.readAll(Match.class);
     }
 
-    public Match getMatchById(String matchId) throws Exception {
+    public static Match getMatchById(String matchId) throws Exception {
         Match[] matches = dao.query(Match.class, new String[]{"id"}, new String[]{matchId});
         if (matches != null && matches.length > 0) {
             return matches[0];
@@ -40,7 +40,7 @@ public class MatchRepository {
         return null;
     }
 
-    public Match getMatchByMatchCode(String matchCode) throws Exception {
+    public static Match getMatchByMatchCode(String matchCode) throws Exception {
         Match[] matches = dao.query(Match.class, new String[]{"matchCode"}, new String[]{matchCode});
         if (matches != null && matches.length > 0) {
             return matches[0];
@@ -48,7 +48,7 @@ public class MatchRepository {
         return null;
     }
 
-    public Match[] getMatchesByType(int matchType) throws Exception {
+    public static Match[] getMatchesByType(int matchType) throws Exception {
         if (matchType == 2) { // PLAYOFF
             return dao.query(Match.class, "SELECT * FROM match WHERE NOT matchType = 1");
         } else {
