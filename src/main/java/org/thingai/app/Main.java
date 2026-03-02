@@ -18,7 +18,7 @@ import java.net.UnknownHostException;
 @SpringBootApplication
 public class Main {
 
-    private static final String DEFAULT_VERSION = "1.6";
+    private static final String DEFAULT_VERSION = "1.7";
 
     public static void main(String[] args) {
         ScoringService scoringService = new ScoringService();
