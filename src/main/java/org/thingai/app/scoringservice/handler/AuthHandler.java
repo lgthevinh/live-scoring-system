@@ -24,7 +24,6 @@ public class AuthHandler {
 
     public interface AuthHandlerCallback {
         void onSuccess(String token, String successMessage);
-
         void onFailure(String errorMessage);
     }
 
