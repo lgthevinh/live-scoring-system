@@ -4,7 +4,7 @@
 
 ### Match and Schedule Management
 
-- `POST /api/matches` - Create a new match
+- `POST /api/matches` - Create a new match, usually used for playoffs or special matches
 - `DELETE /api/matches/{id}` - Delete a match
 - `PUT /api/matches/{id}` - Update match details
 - `GET /api/matches/{id}` - Get match details
@@ -17,7 +17,29 @@
 - `GET /api/match/playoffs` - Get current playoff schedule
 - `POST /api/match/playoffs/clear` - Clear existing playoff schedule
 
-### Scoring and Referee Actions
+### Scoring Endpoints
+
+- `GET /api/scores/match/{matchId}` - Get current score for a match
+    - Response:
+      ```json
+        {
+          "matchId": "string",
+          "red": {
+            "score": number,
+            "penalties": number,
+            ...
+          },
+          "blue": {
+            "score": number,
+            "penalties": number,
+            ...
+          },
+          "state": number
+        },
+      ```
+- `GET /api/scores/current` - Get current scores of currently active matches
+
+### Referee Endpoints
 
 - `POST /api/scores/prematch` - Submit pre-match alliance status
     - Request body:
@@ -39,24 +61,23 @@
           }
         }
         ```
-- `POST /api/scores/commit` - Commit final score after both alliances submit
-- `GET /api/scores/match/{matchId}` - Get current score for a match
-    - Response:
-      ```json
-        {
-          "matchId": "string",
-          "red": {
-            "score": number,
-            "penalties": number,
-            ...
-          },
-          "blue": {
-            "score": number,
-            "penalties": number,
-            ...
-          },
-          "state": number
-        },
-      ```
-- `GET /api/scores/current` - Get current scores of currently active matches
-    
+
+### Match control endpoints
+
+- `POST /api/control/load/{matchId}` - Load a match for scoring
+- `POST /api/control/active` - Active a match for scoring
+    - Optional params: `?matchId={matchId}` to specify which match to active, if not provided, will activate the
+      currently loaded match
+- `POST /api/control/start` - Start a match
+- `POST /api/control/abort` - Abort a match
+- `POST /api/control/commit` - Commit final score after both alliances submit
+- `POST /api/control/allow-override` - Allow overriding score of current active match
+
+### Team management
+
+- `POST /api/teams` - Create a new team
+- `POST /api/teams/import` - Import teams in csv format (teamId, teamName, teamSchool, teamRegion)
+- `GET /api/teams` - Get list of teams
+- `GET /api/teams/{id}` - Get team details
+- `PUT /api/teams/{id}` - Update team details
+- `DELETE /api/teams/{id}` - Delete a team
