@@ -18,10 +18,8 @@ public class AuthHandler {
     private static final String SECRET_KEY = "secret_key";
     private static final int TOKEN_EXPIRATION_TIME = 3600 * 1000 * 24; // 1 day in milliseconds
 
-    private final AuthRepository authRepository;
-
-    public AuthHandler(AuthRepository authRepository) {
-        this.authRepository = authRepository;
+    public AuthHandler() {
+        // Default constructor - initialization handled by repository
     }
 
     public interface AuthHandlerCallback {
@@ -32,7 +30,7 @@ public class AuthHandler {
 
     public void handleAuthenticate(String username, String password, AuthHandlerCallback callback) {
         try {
-            AuthData authData = authRepository.getAuthDataById(username);
+            AuthData authData = AuthRepository.getAuthDataById(username);
 
             if (authData == null) {
                 callback.onFailure("Authentication failed: User not found.");
@@ -58,7 +56,7 @@ public class AuthHandler {
 
     public void handleCreateAuth(String username, String password, int role, AuthHandlerCallback callback) {
         try {
-            if (authRepository.authDataExists(username)) {
+            if (AuthRepository.authDataExists(username)) {
                 callback.onFailure("User already exists.");
                 return;
             }
@@ -80,8 +78,8 @@ public class AuthHandler {
             accountRole.setUsername(username);
             accountRole.setRole(role);
 
-            authRepository.insertAuthData(authData);
-            authRepository.insertAccountRole(accountRole);
+            AuthRepository.insertAuthData(authData);
+            AuthRepository.insertAccountRole(accountRole);
 
             String token = generateToken(username);
             callback.onSuccess(token, "Authentication created successfully.");
@@ -122,14 +120,14 @@ public class AuthHandler {
 
     public void handleGetAllUsers(RequestCallback<UserDto[]> callback) {
         try {
-            AuthData[] authDataList = authRepository.listAuthData();
+            AuthData[] authDataList = AuthRepository.listAuthData();
 
             UserDto[] users = new UserDto[authDataList.length];
             for (int i = 0; i < authDataList.length; i++) {
                 String username = authDataList[i].getUsername();
                 int role = 0;
 
-                AccountRole accountRole = authRepository.getAccountRoleById(username);
+                AccountRole accountRole = AuthRepository.getAccountRoleById(username);
                 if (accountRole != null) {
                     role = accountRole.getRole();
                 }
@@ -145,13 +143,13 @@ public class AuthHandler {
 
     public void handleDeleteAccount(String username, RequestCallback<Void> callback) {
         try {
-            if (!authRepository.authDataExists(username)) {
+            if (!AuthRepository.authDataExists(username)) {
                 callback.onFailure(404, "User not found: " + username);
                 return;
             }
 
-            authRepository.deleteAccountRole(username);
-            authRepository.deleteAuthData(username);
+            AuthRepository.deleteAccountRole(username);
+            AuthRepository.deleteAuthData(username);
 
             callback.onSuccess(null, "Account '" + username + "' deleted successfully.");
         } catch (Exception e) {
@@ -184,10 +182,10 @@ public class AuthHandler {
 
     public AccountRole[] getAllAccounts() {
         try {
-            AccountRole[] accountRoles = authRepository.listAccountRoles();
+            AccountRole[] accountRoles = AuthRepository.listAccountRoles();
 
             if (accountRoles.length == 0) {
-                AuthData[] authDataList = authRepository.listAuthData();
+                AuthData[] authDataList = AuthRepository.listAuthData();
                 accountRoles = new AccountRole[authDataList.length];
                 for (int i = 0; i < authDataList.length; i++) {
                     AccountRole role = new AccountRole();
@@ -205,7 +203,7 @@ public class AuthHandler {
 
     public AuthData getAuthDataByUsername(String username) {
         try {
-            return authRepository.getAuthDataById(username);
+            return AuthRepository.getAuthDataById(username);
         } catch (Exception e) {
             return null;
         }
@@ -213,7 +211,7 @@ public class AuthHandler {
 
     public void handleUpdateAccount(String username, String newPassword, int newRole, AuthHandlerCallback callback) {
         try {
-            AuthData existingAuth = authRepository.getAuthDataById(username);
+            AuthData existingAuth = AuthRepository.getAuthDataById(username);
             if (existingAuth == null) {
                 callback.onFailure("User not found.");
                 return;
@@ -236,8 +234,8 @@ public class AuthHandler {
             accountRole.setUsername(username);
             accountRole.setRole(newRole);
 
-            authRepository.updateAuthData(existingAuth);
-            authRepository.updateAccountRole(accountRole);
+            AuthRepository.updateAuthData(existingAuth);
+            AuthRepository.updateAccountRole(accountRole);
 
             callback.onSuccess(null, "Account updated successfully.");
         } catch (Exception e) {
@@ -247,15 +245,15 @@ public class AuthHandler {
 
     public void handleDeleteAccount(String username, AuthHandlerCallback callback) {
         try {
-            AuthData authData = authRepository.getAuthDataById(username);
+            AuthData authData = AuthRepository.getAuthDataById(username);
 
             if (authData != null) {
-                authRepository.deleteAuthData(username);
+                AuthRepository.deleteAuthData(username);
             }
 
-            AccountRole accountRole = authRepository.getAccountRoleById(username);
+            AccountRole accountRole = AuthRepository.getAccountRoleById(username);
             if (accountRole != null) {
-                authRepository.deleteAccountRole(username);
+                AuthRepository.deleteAccountRole(username);
             }
 
             callback.onSuccess(null, "Account deleted successfully.");

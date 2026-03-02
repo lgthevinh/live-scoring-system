@@ -6,8 +6,11 @@ import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.*;
 import org.thingai.app.scoringservice.repository.AuthRepository;
+import org.thingai.app.scoringservice.repository.AllianceTeamRepository;
 import org.thingai.app.scoringservice.repository.EventRepository;
 import org.thingai.app.scoringservice.repository.MatchRepository;
+import org.thingai.app.scoringservice.repository.RankEntryRepository;
+import org.thingai.app.scoringservice.repository.ScoreRepository;
 import org.thingai.app.scoringservice.repository.TeamRepository;
 import org.thingai.base.Service;
 import org.thingai.base.dao.Dao;
@@ -21,10 +24,6 @@ import org.thingai.platform.log.ILogImpl;
 
 public class ScoringService extends Service {
     private static final String SERVICE_NAME = "ScoringService";
-
-    // Repositories
-    private static TeamRepository teamRepository;
-    private static MatchRepository matchRepository;
 
     private static EventHandler eventHandler;
     private static AuthHandler authHandler;
@@ -56,18 +55,21 @@ public class ScoringService extends Service {
                 DbMapEntity.class
         });
         // Initialize system level repositories and handlers
-        authHandler = new AuthHandler(new AuthRepository(dao));
-        eventHandler = new EventHandler(dao, new EventRepository(dao), new EventHandler.EventCallback() {
+        AuthRepository.initialize(dao);
+        EventRepository.initialize(dao);
+
+        authHandler = new AuthHandler();
+        eventHandler = new EventHandler(dao, new EventHandler.EventCallback() {
             @Override
             public void onSetEvent(Dao eventDao, DaoFile eventDaoFile) {
                 ILog.i(SERVICE_NAME, "Event is set. Injecting handlers with new event data.");
-                injectHandler(eventDao, eventDaoFile);
+                injectDao(eventDao, eventDaoFile);
             }
 
             @Override
             public void isCurrentEventSet(Event currentEvent, Dao eventDao, DaoFile eventDaoFile) {
                 ILog.i(SERVICE_NAME, "Current event is set to: ", currentEvent.getEventCode());
-                injectHandler(eventDao, eventDaoFile);
+                injectDao(eventDao, eventDaoFile);
             }
 
             @Override
@@ -87,10 +89,6 @@ public class ScoringService extends Service {
 
     public static EventHandler eventHandler() {
         return eventHandler;
-    }
-
-    public static TeamRepository teamRepository() {
-        return teamRepository;
     }
 
     public static ScoreHandler scoreHandler() {
@@ -126,14 +124,19 @@ public class ScoringService extends Service {
         RankingHandler.setRankingStrategy(rankingStrategy);
     }
 
-    private void injectHandler(Dao dao, DaoFile daoFile) {
-        teamRepository = new TeamRepository(dao);
-        matchHandler = new MatchHandler(dao);
+    private void injectDao(Dao dao, DaoFile daoFile) {
+        AuthRepository.initialize(dao);
+        TeamRepository.initialize(dao);
+        MatchRepository.initialize(dao);
+        AllianceTeamRepository.initialize(dao);
+        ScoreRepository.initialize(dao);
+        RankEntryRepository.initialize(dao);
+
+        matchHandler = new MatchHandler();
         scoreHandler = new ScoreHandler(dao, daoFile);
         rankingHandler = new RankingHandler(dao, matchHandler);
 
         liveScoreHandler = new LiveScoreHandler(matchHandler, scoreHandler, rankingHandler);
         liveScoreHandler.setBroadcastHandler(broadcastHandler);
-
     }
 }

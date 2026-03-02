@@ -11,6 +11,7 @@ import org.thingai.app.scoringservice.entity.time.TimeBlock;
 import org.thingai.app.scoringservice.repository.AllianceTeamRepository;
 import org.thingai.app.scoringservice.repository.MatchRepository;
 import org.thingai.app.scoringservice.repository.ScoreRepository;
+import org.thingai.app.scoringservice.repository.TeamRepository;
 import org.thingai.base.dao.Dao;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;
@@ -28,16 +29,9 @@ import java.util.regex.Pattern;
 public class MatchHandler {
     private static final String TAG = "MatchHandler";
 
-    private final MatchRepository matchRepository;
-    private final AllianceTeamRepository allianceTeamRepository;
-    private final ScoreRepository scoreRepository;
     private final MatchMakerHandler matchMakerHandler = new MatchMakerHandler();
 
-    public MatchHandler(Dao dao) {
-        this.matchRepository = new MatchRepository(dao);
-        this.allianceTeamRepository = new AllianceTeamRepository(dao);
-        this.scoreRepository = new ScoreRepository(dao);
-
+    public MatchHandler() {
         String osName = System.getProperty("os.name").toLowerCase();
         Path binary = Paths.get("binary");
         if (osName.contains("win")) {
@@ -73,29 +67,7 @@ public class MatchHandler {
         String outDir = outPath.toAbsolutePath().toString();
         ILog.d("MatchHandler", "Match schedule output path set to: " + outDir);
         this.matchMakerHandler.setOutPath(outDir);
-
-        // Get event match type from dao
-        // try {
-        //     DbMapEntity eventMatchType = dao.query(DbMapEntity.class, new String[]{"key"}, new String[]{"event_match_type_key"})[0];
-        //     if (eventMatchType != null) {
-        //         currentEventMatchType = Integer.parseInt(eventMatchType.getValue());
-        //     } else {
-        //         currentEventMatchType = MatchType.QUALIFICATION;
-        //         dao.insertOrUpdate(new DbMapEntity("event_match_type_key", String.valueOf(currentEventMatchType)));
-        //     }
-        // } catch (Exception e) {
-        //     currentEventMatchType = MatchType.QUALIFICATION;
-        // }
     }
-
-    // public void updateEventMatchType(int matchType) {
-    //     currentEventMatchType = matchType;
-    //     try {
-    //         dao.insertOrUpdate(new DbMapEntity("event_match_type_key", String.valueOf(currentEventMatchType)));
-    //     } catch (Exception e) {
-    //         ILog.e("MatchHandler", "Failed to update event match type in DB: " + e.getMessage());
-    //     }
-    // }
 
     // Methods use outside system implementation
     public void createMatch(int matchType, int matchNumber, String matchStartTime, String[] redTeamIds, String[] blueTeamIds, RequestCallback<Match> callback) {
@@ -127,21 +99,21 @@ public class MatchHandler {
             String redAllianceId = matchCode + "_R";
 
             // Clear existing alliance teams if any
-            allianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
-            allianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
+            AllianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
+            AllianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
 
             for (String teamId : uniqueReds) {
                 AllianceTeam team = new AllianceTeam();
                 team.setTeamId(teamId);
                 team.setAllianceId(redAllianceId);
-                allianceTeamRepository.insertAllianceTeam(team);
+                AllianceTeamRepository.insertAllianceTeam(team);
             }
 
             for (String teamId : uniqueBlues) {
                 AllianceTeam team = new AllianceTeam();
                 team.setTeamId(teamId);
                 team.setAllianceId(blueAllianceId);
-                allianceTeamRepository.insertAllianceTeam(team);
+                AllianceTeamRepository.insertAllianceTeam(team);
             }
 
             // Create scores (as per original code)
@@ -151,9 +123,9 @@ public class MatchHandler {
             Score blueScore = ScoreHandler.factoryScore();
             blueScore.setAllianceId(blueAllianceId);
 
-            matchRepository.insertMatch(match);
-            scoreRepository.insertScore(redScore);
-            scoreRepository.insertScore(blueScore);
+            MatchRepository.insertMatch(match);
+            ScoreRepository.insertScore(redScore);
+            ScoreRepository.insertScore(blueScore);
 
             ILog.d(TAG, "created match: " + matchCode, Arrays.toString(redTeamIds), Arrays.toString(blueTeamIds));
             callback.onSuccess(match, "Match created successfully.");
@@ -165,7 +137,7 @@ public class MatchHandler {
 
     public void getMatch(String matchId, RequestCallback<Match> callback) {
         try {
-            Match match = matchRepository.getMatchById(matchId);
+            Match match = MatchRepository.getMatchById(matchId);
             if (match != null) {
                 callback.onSuccess(match, "Match retrieved successfully.");
             } else {
@@ -178,7 +150,7 @@ public class MatchHandler {
 
     public void getMatchDetail(String matchId, RequestCallback<MatchDetailDto> callback) {
         try {
-            Match match = matchRepository.getMatchById(matchId);
+            Match match = MatchRepository.getMatchById(matchId);
             if (match == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Match not found.");
                 return;
@@ -187,12 +159,12 @@ public class MatchHandler {
             String redAllianceId = match.getMatchCode() + "_R";
             String blueAllianceId = match.getMatchCode() + "_B";
 
-            AllianceTeam[] redAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
-            AllianceTeam[] blueAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
+            AllianceTeam[] redAllianceTeams = AllianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
+            AllianceTeam[] blueAllianceTeams = AllianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
             Team[] redTeams = Arrays.stream(redAllianceTeams)
                     .map(at -> {
                         try {
-                            return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                            return TeamRepository.getTeamById(at.getTeamId());
                         } catch (Exception e) {
                             return null;
                         }
@@ -202,7 +174,7 @@ public class MatchHandler {
             Team[] blueTeams = Arrays.stream(blueAllianceTeams)
                     .map(at -> {
                         try {
-                            return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                            return TeamRepository.getTeamById(at.getTeamId());
                         } catch (Exception e) {
                             return null;
                         }
@@ -226,7 +198,7 @@ public class MatchHandler {
 
     public void updateMatch(Match match, RequestCallback<Match> callback) {
         try {
-            matchRepository.updateMatch(match);
+            MatchRepository.updateMatch(match);
             callback.onSuccess(match, "Match updated successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to update match: " + e.getMessage());
@@ -235,7 +207,7 @@ public class MatchHandler {
 
     public void deleteMatch(String matchId, RequestCallback<Void> callback) {
         try {
-            matchRepository.deleteMatch(matchId);
+            MatchRepository.deleteMatch(matchId);
             callback.onSuccess(null, "Match deleted successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete match: " + e.getMessage());
@@ -244,7 +216,7 @@ public class MatchHandler {
 
     public void listMatches(RequestCallback<Match[]> callback) {
         try {
-            Match[] matches = matchRepository.listMatches();
+            Match[] matches = MatchRepository.listMatches();
             callback.onSuccess(matches, "Matches retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve matches: " + e.getMessage());
@@ -253,7 +225,7 @@ public class MatchHandler {
 
     public void listMatchesByType(int matchType, RequestCallback<Match[]> callback) {
         try {
-            Match[] matches = matchRepository.getMatchesByType(matchType);
+            Match[] matches = MatchRepository.getMatchesByType(matchType);
             callback.onSuccess(matches, "Matches retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve matches: " + e.getMessage());
@@ -262,22 +234,22 @@ public class MatchHandler {
 
     public void listMatchDetails(int matchType, boolean withScore, RequestCallback<MatchDetailDto[]> callback) {
         try {
-            Match[] matches = matchRepository.getMatchesByType(matchType);
+            Match[] matches = MatchRepository.getMatchesByType(matchType);
             List<MatchDetailDto> detailsList = new ArrayList<>();
 
             for (Match match : matches) {
                 String redAllianceId = match.getMatchCode() + "_R";
                 String blueAllianceId = match.getMatchCode() + "_B";
 
-                AllianceTeam[] redAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
-                AllianceTeam[] blueAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
+                AllianceTeam[] redAllianceTeams = AllianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
+                AllianceTeam[] blueAllianceTeams = AllianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
 
                 HashMap<String, Boolean> surrogateMap = new HashMap<>();
 
                 Team[] redTeams = Arrays.stream(redAllianceTeams)
                         .map(at -> {
                             try {
-                                return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                                return TeamRepository.getTeamById(at.getTeamId());
                             } catch (Exception e) {
                                 return null;
                             }
@@ -288,7 +260,7 @@ public class MatchHandler {
                 Team[] blueTeams = Arrays.stream(blueAllianceTeams)
                         .map(at -> {
                             try {
-                                return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                                return TeamRepository.getTeamById(at.getTeamId());
                             } catch (Exception e) {
                                 return null;
                             }
@@ -299,8 +271,8 @@ public class MatchHandler {
                 if (withScore) {
                     String redAllianceScoreId = match.getMatchCode() + "_R";
                     String blueAllianceScoreId = match.getMatchCode() + "_B";
-                    Score redScore = scoreRepository.getScoreById(redAllianceScoreId);
-                    Score blueScore = scoreRepository.getScoreById(blueAllianceScoreId);
+                    Score redScore = ScoreRepository.getScoreById(redAllianceScoreId);
+                    Score blueScore = ScoreRepository.getScoreById(blueAllianceScoreId);
                     detailsList.add(new MatchDetailDto(match, redTeams, blueTeams, redScore, blueScore, surrogateMap));
                     continue;
                 }
@@ -325,11 +297,11 @@ public class MatchHandler {
         ILog.d("MatchHandler", "Generating match schedule V2 with rounds=" + rounds + ", start=" + startTime + ", duration=" + matchDuration + " min");
         try {
             // 1) Load teams and reset schedule-related tables and caches
-            Team[] allTeams = dao.readAll(Team.class);
+            Team[] allTeams = TeamRepository.listTeams();
 
-            matchRepository.deleteAllMatch();
-            allianceTeamRepository.deleteAllAllianceTeams();
-            scoreRepository.deleteAllScores();
+            MatchRepository.deleteAllMatch();
+            AllianceTeamRepository.deleteAllAllianceTeams();
+            ScoreRepository.deleteAllScores();
 
             if (allTeams == null || allTeams.length < 4) {
                 callback.onFailure(ErrorCode.CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
@@ -553,8 +525,8 @@ public class MatchHandler {
         String blueAllianceId = matchCode + "_B";
         String redAllianceId = matchCode + "_R";
 
-        allianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
-        allianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
+        AllianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
+        AllianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
 
         for (String teamId : uniqueReds) {
             AllianceTeam team = new AllianceTeam();
@@ -562,7 +534,7 @@ public class MatchHandler {
             team.setAllianceId(redAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
             ILog.d("MatchHandler", "Inserting red alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
-            allianceTeamRepository.insertAllianceTeam(team);
+            AllianceTeamRepository.insertAllianceTeam(team);
         }
 
         for (String teamId : uniqueBlues) {
@@ -571,7 +543,7 @@ public class MatchHandler {
             team.setAllianceId(blueAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
             ILog.d("MatchHandler", "Inserting blue alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
-            allianceTeamRepository.insertAllianceTeam(team);
+            AllianceTeamRepository.insertAllianceTeam(team);
         }
 
         Score redScore = ScoreHandler.factoryScore();
@@ -580,13 +552,13 @@ public class MatchHandler {
         Score blueScore = ScoreHandler.factoryScore();
         blueScore.setAllianceId(blueAllianceId);
 
-        matchRepository.insertMatch(match);
-        scoreRepository.insertScore(redScore);
-        scoreRepository.insertScore(blueScore);
+        MatchRepository.insertMatch(match);
+        ScoreRepository.insertScore(redScore);
+        ScoreRepository.insertScore(blueScore);
     }
 
     public MatchDetailDto getMatchDetailSync(String matchId) throws Exception {
-        Match match = matchRepository.getMatchById(matchId);
+        Match match = MatchRepository.getMatchById(matchId);
         if (match == null) {
             throw new Exception("Match not found.");
         }
@@ -594,12 +566,12 @@ public class MatchHandler {
         String redAllianceId = match.getMatchCode() + "_R";
         String blueAllianceId = match.getMatchCode() + "_B";
 
-        AllianceTeam[] redAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
-        AllianceTeam[] blueAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
+        AllianceTeam[] redAllianceTeams = AllianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
+        AllianceTeam[] blueAllianceTeams = AllianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
         Team[] redTeams = Arrays.stream(redAllianceTeams)
                 .map(at -> {
                     try {
-                        return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                        return TeamRepository.getTeamById(at.getTeamId());
                     } catch (Exception e) {
                         return null;
                     }
@@ -609,7 +581,7 @@ public class MatchHandler {
         Team[] blueTeams = Arrays.stream(blueAllianceTeams)
                 .map(at -> {
                     try {
-                        return dao.query(Team.class, new String[]{"id"}, new String[]{at.getTeamId()})[0];
+                        return TeamRepository.getTeamById(at.getTeamId());
                     } catch (Exception e) {
                         return null;
                     }
@@ -640,11 +612,5 @@ public class MatchHandler {
             array[index] = array[i];
             array[i] = a;
         }
-    }
-    
-    public void setDao(Dao dao) {
-        this.matchRepository = new MatchRepository(dao);
-        this.allianceTeamRepository = new AllianceTeamRepository(dao);
-        this.scoreRepository = new ScoreRepository(dao);
     }
 }

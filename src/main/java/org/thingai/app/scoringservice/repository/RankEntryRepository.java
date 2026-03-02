@@ -4,31 +4,31 @@ import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
 import org.thingai.base.dao.Dao;
 
 public class RankEntryRepository {
-    private final Dao dao;
+    private static Dao dao;
 
-    public RankEntryRepository(Dao dao) {
-        this.dao = dao;
+    public static void initialize(Dao daoInstance) {
+        dao = daoInstance;
     }
 
-    public RankingEntry insertRankingEntry(RankingEntry entry) throws Exception {
+    public static RankingEntry insertRankingEntry(RankingEntry entry) throws Exception {
         dao.insert(entry);
         return entry;
     }
 
-    public RankingEntry updateRankingEntry(RankingEntry entry) throws Exception {
+    public static RankingEntry updateRankingEntry(RankingEntry entry) throws Exception {
         dao.insertOrUpdate(entry);
         return entry;
     }
 
-    public void deleteRankingEntry(String teamId) throws Exception {
+    public static void deleteRankingEntry(String teamId) throws Exception {
         dao.deleteByColumn(RankingEntry.class, "teamId", teamId);
     }
 
-    public RankingEntry[] listRankingEntries() throws Exception {
+    public static RankingEntry[] listRankingEntries() throws Exception {
         return dao.readAll(RankingEntry.class);
     }
 
-    public RankingEntry getRankingEntryById(String teamId) throws Exception {
+    public static RankingEntry getRankingEntryById(String teamId) throws Exception {
         RankingEntry[] entries = dao.query(RankingEntry.class, new String[]{"teamId"}, new String[]{teamId});
         if (entries != null && entries.length > 0) {
             return entries[0];
@@ -36,13 +36,13 @@ public class RankEntryRepository {
         return null;
     }
 
-    public void insertRankingEntries(RankingEntry[] entries) throws Exception {
+    public static void insertRankingEntries(RankingEntry[] entries) throws Exception {
         for (RankingEntry entry : entries) {
             dao.insert(entry);
         }
     }
 
-    public void deleteAllRankingEntries() throws Exception {
+    public static void deleteAllRankingEntries() throws Exception {
         dao.deleteAll(RankingEntry.class);
     }
 }
