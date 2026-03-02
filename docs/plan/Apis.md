@@ -9,13 +9,13 @@
 - `PUT /api/matches/{id}` - Update match details
 - `GET /api/matches/{id}` - Get match details
 
-- `POST /api/schedules/generate` - Generate match schedule
-- `GET /api/schedules` - Get current match schedule
-- `POST /api/schedules/clear` - Clear existing schedule
+- `POST /api/match/schedules/generate` - Generate match schedule
+- `GET /api/match/schedules` - Get current match schedule
+- `POST /api/match/schedules/clear` - Clear existing schedule
 
-- `POST /api/playoffs/generate` - Generate playoff schedule
-- `GET /api/playoffs` - Get current playoff schedule
-- `POST /api/playoffs/clear` - Clear existing playoff schedule
+- `POST /api/match/playoffs/generate` - Generate playoff schedule
+- `GET /api/match/playoffs` - Get current playoff schedule
+- `POST /api/match/playoffs/clear` - Clear existing playoff schedule
 
 ### Scoring and Referee Actions
 
