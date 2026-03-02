@@ -81,3 +81,35 @@
 - `GET /api/teams/{id}` - Get team details
 - `PUT /api/teams/{id}` - Update team details
 - `DELETE /api/teams/{id}` - Delete a team
+
+## Websocket Events
+
+Base topic: `live/`
+
+### Match lifecycle events - Topic: `live/match`
+
+- Payload:
+    ```json
+    {
+      "state": 1, 2 or 3... in MatchLifeCycleState
+      "matchId": "string",
+      "red": [{teamId}, {teamId}],
+      "blue": [{teamId}, {teamId}]
+    }
+    ```
+
+### Score update events - Topic: `live/score`
+
+- Payload:
+  ```json
+    {
+      "matchId": "string",
+      "red": {
+        ...
+      },
+      "blue": {
+        ...
+      },
+      "state": number
+    }
+  ```
