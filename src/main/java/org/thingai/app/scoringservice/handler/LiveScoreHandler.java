@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 public class LiveScoreHandler {
     private static final String TAG = "ScorekeeperHandler";
     private static final int MATCH_DURATION_SECONDS = 180; // modify this based on season rules
+    private static final long SOUND_DEBOUNCE_MS = 5000; // Debounce sound for 5 seconds to prevent overlapping
 
     private final MatchTimerHandler matchTimerHandler;
     private final MatchHandler matchHandler;
@@ -39,6 +40,9 @@ public class LiveScoreHandler {
     /* Flags */
     private boolean isRedCommitable = false;
     private boolean isBlueCommitable = false;
+    /* Sound debouncing */
+    private volatile boolean isCountdownRunning = false;
+    private volatile long lastSoundBroadcastTime = 0;
 
     public LiveScoreHandler(MatchHandler matchHandler, ScoreHandler scoreHandler, RankingHandler rankingHandler) {
         this.matchHandler = matchHandler;
@@ -98,6 +102,13 @@ public class LiveScoreHandler {
                 return;
             }
 
+            // Prevent multiple countdowns from running simultaneously (debouncing)
+            if (isCountdownRunning) {
+                ILog.w(TAG, "Countdown already running, ignoring duplicate start request");
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "Match countdown already in progress");
+                return;
+            }
+
             int fieldNumber = currentMatch.getMatch().getFieldNumber();
             String rootTopic = "/topic/display/field/" + fieldNumber;
 
@@ -109,22 +120,33 @@ public class LiveScoreHandler {
             // Start 3-second countdown before main timer
             final int countdownSeconds = 3;
             final int[] countdown = {countdownSeconds};
+            isCountdownRunning = true;
+
             ScheduledExecutorService countdownScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
             countdownScheduler.scheduleAtFixedRate(() -> {
                 if (countdown[0] > 0) {
                     // Broadcast countdown value
                     MatchTimeStatusDto countdownDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), countdown[0]);
                     broadcastHandler.broadcast(rootTopic + "/timer", countdownDto, BroadcastMessageType.MATCH_STATUS);
-                    
+
                     // When countdown reaches 3 (first countdown tick), broadcast PLAY_SOUND for synchronized playback
+                    // Use debouncing to prevent overlapping sounds
                     if (countdown[0] == countdownSeconds) {
-                        broadcastHandler.broadcast(rootTopic + "/sound", countdownDto, BroadcastMessageType.PLAY_SOUND);
+                        long currentTimeMs = System.currentTimeMillis();
+                        if (currentTimeMs - lastSoundBroadcastTime > SOUND_DEBOUNCE_MS) {
+                            lastSoundBroadcastTime = currentTimeMs;
+                            broadcastHandler.broadcast(rootTopic + "/sound", countdownDto, BroadcastMessageType.PLAY_SOUND);
+                            ILog.d(TAG, "PLAY_SOUND broadcast at countdown " + countdown[0]);
+                        } else {
+                            ILog.w(TAG, "Sound broadcast debounced - too soon since last broadcast");
+                        }
                     }
-                    
+
                     countdown[0]--;
                 } else {
                     // Countdown finished, start main timer at full 3:00 (180 seconds)
                     countdownScheduler.shutdown();
+                    isCountdownRunning = false;
                     matchTimerHandler.startTimer(currentMatch.getMatch().getId(), fieldNumber, typicalMatchDuration);
                     MatchTimeStatusDto initialTimerDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), typicalMatchDuration);
                     broadcastHandler.broadcast(rootTopic + "/timer", initialTimerDto, BroadcastMessageType.MATCH_STATUS);
@@ -137,6 +159,7 @@ public class LiveScoreHandler {
 
             callback.onSuccess(true, "Match started");
         } catch (Exception e) {
+            isCountdownRunning = false;
             e.printStackTrace();
             callback.onFailure(ErrorCode.CUSTOM_ERR, "Failed to start match: " + e.getMessage());
         }
@@ -485,11 +508,17 @@ public class LiveScoreHandler {
         // Stop the timer
         matchTimerHandler.stopTimer();
 
+        // Reset countdown flag to allow new countdowns
+        isCountdownRunning = false;
+
         // Broadcast abort state to all displays
         int fieldNumber = currentMatch.getMatch().getFieldNumber();
         String rootTopic = "/topic/display/field/" + fieldNumber;
         MatchTimeStatusDto abortDto = new MatchTimeStatusDto(currentMatch.getMatch().getId(), -1); // -1 indicates aborted
         broadcastHandler.broadcast(rootTopic + "/timer", abortDto, BroadcastMessageType.MATCH_STATUS);
+
+        // Broadcast STOP_SOUND to stop any playing sound
+        broadcastHandler.broadcast(rootTopic + "/sound", abortDto, BroadcastMessageType.STOP_SOUND);
 
         // Move current match back to loaded state (can be restarted)
         MatchDetailDto abortedMatch = currentMatch;
@@ -586,10 +615,40 @@ public class LiveScoreHandler {
 
             ILog.d(TAG, "Score submission received for alliance " + allianceId + ": Total=" + submittedScore.getTotalScore() + ", Penalties=" + submittedScore.getPenaltiesScore());
 
+            // Check if both scores are now committed - if so, set match end time
+            if (isRedCommitable && isBlueCommitable && currentMatch != null) {
+                updateMatchEndTime();
+            }
+
             callback.onSuccess(true, "Score submission processed successfully");
         } catch (Exception e) {
             e.printStackTrace();
             callback.onFailure(ErrorCode.CUSTOM_ERR, "Failed to process score submission: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Updates the current match's end time when both scores are committed.
+     */
+    private void updateMatchEndTime() {
+        try {
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+            LocalDateTime currentTime = LocalDateTime.now();
+
+            currentMatch.getMatch().setMatchEndTime(currentTime.format(timeFormatter));
+            matchHandler.updateMatch(currentMatch.getMatch(), new RequestCallback<Match>() {
+                @Override
+                public void onSuccess(Match responseObject, String message) {
+                    ILog.d(TAG, "Match end time auto-set after both scores committed: " + message);
+                }
+
+                @Override
+                public void onFailure(int errorCode, String errorMessage) {
+                    ILog.d(TAG, "Failed to auto-set match end time: " + errorMessage);
+                }
+            });
+        } catch (Exception e) {
+            ILog.e(TAG, "Error updating match end time: " + e.getMessage());
         }
     }
 

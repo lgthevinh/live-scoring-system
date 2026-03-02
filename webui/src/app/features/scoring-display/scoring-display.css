@@ -391,3 +391,33 @@
     color: inherit;
     opacity: 0.7;
 }
+
+/* ========== SOUND INDICATOR ========== */
+.sound-indicator {
+    position: absolute;
+    top: clamp(10px, 2vw, 20px);
+    right: clamp(10px, 2vw, 20px);
+}
+
+.sound-indicator .badge {
+    font-size: clamp(0.7rem, 1.2vw, 1rem);
+    padding: clamp(4px, 0.5vw, 8px) clamp(8px, 1vw, 12px);
+    animation: pulse-badge 1s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* ========== AUDIO VISUALIZER ========== */
+.audio-visualizer {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.audio-bar {
+    min-height: 2px;
+    border-radius: 1px;
+}
