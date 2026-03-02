@@ -2,21 +2,15 @@ package org.thingai.app.scoringservice;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
+import org.thingai.app.scoringservice.entity.config.AuthData;
+import org.thingai.app.scoringservice.entity.config.DbMapEntity;
+import org.thingai.app.scoringservice.entity.event.Event;
 import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.*;
-import org.thingai.app.scoringservice.repository.AuthRepository;
-import org.thingai.app.scoringservice.repository.AllianceTeamRepository;
-import org.thingai.app.scoringservice.repository.EventRepository;
-import org.thingai.app.scoringservice.repository.MatchRepository;
-import org.thingai.app.scoringservice.repository.RankEntryRepository;
-import org.thingai.app.scoringservice.repository.ScoreRepository;
-import org.thingai.app.scoringservice.repository.TeamRepository;
+import org.thingai.app.scoringservice.repository.*;
 import org.thingai.base.Service;
 import org.thingai.base.dao.Dao;
-import org.thingai.app.scoringservice.entity.event.Event;
-import org.thingai.app.scoringservice.entity.config.AuthData;
-import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.dao.DaoFile;
 import org.thingai.platform.dao.DaoSqlite;
@@ -27,8 +21,8 @@ public class ScoringService extends Service {
 
     private static EventHandler eventHandler;
     private static AuthHandler authHandler;
-    private static ScoreHandler scoreHandler;
-    private static MatchHandler matchHandler;
+    private static ScoringHandler scoringHandler;
+    private static ScheduleHandler scheduleHandler;
     private static RankingHandler rankingHandler;
     private static BroadcastHandler broadcastHandler;
     private static LiveScoreHandler liveScoreHandler;
@@ -91,12 +85,12 @@ public class ScoringService extends Service {
         return eventHandler;
     }
 
-    public static ScoreHandler scoreHandler() {
-        return scoreHandler;
+    public static ScoringHandler scoreHandler() {
+        return scoringHandler;
     }
 
-    public static MatchHandler matchHandler() {
-        return matchHandler;
+    public static ScheduleHandler matchHandler() {
+        return scheduleHandler;
     }
 
     public static BroadcastHandler broadcastHandler() {
@@ -117,7 +111,7 @@ public class ScoringService extends Service {
     }
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {
-        ScoreHandler.setScoreClass(scoreClass);
+        ScoringHandler.setScoreClass(scoreClass);
     }
 
     public void registerRankingStrategy(IRankingStrategy rankingStrategy) {
@@ -132,11 +126,11 @@ public class ScoringService extends Service {
         ScoreRepository.initialize(dao);
         RankEntryRepository.initialize(dao);
 
-        matchHandler = new MatchHandler();
-        scoreHandler = new ScoreHandler(dao, daoFile);
-        rankingHandler = new RankingHandler(dao, matchHandler);
+        scheduleHandler = new ScheduleHandler();
+        scoringHandler = new ScoringHandler(dao, daoFile);
+        rankingHandler = new RankingHandler(dao, scheduleHandler);
 
-        liveScoreHandler = new LiveScoreHandler(matchHandler, scoreHandler, rankingHandler);
+        liveScoreHandler = new LiveScoreHandler(scheduleHandler, scoringHandler, rankingHandler);
         liveScoreHandler.setBroadcastHandler(broadcastHandler);
     }
 }

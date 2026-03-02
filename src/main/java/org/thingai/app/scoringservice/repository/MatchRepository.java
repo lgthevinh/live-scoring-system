@@ -1,8 +1,16 @@
 package org.thingai.app.scoringservice.repository;
 
+import org.thingai.app.scoringservice.dto.MatchDetailDto;
+import org.thingai.app.scoringservice.entity.match.AllianceTeam;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.dao.Dao;
 
+/*
+ * Repository class for Match entity, providing CRUD operations and additional query methods.
+ * This class interacts with the Dao to perform database operations related to Match entities.
+ * It also provides a method to get detailed information about a match, including the teams in
+ * the red and blue alliances.
+ */
 public class MatchRepository {
     private static Dao dao;
 
@@ -38,6 +46,24 @@ public class MatchRepository {
             return matches[0];
         }
         return null;
+    }
+
+    public static MatchDetailDto getMatchDetailById(String matchId) throws Exception {
+        Match match = getMatchById(matchId);
+        if (match == null) {
+            return null;
+        }
+
+        MatchDetailDto matchDetailDto = new MatchDetailDto();
+        matchDetailDto.setMatch(match);
+
+        AllianceTeam[] redAlliance = AllianceTeamRepository.getAllianceTeamsByAllianceId(matchId + "_R");
+        AllianceTeam[] blueAlliance = AllianceTeamRepository.getAllianceTeamsByAllianceId(matchId + "_B");
+
+        matchDetailDto.setRedAllianceTeams(redAlliance);
+        matchDetailDto.setBlueAllianceTeams(blueAlliance);
+
+        return matchDetailDto;
     }
 
     public static Match getMatchByMatchCode(String matchCode) throws Exception {
