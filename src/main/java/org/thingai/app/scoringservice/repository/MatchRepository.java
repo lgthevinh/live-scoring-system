@@ -47,4 +47,12 @@ public class MatchRepository {
         }
         return null;
     }
+
+    public Match[] getMatchesByType(int matchType) throws Exception {
+        if (matchType == 2) { // PLAYOFF
+            return dao.query(Match.class, "SELECT * FROM match WHERE NOT matchType = 1");
+        } else {
+            return dao.query(Match.class, new String[]{"matchType"}, new String[]{String.valueOf(matchType)});
+        }
+    }
 }
