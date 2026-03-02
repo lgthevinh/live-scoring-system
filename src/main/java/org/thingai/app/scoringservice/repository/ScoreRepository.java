@@ -24,6 +24,10 @@ public class ScoreRepository {
         dao.deleteByColumn(Score.class, "id", scoreId);
     }
 
+    public void deleteAllScores() throws Exception {
+        dao.deleteAll(Score.class);
+    }
+
     public Score[] listScores() throws Exception {
         return dao.readAll(Score.class);
     }

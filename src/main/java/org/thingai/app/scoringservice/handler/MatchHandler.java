@@ -8,8 +8,10 @@ import org.thingai.app.scoringservice.entity.match.AllianceTeam;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.time.TimeBlock;
+import org.thingai.app.scoringservice.repository.AllianceTeamRepository;
+import org.thingai.app.scoringservice.repository.MatchRepository;
+import org.thingai.app.scoringservice.repository.ScoreRepository;
 import org.thingai.base.dao.Dao;
-import org.thingai.platform.dao.DaoFile;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.base.log.ILog;
 
@@ -26,14 +28,15 @@ import java.util.regex.Pattern;
 public class MatchHandler {
     private static final String TAG = "MatchHandler";
 
-    private Dao dao;
-    private DaoFile daoFile;
-
+    private final MatchRepository matchRepository;
+    private final AllianceTeamRepository allianceTeamRepository;
+    private final ScoreRepository scoreRepository;
     private final MatchMakerHandler matchMakerHandler = new MatchMakerHandler();
 
-    public MatchHandler(Dao dao, DaoFile daoFile) {
-        this.dao = dao;
-        this.daoFile = daoFile;
+    public MatchHandler(Dao dao) {
+        this.matchRepository = new MatchRepository(dao);
+        this.allianceTeamRepository = new AllianceTeamRepository(dao);
+        this.scoreRepository = new ScoreRepository(dao);
 
         String osName = System.getProperty("os.name").toLowerCase();
         Path binary = Paths.get("binary");
@@ -124,21 +127,21 @@ public class MatchHandler {
             String redAllianceId = matchCode + "_R";
 
             // Clear existing alliance teams if any
-            dao.deleteByColumn(AllianceTeam.class, "allianceId", redAllianceId);
-            dao.deleteByColumn(AllianceTeam.class, "allianceId", blueAllianceId);
+            allianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
+            allianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
 
             for (String teamId : uniqueReds) {
                 AllianceTeam team = new AllianceTeam();
                 team.setTeamId(teamId);
                 team.setAllianceId(redAllianceId);
-                dao.insertOrUpdate(team);
+                allianceTeamRepository.insertAllianceTeam(team);
             }
 
             for (String teamId : uniqueBlues) {
                 AllianceTeam team = new AllianceTeam();
                 team.setTeamId(teamId);
                 team.setAllianceId(blueAllianceId);
-                dao.insertOrUpdate(team);
+                allianceTeamRepository.insertAllianceTeam(team);
             }
 
             // Create scores (as per original code)
@@ -148,9 +151,9 @@ public class MatchHandler {
             Score blueScore = ScoreHandler.factoryScore();
             blueScore.setAllianceId(blueAllianceId);
 
-            dao.insertOrUpdate(match);
-            dao.insertOrUpdate(Score.class, redScore);
-            dao.insertOrUpdate(Score.class, blueScore);
+            matchRepository.insertMatch(match);
+            scoreRepository.insertScore(redScore);
+            scoreRepository.insertScore(blueScore);
 
             ILog.d(TAG, "created match: " + matchCode, Arrays.toString(redTeamIds), Arrays.toString(blueTeamIds));
             callback.onSuccess(match, "Match created successfully.");
@@ -162,7 +165,7 @@ public class MatchHandler {
 
     public void getMatch(String matchId, RequestCallback<Match> callback) {
         try {
-            Match match = dao.query(Match.class, new String[]{"id"}, new String[]{matchId})[0];
+            Match match = matchRepository.getMatchById(matchId);
             if (match != null) {
                 callback.onSuccess(match, "Match retrieved successfully.");
             } else {
@@ -175,7 +178,7 @@ public class MatchHandler {
 
     public void getMatchDetail(String matchId, RequestCallback<MatchDetailDto> callback) {
         try {
-            Match match = dao.query(Match.class, new String[]{"id"}, new String[]{matchId})[0];
+            Match match = matchRepository.getMatchById(matchId);
             if (match == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Match not found.");
                 return;
@@ -184,8 +187,8 @@ public class MatchHandler {
             String redAllianceId = match.getMatchCode() + "_R";
             String blueAllianceId = match.getMatchCode() + "_B";
 
-            AllianceTeam[] redAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{redAllianceId});
-            AllianceTeam[] blueAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{blueAllianceId});
+            AllianceTeam[] redAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
+            AllianceTeam[] blueAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
             Team[] redTeams = Arrays.stream(redAllianceTeams)
                     .map(at -> {
                         try {
@@ -215,30 +218,6 @@ public class MatchHandler {
                 surrogateMap.put(at.getTeamId(), at.isSurrogate());
             }
             MatchDetailDto detailDto = new MatchDetailDto(match, redTeams, blueTeams, surrogateMap);
-
-            // Load scores from database
-            Score[] redScores = dao.query(Score.class, new String[]{"id"}, new String[]{redAllianceId});
-            Score[] blueScores = dao.query(Score.class, new String[]{"id"}, new String[]{blueAllianceId});
-
-            if (redScores != null && redScores.length > 0) {
-                detailDto.setRedScore(redScores[0]);
-            }
-            if (blueScores != null && blueScores.length > 0) {
-                detailDto.setBlueScore(blueScores[0]);
-            }
-
-            String redTempScoreData = daoFile.readJsonFile("/temp_scores/" + redAllianceId + ".json");
-            String blueTempScoreData = daoFile.readJsonFile("/temp_scores/" + blueAllianceId + ".json");
-
-            if (redTempScoreData != null && !redTempScoreData.isEmpty()) {
-                detailDto.setHasRedTempScore(true);
-                detailDto.setRedTempScoreRawData(redTempScoreData);
-            }
-            if (blueTempScoreData != null && !blueTempScoreData.isEmpty()) {
-                detailDto.setHasBlueTempScore(true);
-                detailDto.setBlueTempScoreRawData(blueTempScoreData);
-            }
-
             callback.onSuccess(detailDto, "Match detail retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve match detail: " + e.getMessage());
@@ -247,7 +226,7 @@ public class MatchHandler {
 
     public void updateMatch(Match match, RequestCallback<Match> callback) {
         try {
-            dao.insertOrUpdate(match);
+            matchRepository.updateMatch(match);
             callback.onSuccess(match, "Match updated successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Failed to update match: " + e.getMessage());
@@ -256,7 +235,7 @@ public class MatchHandler {
 
     public void deleteMatch(String matchId, RequestCallback<Void> callback) {
         try {
-            dao.delete(Match.class, matchId);
+            matchRepository.deleteMatch(matchId);
             callback.onSuccess(null, "Match deleted successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete match: " + e.getMessage());
@@ -265,7 +244,7 @@ public class MatchHandler {
 
     public void listMatches(RequestCallback<Match[]> callback) {
         try {
-            Match[] matches = dao.readAll(Match.class);
+            Match[] matches = matchRepository.listMatches();
             callback.onSuccess(matches, "Matches retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve matches: " + e.getMessage());
@@ -274,13 +253,7 @@ public class MatchHandler {
 
     public void listMatchesByType(int matchType, RequestCallback<Match[]> callback) {
         try {
-            Match[] matches;
-            if (matchType == MatchType.PLAYOFF) {
-                matches = dao.query(Match.class, "SELECT * FROM match WHERE NOT matchType = 1");
-            } else {
-                matches = dao.query(Match.class, new String[]{"matchType"}, new String[]{String.valueOf(matchType)});
-            }
-
+            Match[] matches = matchRepository.getMatchesByType(matchType);
             callback.onSuccess(matches, "Matches retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to retrieve matches: " + e.getMessage());
@@ -289,20 +262,15 @@ public class MatchHandler {
 
     public void listMatchDetails(int matchType, boolean withScore, RequestCallback<MatchDetailDto[]> callback) {
         try {
-            Match[] matches;
-            if (matchType == MatchType.PLAYOFF) {
-                matches = dao.query(Match.class, "SELECT * FROM match WHERE NOT matchType = 1");
-            } else {
-                matches = dao.query(Match.class, new String[]{"matchType"}, new String[]{String.valueOf(matchType)});
-            }
+            Match[] matches = matchRepository.getMatchesByType(matchType);
             List<MatchDetailDto> detailsList = new ArrayList<>();
 
             for (Match match : matches) {
                 String redAllianceId = match.getMatchCode() + "_R";
                 String blueAllianceId = match.getMatchCode() + "_B";
 
-                AllianceTeam[] redAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{redAllianceId});
-                AllianceTeam[] blueAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{blueAllianceId});
+                AllianceTeam[] redAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
+                AllianceTeam[] blueAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
 
                 HashMap<String, Boolean> surrogateMap = new HashMap<>();
 
@@ -331,53 +299,9 @@ public class MatchHandler {
                 if (withScore) {
                     String redAllianceScoreId = match.getMatchCode() + "_R";
                     String blueAllianceScoreId = match.getMatchCode() + "_B";
-                    System.out.println("[DEBUG] getMatchDetail: Looking for scores with IDs: red=" + redAllianceScoreId + ", blue=" + blueAllianceScoreId);
-                    
-                    Score[] redScores = dao.query(Score.class, "id", redAllianceScoreId);
-                    Score[] blueScores = dao.query(Score.class, "id", blueAllianceScoreId);
-                    
-                    System.out.println("[DEBUG] getMatchDetail: Found redScores=" + (redScores != null ? redScores.length : "null") + 
-                                       ", blueScores=" + (blueScores != null ? blueScores.length : "null"));
-                    
-                    Score redScore = (redScores != null && redScores.length > 0) ? redScores[0] : null;
-                    Score blueScore = (blueScores != null && blueScores.length > 0) ? blueScores[0] : null;
-
-                    // Load raw score data from JSON files and recalculate
-                    if (redScore != null) {
-                        String redJsonData = daoFile.readJsonFile("/scores/" + redAllianceScoreId + ".json");
-                        if (redJsonData != null) {
-                            redScore.setRawScoreData(redJsonData);
-                            redScore.fromJson(redJsonData);
-                            redScore.calculatePenalties();
-                            redScore.calculateTotalScore();
-                        }
-                    }
-                    if (blueScore != null) {
-                        String blueJsonData = daoFile.readJsonFile("/scores/" + blueAllianceScoreId + ".json");
-                        if (blueJsonData != null) {
-                            blueScore.setRawScoreData(blueJsonData);
-                            blueScore.fromJson(blueJsonData);
-                            blueScore.calculatePenalties();
-                            blueScore.calculateTotalScore();
-                        }
-                    }
-
-                    MatchDetailDto detailDto = new MatchDetailDto(match, redTeams, blueTeams, redScore, blueScore, surrogateMap);
-
-                    // Load temp scores from /temp_scores/ folder
-                    String redTempScoreData = daoFile.readJsonFile("/temp_scores/" + redAllianceScoreId + ".json");
-                    String blueTempScoreData = daoFile.readJsonFile("/temp_scores/" + blueAllianceScoreId + ".json");
-
-                    if (redTempScoreData != null && !redTempScoreData.isEmpty()) {
-                        detailDto.setHasRedTempScore(true);
-                        detailDto.setRedTempScoreRawData(redTempScoreData);
-                    }
-                    if (blueTempScoreData != null && !blueTempScoreData.isEmpty()) {
-                        detailDto.setHasBlueTempScore(true);
-                        detailDto.setBlueTempScoreRawData(blueTempScoreData);
-                    }
-
-                    detailsList.add(detailDto);
+                    Score redScore = scoreRepository.getScoreById(redAllianceScoreId);
+                    Score blueScore = scoreRepository.getScoreById(blueAllianceScoreId);
+                    detailsList.add(new MatchDetailDto(match, redTeams, blueTeams, redScore, blueScore, surrogateMap));
                     continue;
                 }
 
@@ -403,9 +327,9 @@ public class MatchHandler {
             // 1) Load teams and reset schedule-related tables and caches
             Team[] allTeams = dao.readAll(Team.class);
 
-            dao.deleteAll(Match.class);
-            dao.deleteAll(AllianceTeam.class);
-            dao.deleteAll(Score.class);
+            matchRepository.deleteAllMatch();
+            allianceTeamRepository.deleteAllAllianceTeams();
+            scoreRepository.deleteAllScores();
 
             if (allTeams == null || allTeams.length < 4) {
                 callback.onFailure(ErrorCode.CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
@@ -629,8 +553,8 @@ public class MatchHandler {
         String blueAllianceId = matchCode + "_B";
         String redAllianceId = matchCode + "_R";
 
-        dao.deleteByColumn(AllianceTeam.class, "allianceId", redAllianceId);
-        dao.deleteByColumn(AllianceTeam.class, "allianceId", blueAllianceId);
+        allianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
+        allianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
 
         for (String teamId : uniqueReds) {
             AllianceTeam team = new AllianceTeam();
@@ -638,7 +562,7 @@ public class MatchHandler {
             team.setAllianceId(redAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
             ILog.d("MatchHandler", "Inserting red alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
-            dao.insertOrUpdate(team);
+            allianceTeamRepository.insertAllianceTeam(team);
         }
 
         for (String teamId : uniqueBlues) {
@@ -647,7 +571,7 @@ public class MatchHandler {
             team.setAllianceId(blueAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
             ILog.d("MatchHandler", "Inserting blue alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
-            dao.insertOrUpdate(team);
+            allianceTeamRepository.insertAllianceTeam(team);
         }
 
         Score redScore = ScoreHandler.factoryScore();
@@ -656,13 +580,13 @@ public class MatchHandler {
         Score blueScore = ScoreHandler.factoryScore();
         blueScore.setAllianceId(blueAllianceId);
 
-        dao.insertOrUpdate(match);
-        dao.insertOrUpdate(Score.class, redScore);
-        dao.insertOrUpdate(Score.class, blueScore);
+        matchRepository.insertMatch(match);
+        scoreRepository.insertScore(redScore);
+        scoreRepository.insertScore(blueScore);
     }
 
     public MatchDetailDto getMatchDetailSync(String matchId) throws Exception {
-        Match match = dao.query(Match.class, new String[]{"id"}, new String[]{matchId})[0];
+        Match match = matchRepository.getMatchById(matchId);
         if (match == null) {
             throw new Exception("Match not found.");
         }
@@ -670,8 +594,8 @@ public class MatchHandler {
         String redAllianceId = match.getMatchCode() + "_R";
         String blueAllianceId = match.getMatchCode() + "_B";
 
-        AllianceTeam[] redAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{redAllianceId});
-        AllianceTeam[] blueAllianceTeams = dao.query(AllianceTeam.class, new String[]{"allianceId"}, new String[]{blueAllianceId});
+        AllianceTeam[] redAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(redAllianceId);
+        AllianceTeam[] blueAllianceTeams = allianceTeamRepository.getAllianceTeamsByAllianceId(blueAllianceId);
         Team[] redTeams = Arrays.stream(redAllianceTeams)
                 .map(at -> {
                     try {
@@ -704,22 +628,7 @@ public class MatchHandler {
                 surrogateMap.put(at.getTeamId(), true);
             }
         }
-        MatchDetailDto detailDto = new MatchDetailDto(match, redTeams, blueTeams, surrogateMap);
-
-        // Load temp scores from /temp_scores/ folder
-        String redTempScoreData = daoFile.readJsonFile("/temp_scores/" + redAllianceId + ".json");
-        String blueTempScoreData = daoFile.readJsonFile("/temp_scores/" + blueAllianceId + ".json");
-
-        if (redTempScoreData != null && !redTempScoreData.isEmpty()) {
-            detailDto.setHasRedTempScore(true);
-            detailDto.setRedTempScoreRawData(redTempScoreData);
-        }
-        if (blueTempScoreData != null && !blueTempScoreData.isEmpty()) {
-            detailDto.setHasBlueTempScore(true);
-            detailDto.setBlueTempScoreRawData(blueTempScoreData);
-        }
-
-        return detailDto;
+        return new MatchDetailDto(match, redTeams, blueTeams, surrogateMap);
     }
 
     // Utility methods
@@ -734,6 +643,8 @@ public class MatchHandler {
     }
     
     public void setDao(Dao dao) {
-        this.dao = dao;
+        this.matchRepository = new MatchRepository(dao);
+        this.allianceTeamRepository = new AllianceTeamRepository(dao);
+        this.scoreRepository = new ScoreRepository(dao);
     }
 }
