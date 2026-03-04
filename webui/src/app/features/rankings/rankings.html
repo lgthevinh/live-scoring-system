@@ -26,27 +26,58 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-4">Rank</th>
-                            <th>Team</th>
-                            <th class="text-center">Total Score</th>
-                            <th class="text-center">High Score</th>
-                            <th class="text-center">Matches</th>
+                            <th class="ps-4" (click)="sortBy('rank')" style="cursor: pointer;">
+                                Rank
+                                @if (sortColumn() === 'rank') {
+                                    <i class="bi" [class.bi-arrow-up]="sortDirection() === 'asc'" [class.bi-arrow-down]="sortDirection() === 'desc'"></i>
+                                }
+                            </th>
+                            <th (click)="sortBy('teamId')" style="cursor: pointer;">
+                                Team
+                                @if (sortColumn() === 'teamId') {
+                                    <i class="bi" [class.bi-arrow-up]="sortDirection() === 'asc'" [class.bi-arrow-down]="sortDirection() === 'desc'"></i>
+                                }
+                            </th>
+                            <th class="text-center" (click)="sortBy('averageScore')" style="cursor: pointer;">
+                                Avg Score
+                                @if (sortColumn() === 'averageScore') {
+                                    <i class="bi" [class.bi-arrow-up]="sortDirection() === 'asc'" [class.bi-arrow-down]="sortDirection() === 'desc'"></i>
+                                }
+                            </th>
+                            <th class="text-center" (click)="sortBy('totalScore')" style="cursor: pointer;">
+                                Total Score
+                                @if (sortColumn() === 'totalScore') {
+                                    <i class="bi" [class.bi-arrow-up]="sortDirection() === 'asc'" [class.bi-arrow-down]="sortDirection() === 'desc'"></i>
+                                }
+                            </th>
+                            <th class="text-center" (click)="sortBy('highestScore')" style="cursor: pointer;">
+                                High Score
+                                @if (sortColumn() === 'highestScore') {
+                                    <i class="bi" [class.bi-arrow-up]="sortDirection() === 'asc'" [class.bi-arrow-down]="sortDirection() === 'desc'"></i>
+                                }
+                            </th>
+                            <th class="text-center" (click)="sortBy('matchesPlayed')" style="cursor: pointer;">
+                                Matches
+                                @if (sortColumn() === 'matchesPlayed') {
+                                    <i class="bi" [class.bi-arrow-up]="sortDirection() === 'asc'" [class.bi-arrow-down]="sortDirection() === 'desc'"></i>
+                                }
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
-                        @for (rank of rankings(); track rank.teamId) {
-                            @let i = rankings().indexOf(rank);
+                        @for (rank of sortedRankings(); track rank.teamId) {
                             <tr>
-                              <td class="ps-4 fw-bold">{{ i + 1 }}</td>
+                              <td class="ps-4 fw-bold">{{ rank.rank }}</td>
                               <td >{{ rank.teamId }}</td>
-                              <td class="text-center fw-bold text-primary">{{ rank.totalScore }}</td>
+                              <td class="text-center fw-bold text-primary">{{ rank.averageScore }}</td>
+                              <td class="text-center">{{ rank.totalScore }}</td>
                               <td class="text-center">{{ rank.highestScore }}</td>
                               <td class="text-center">{{ rank.matchesPlayed }}</td>
                             </tr>
                         }
-                        @if (rankings().length === 0 && !isLoading()) {
+                        @if (sortedRankings().length === 0 && !isLoading()) {
                             <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">
+                                <td colspan="6" class="text-center py-5 text-muted">
                                     No rankings available yet.
                                 </td>
                             </tr>

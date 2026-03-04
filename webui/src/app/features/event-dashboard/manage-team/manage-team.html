@@ -24,17 +24,17 @@
         </div>
         <div class="col-auto">
           <button class="btn btn-info" type="button" (click)="downloadTemplate()">
-            <i class="bi bi-file-earmark-text"></i> Template
+            <i class="bi bi-file-earmark-text"></i> CSV Template
           </button>
         </div>
       </form>
       <form class="row g-2 align-items-center mb-3">
         <div class="col-auto ms-auto">
-          <input type="file" class="form-control form-control-sm" accept=".csv" (change)="handleFileInput($event)">
+          <input type="file" class="form-control form-control-sm" accept=".csv,.xlsx" (change)="handleFileInput($event)">
         </div>
         <div class="col-auto">
           <button class="btn btn-primary btn-sm" type="button" (click)="uploadTeamList()" [disabled]="!fileToUpload">
-            <i class="bi bi-upload"></i> Import CSV
+            <i class="bi bi-upload"></i> Import File
           </button>
         </div>
       </form>

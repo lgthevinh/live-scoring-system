@@ -54,7 +54,6 @@ public class LiveScoreHandler {
         matchTimerHandler.setCallback(new MatchTimerHandler.TimerCallback() {
             @Override
             public void onTimerEnded(String matchId) {
-                ILog.d(TAG, "Match Timer Ended: " + matchId);
             }
             @Override
             public void onTimerUpdated(String matchId, String fieldNumber, int remainingSeconds) {
@@ -137,7 +136,6 @@ public class LiveScoreHandler {
                         if (currentTimeMs - lastSoundBroadcastTime > SOUND_DEBOUNCE_MS) {
                             lastSoundBroadcastTime = currentTimeMs;
                             broadcastHandler.broadcast(rootTopic + "/sound", countdownDto, BroadcastMessageType.PLAY_SOUND);
-                            ILog.d(TAG, "PLAY_SOUND broadcast at countdown " + countdown[0]);
                         } else {
                             ILog.w(TAG, "Sound broadcast debounced - too soon since last broadcast");
                         }
@@ -201,8 +199,6 @@ public class LiveScoreHandler {
     }
 
     public void handleLiveScoreUpdate(LiveScoreUpdateDto liveScoreUpdate, boolean isRedAlliance) {
-        ILog.d(TAG, "Live Score Update Received: " + liveScoreUpdate);
-
         try {
             // Create score object for database persistence
             Score liveScore = ScoreHandler.factoryScore();
@@ -225,16 +221,13 @@ public class LiveScoreHandler {
             liveScore.setStatus(ScoreStatus.SCORED); // Mark as scored for live tracking
 
             // Persist to database for logging/tracking
-            ILog.d(TAG, "Persisting live score update for alliance: " + allianceId + " with score: " + liveScore.getTotalScore());
             scoreHandler.submitScore(liveScore, false, new RequestCallback<Score>() {
                 @Override
                 public void onSuccess(Score responseObject, String message) {
-                    ILog.d(TAG, "Live score persisted successfully for " + allianceId + ": Total=" + responseObject.getTotalScore() + " (" + message + ")");
                 }
 
                 @Override
                 public void onFailure(int errorCode, String errorMessage) {
-                    ILog.d(TAG, "Failed to persist live score for " + allianceId + ": " + errorMessage + " (error code: " + errorCode + ")");
                 }
             });
 
@@ -265,11 +258,9 @@ public class LiveScoreHandler {
                 liveScore.calculateTotalScore(); // Ensure score is calculated
                 broadcastHandler.broadcast(fallbackTopic, liveScore, BroadcastMessageType.SCORE_UPDATE);
 
-                ILog.d(TAG, "Live score update broadcasted to fallback topic: " + fallbackTopic + " (score=" + liveScore.getTotalScore() + ")");
             }
         } catch (Exception e) {
             e.printStackTrace();
-            ILog.d(TAG, "Failed to process live score update: " + e.getMessage());
         }
     }
 
@@ -289,26 +280,22 @@ public class LiveScoreHandler {
         scoreHandler.submitScore(currentRedScoreHolder, true, new RequestCallback<Score>() {
             @Override
             public void onSuccess(Score responseObject, String message) {
-                ILog.d(TAG, "Red alliance score submitted: " + message);
                 result[0] = responseObject;
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                ILog.d(TAG, "Failed to submit red alliance score: " + errorMessage);
             }
         });
 
         scoreHandler.submitScore(currentBlueScoreHolder, true, new RequestCallback<Score>() {
             @Override
             public void onSuccess(Score responseObject, String message) {
-                ILog.d(TAG, "Blue alliance score submitted: " + message);
                 result[1] = responseObject;
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                ILog.d(TAG, "Failed to submit blue alliance score: " + errorMessage);
             }
         });
 
@@ -320,12 +307,10 @@ public class LiveScoreHandler {
         matchHandler.updateMatch(currentMatch.getMatch(), new RequestCallback<Match>() {
             @Override
             public void onSuccess(Match responseObject, String message) {
-                ILog.d(TAG, "Match end time updated: " + message);
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                ILog.d(TAG, "Failed to update match end time: " + errorMessage);
             }
         });
 
@@ -344,8 +329,6 @@ public class LiveScoreHandler {
      * @param callback
      */
     public void overrideScore(String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
-        ILog.d(TAG, "Override score request received for alliance " + allianceId + ": " + jsonScoreData);
-        
         // Validate inputs
         if (allianceId == null || allianceId.isEmpty()) {
             callback.onFailure(ErrorCode.CUSTOM_ERR, "AllianceId is required");
@@ -364,7 +347,6 @@ public class LiveScoreHandler {
             return;
         }
         matchId = allianceId.substring(0, allianceId.lastIndexOf("_"));
-        ILog.d(TAG, "Extracted matchId: " + matchId);
         String otherAllianceId = allianceId.endsWith("_R") ? matchId + "_B" : matchId + "_R";
         
         // Fetch the other alliance's score first
@@ -378,7 +360,6 @@ public class LiveScoreHandler {
             @Override
             public void onFailure(int errorCode, String errorMessage) {
                 // If other alliance score not found, proceed anyway (might be a new match)
-                ILog.d(TAG, "Other alliance score not found: " + errorMessage);
                 processScoreOverride(allianceId, jsonScoreData, matchId, null, callback);
             }
         });
@@ -400,16 +381,12 @@ public class LiveScoreHandler {
             scoreHandler.submitScore(targetScore, true, new RequestCallback<Score>() {
                 @Override
                 public void onSuccess(Score responseObject, String message) {
-                    ILog.d(TAG, "Score override submitted for alliance " + allianceId + ": " + message);
-                    
-                    // Now update rankings
+                    // Now update rankings and report success once
                     updateRankingsForOverride(matchId, targetScore, otherScore, callback);
-                    callback.onSuccess(true, "Score override successful and rankings updated");
                 }
 
                 @Override
                 public void onFailure(int errorCode, String errorMessage) {
-                    ILog.d(TAG, "Failed to submit score override for alliance " + allianceId + ": " + errorMessage);
                     callback.onFailure(errorCode, "Score override failed: " + errorMessage);
                 }
             });
@@ -439,51 +416,11 @@ public class LiveScoreHandler {
                     redScore = otherScore;
                 }
                 
-                // Handle case where otherScore is null - fetch it
-                if (redScore == null) {
-                    // Try to fetch red score
-                    final Score finalBlueScore = blueScore;
-                    scoreHandler.getScoreByAllianceId(matchId + "_R", new RequestCallback<Score>() {
-                        @Override
-                        public void onSuccess(Score rScore, String message) {
-                            Score finalRedScore = rScore;
-                            Score finalBlue = finalBlueScore != null ? finalBlueScore : rScore;
-                            rankingHandler.updateRankingEntry(matchDetail, finalBlue, finalRedScore);
-                            callback.onSuccess(true, "Score override and rankings updated successfully");
-                        }
-
-                        @Override
-                        public void onFailure(int errorCode, String errorMessage) {
-                            // Use updatedScore as fallback
-                            Score finalRed = updatedScore;
-                            Score finalBlue = otherScore;
-                            rankingHandler.updateRankingEntry(matchDetail, finalBlue, finalRed);
-                            callback.onSuccess(true, "Score override completed with fallback rankings");
-                        }
-                    });
-                    return;
-                }
-                
-                if (blueScore == null) {
-                    // Try to fetch blue score
-                    final Score finalRedScore = redScore;
-                    scoreHandler.getScoreByAllianceId(matchId + "_B", new RequestCallback<Score>() {
-                        @Override
-                        public void onSuccess(Score bScore, String message) {
-                            Score finalBlueScore = bScore;
-                            Score finalRed = updatedScore.getAllianceId().endsWith("_R") ? updatedScore : finalRedScore;
-                            rankingHandler.updateRankingEntry(matchDetail, finalBlueScore, finalRed);
-                            callback.onSuccess(true, "Score override and rankings updated successfully");
-                        }
-
-                        @Override
-                        public void onFailure(int errorCode, String errorMessage) {
-                            // Use updatedScore as fallback
-                            Score finalBlue = updatedScore;
-                            rankingHandler.updateRankingEntry(matchDetail, finalBlue, finalRedScore);
-                            callback.onSuccess(true, "Score override completed with fallback rankings");
-                        }
-                    });
+                // Only update rankings if BOTH scores are available
+                if (redScore == null || blueScore == null) {
+                    System.out.println("[DEBUG] Skipping ranking update in override - missing scores. Red: " + 
+                        (redScore != null ? "yes" : "no") + ", Blue: " + (blueScore != null ? "yes" : "no"));
+                    callback.onSuccess(true, "Score override successful - rankings skipped (waiting for both scores)");
                     return;
                 }
                 
@@ -494,7 +431,6 @@ public class LiveScoreHandler {
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                ILog.d(TAG, "Failed to fetch match details for ranking update: " + errorMessage);
                 // Still report success for the score override
                 callback.onSuccess(true, "Score override completed, but ranking update failed");
             }
@@ -531,8 +467,6 @@ public class LiveScoreHandler {
         currentRedScoreHolder = null;
         currentBlueScoreHolder = null;
 
-        ILog.d(TAG, "Match aborted: " + abortedMatch.getMatch().getMatchCode());
-
         callback.onSuccess(true, "Match aborted successfully");
     }
 
@@ -568,15 +502,11 @@ public class LiveScoreHandler {
                 callback.onFailure(ErrorCode.NOT_FOUND, "No match found for field number: " + fieldNumber);
             }
         } catch (Exception e) {
-            ILog.d(TAG, "Failed to get current match field: " + e.getMessage());
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Failed to get current match field: " + e.getMessage());
         }
     }
 
     public void handleScoreSubmission(boolean isRed, String allianceId, String jsonScoreData, RequestCallback<Boolean> callback) {
-        ILog.d(TAG, "=== HANDLE SCORE SUBMISSION ===");
-        ILog.d(TAG, "isRed: " + isRed + ", allianceId: " + allianceId);
-        ILog.d(TAG, "jsonScoreData: " + jsonScoreData);
         // Check if we have an active match with score holders
         Score activeScoreHolder = isRed ? currentRedScoreHolder : currentBlueScoreHolder;
         boolean hasActiveMatch = activeScoreHolder != null;
@@ -609,8 +539,14 @@ public class LiveScoreHandler {
                 submittedScore.setAllianceId(allianceId);
             }
             
-            // Always save to temp score - scorekeeper will commit later
-            saveAsTempScore(allianceId, jsonScoreData, callback);
+            // Only save temp score if no active match (fallback for buffer service)
+            // When buffer service is used, temp score is already created - just update committable status
+            if (!hasActiveMatch) {
+                saveAsTempScore(allianceId, jsonScoreData, callback);
+            } else {
+                // Buffer service already created temp score - just confirm submission
+                callback.onSuccess(true, "Score submitted - awaiting scorekeeper approval");
+            }
         } catch (Exception e) {
             e.printStackTrace();
             callback.onFailure(ErrorCode.CUSTOM_ERR, "Failed to process score submission: " + e.getMessage());
@@ -630,7 +566,6 @@ public class LiveScoreHandler {
             tempHandler.saveTempScore(allianceId, jsonScoreData, submittedBy, new RequestCallback<String>() {
                 @Override
                 public void onSuccess(String tempScoreId, String message) {
-                    ILog.d(TAG, "Saved as temp score: " + tempScoreId);
                     callback.onSuccess(true, "Score saved as temp - awaiting scorekeeper approval");
                 }
 
@@ -657,12 +592,10 @@ public class LiveScoreHandler {
             matchHandler.updateMatch(currentMatch.getMatch(), new RequestCallback<Match>() {
                 @Override
                 public void onSuccess(Match responseObject, String message) {
-                    ILog.d(TAG, "Match end time auto-set after both scores committed: " + message);
                 }
 
                 @Override
                 public void onFailure(int errorCode, String errorMessage) {
-                    ILog.d(TAG, "Failed to auto-set match end time: " + errorMessage);
                 }
             });
         } catch (Exception e) {

@@ -30,15 +30,17 @@ public class FanrocRankingStrategy implements IRankingStrategy {
 
     @Override
     public RankingEntry[] sortRankingEntries(RankingEntry[] entries) {
-        // Simple score-based ranking:
-        // 1. Total Score (descending)
-        // 2. Highest Score (descending)
+        // Sort by average score (descending), then total score as tiebreaker
         Arrays.sort(entries, (teamA, teamB) -> {
-            // Primary sort: total score
+            // Primary sort: average score
+            if (teamB.getAverageScore() != teamA.getAverageScore()) {
+                return Integer.compare(teamB.getAverageScore(), teamA.getAverageScore());
+            }
+            // Secondary sort: total score
             if (teamB.getTotalScore() != teamA.getTotalScore()) {
                 return Integer.compare(teamB.getTotalScore(), teamA.getTotalScore());
             }
-            // Secondary sort: highest single match score
+            // Tertiary sort: highest single match score
             return Integer.compare(teamB.getHighestScore(), teamA.getHighestScore());
         });
         return entries;

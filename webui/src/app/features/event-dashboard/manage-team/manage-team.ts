@@ -26,22 +26,21 @@ export class ManageTeam implements OnInit{
       this.teamService.addTeam(this.newTeam).subscribe({
         next: () => {
           this.teams.update(teams => [...teams, { ...this.newTeam }]);
-          console.log('Team added successfully');
           this.toastService.show('Team added successfully', 'success');
+          // Reset the newTeam object
+          this.newTeam = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
+          // Hide the modal
+          const modal = document.getElementById('addTeamModal');
+          if (modal) {
+            // Bootstrap 5 modal instance
+            (window as any).bootstrap.Modal.getInstance(modal).hide();
+          }
         },
         error: (error) => {
           console.error('Error adding team:', error);
           this.toastService.show('Error adding team: ' + error.message, 'error');
         },
       });
-      // Reset the newTeam object
-      this.newTeam = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
-      // Hide the modal
-      const modal = document.getElementById('addTeamModal');
-      if (modal) {
-        // Bootstrap 5 modal instance
-        (window as any).bootstrap.Modal.getInstance(modal).hide();
-      }
     }
   }
 
@@ -52,28 +51,27 @@ export class ManageTeam implements OnInit{
 
   submitEditTeam() {
     const index = this.teams().findIndex(t => t.teamId === this.editTeam.teamId);
-    if (index !== -1) {
-      this.teams.update(teams => {
-        const updatedTeams = [...teams];
-        updatedTeams[index] = { ...this.editTeam };
-        return updatedTeams;
-      });
-    }
     this.teamService.updateTeam(this.editTeam).subscribe({
       next: () => {
-        console.log('Team updated successfully');
+        if (index !== -1) {
+          this.teams.update(teams => {
+            const updatedTeams = [...teams];
+            updatedTeams[index] = { ...this.editTeam };
+            return updatedTeams;
+          });
+        }
         this.toastService.show('Team updated successfully', 'success');
+        // Hide the modal (Bootstrap 5)
+        const modal = document.getElementById('editTeamModal');
+        if (modal) {
+          (window as any).bootstrap.Modal.getInstance(modal)?.hide();
+        }
       },
       error: (error) => {
         console.error('Error updating team:', error);
         this.toastService.show('Error updating team: ' + error.message, 'error');
       },
     });
-    // Hide the modal (Bootstrap 5)
-    const modal = document.getElementById('editTeamModal');
-    if (modal) {
-      (window as any).bootstrap.Modal.getInstance(modal)?.hide();
-    }
   }
 
   handleFileInput(event: Event) {
@@ -83,12 +81,13 @@ export class ManageTeam implements OnInit{
 
   uploadTeamList() {
     if (!this.fileToUpload) {
-      this.toastService.show('Please select a CSV file to import', 'info');
+      this.toastService.show('Please select a CSV or Excel file to import', 'info');
       return;
     }
 
-    if (!this.fileToUpload.name.endsWith('.csv')) {
-      this.toastService.show('Please select a valid CSV file', 'error');
+    const fileName = this.fileToUpload.name.toLowerCase();
+    if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx')) {
+      this.toastService.show('Please select a valid CSV or Excel (.xlsx) file', 'error');
       return;
     }
 
@@ -171,7 +170,6 @@ export class ManageTeam implements OnInit{
     this.teamService.deleteTeam(teamId).subscribe({
       next: () => {
         this.teams.update(teams => teams.filter(t => t.teamId !== teamId));
-        console.log('Team deleted successfully');
         this.toastService.show(`Team ${deletedTeam?.teamId || ''} deleted`, 'success', 15000, {
           label: 'Undo',
           onAction: () => {

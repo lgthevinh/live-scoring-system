@@ -108,7 +108,6 @@ public class TempScoreHandler {
             String tempFilePath = TEMP_SCORES_DIR + tempScoreId;
             daoFile.writeJsonFile(tempFilePath, tempScoreJson);
 
-            ILog.d(TAG, "Saved temp score " + tempScoreId + " for " + allianceId + " by " + submittedBy);
             callback.onSuccess(tempScoreId, "Temp score saved successfully");
 
         } catch (Exception e) {
@@ -206,6 +205,7 @@ public class TempScoreHandler {
             }
             return count;
         } catch (Exception e) {
+            ILog.e(TAG, "Failed to get temp score count: " + e.getMessage());
             return 0;
         }
     }
@@ -253,7 +253,10 @@ public class TempScoreHandler {
             scoreHandler.submitScore(score, true, new RequestCallback<Score>() {
                 @Override
                 public void onSuccess(Score savedScore, String message) {
-                    ILog.d(TAG, "Committed temp score " + tempScoreId + " by " + approvedBy + " (temp file NOT deleted for debugging)");
+                    File tempFile = new File(daoFile.getRootPath() + tempFilePath);
+                    if (tempFile.exists()) {
+                        tempFile.delete();
+                    }
                     callback.onSuccess(savedScore, "Score committed successfully");
                 }
 
@@ -283,7 +286,6 @@ public class TempScoreHandler {
             }
 
             daoFile.writeJsonFile(tempFilePath, "{\"deleted\":true}");
-            ILog.d(TAG, "Rejected temp score " + tempScoreId + " by " + rejectedBy + " reason: " + reason);
             callback.onSuccess(true, "Temp score rejected and deleted");
 
         } catch (Exception e) {

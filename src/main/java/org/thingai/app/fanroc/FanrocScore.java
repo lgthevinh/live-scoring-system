@@ -94,7 +94,7 @@ public class FanrocScore extends Score implements IScoreConfig {
         System.out.println("penalties: " + penalties);
 
         // Total score includes penalties
-        totalScore = (int) Math.round(baseScore + endGamePoints - penalties);
+        totalScore = Math.max(0, (int) Math.round(baseScore + endGamePoints - penalties));
         System.out.println("FINAL totalScore: " + totalScore);
     }
 

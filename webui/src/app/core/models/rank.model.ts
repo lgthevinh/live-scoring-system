@@ -6,4 +6,6 @@ export interface RankingEntry {
     totalPenalties: number;
     highestScore: number;
     rankingPoints: number;
+    averageScore: number;
+    rank?: number;
 }

@@ -26,6 +26,9 @@ public class RankingEntry {
     @DaoColumn
     private int rankingPoints;
 
+    @DaoColumn
+    private int averageScore;
+
     public RankingEntry() {
     }
 
@@ -83,5 +86,13 @@ public class RankingEntry {
 
     public void setRankingPoints(int rankingPoints) {
         this.rankingPoints = rankingPoints;
+    }
+
+    public int getAverageScore() {
+        return averageScore;
+    }
+
+    public void setAverageScore(int averageScore) {
+        this.averageScore = averageScore;
     }
 }

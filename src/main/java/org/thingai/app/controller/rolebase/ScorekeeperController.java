@@ -8,6 +8,7 @@ import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.app.scoringservice.entity.score.Score;
+import org.thingai.app.scoringservice.handler.entityhandler.ScoreHandler;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.HashMap;
@@ -341,6 +342,13 @@ public class ScorekeeperController {
             
             System.out.println("[DEBUG] updateRankingsForAlliance called for allianceId=" + allianceId + ", matchId=" + matchId);
             
+            // Add small delay to ensure score is saved and visible
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
             // Fetch match details with scores
             ScoringService.matchHandler().getMatchDetail(matchId, new RequestCallback<MatchDetailDto>() {
                 @Override
@@ -350,16 +358,35 @@ public class ScorekeeperController {
                         System.out.println("[DEBUG] BlueScore: " + (matchDetail.getBlueScore() != null ? "not null" : "null"));
                         System.out.println("[DEBUG] RedScore: " + (matchDetail.getRedScore() != null ? "not null" : "null"));
                     }
-                    if (matchDetail != null && matchDetail.getBlueScore() != null && matchDetail.getRedScore() != null) {
-                        System.out.println("[DEBUG] Calling updateRankingEntry for match " + matchId);
-                        ScoringService.rankingHandler().updateRankingEntry(
-                            matchDetail, 
-                            matchDetail.getBlueScore(), 
-                            matchDetail.getRedScore()
-                        );
-                    } else {
-                        System.out.println("[DEBUG] Skipping ranking update - missing scores");
+
+                    if (matchDetail == null) {
+                        System.out.println("[DEBUG] Skipping ranking update - null match detail");
+                        return;
                     }
+
+                    Score blueScore = matchDetail.getBlueScore();
+                    Score redScore = matchDetail.getRedScore();
+
+                    // Only update rankings when BOTH scores are available
+                    // This ensures fair win/loss calculation
+                    if (blueScore == null || redScore == null) {
+                        System.out.println("[DEBUG] Skipping ranking update - waiting for both scores. Blue: " + 
+                            (blueScore != null ? "yes" : "no") + ", Red: " + (redScore != null ? "yes" : "no"));
+                        return;
+                    }
+                    
+                    // Check if scores are actually scored (not just placeholders)
+                    if (blueScore.getStatus() == 0 || redScore.getStatus() == 0) {
+                        System.out.println("[DEBUG] Skipping ranking update - scores not finalized");
+                        return;
+                    }
+
+                    System.out.println("[DEBUG] Calling updateRankingEntry for match " + matchId);
+                    ScoringService.rankingHandler().updateRankingEntry(
+                        matchDetail,
+                        blueScore,
+                        redScore
+                    );
                 }
                 
                 @Override

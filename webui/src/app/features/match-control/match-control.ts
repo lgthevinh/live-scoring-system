@@ -13,7 +13,6 @@ import { MatchDetailDto } from '../../core/models/match.model';
 import { ScorekeeperService } from '../../core/services/scorekeeper.service';
 import { BroadcastService } from '../../core/services/broadcast.service';
 import { SyncService } from '../../core/services/sync.service';
-import { RankService } from '../../core/services/rank.service';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
 import { ToastService } from '../../core/services/toast.service';
 import { ScoreSubmitBufferService } from '../../core/services/score-submit-buffer.service';
@@ -49,7 +48,6 @@ export class MatchControl implements OnInit {
   private scorekeeper = inject(ScorekeeperService);
   private broadcastService = inject(BroadcastService);
   private syncService = inject(SyncService);
-  private rankService = inject(RankService);
   private toastService = inject(ToastService);
   public bufferService = inject(ScoreSubmitBufferService);
   private refereeService = inject(RefereeService);
@@ -82,7 +80,6 @@ export class MatchControl implements OnInit {
   isSaving = signal<boolean>(false);
   redScoreData: any = {};
   blueScoreData: any = {};
-  isRecalculatingRanking = signal<boolean>(false);
   private redScoreExistedBeforeEdit = false;
   private blueScoreExistedBeforeEdit = false;
 
@@ -125,8 +122,6 @@ export class MatchControl implements OnInit {
     this.loadSchedule();
     this.syncService.syncPlayingMatches().subscribe({
       next: (matches) => {
-        console.log('Synced playing matches', matches);
-
         if (matches && matches.length > 0) {
           // Assume first match is active, second is loaded
           this.active.set(matches[0]);
@@ -141,19 +136,12 @@ export class MatchControl implements OnInit {
     });
     this.broadcastService.subscribeToTopic("/topic/display/field/*/timer").subscribe({
       next: (msg) => {
-        console.log("Received timer update:", msg);
         if (msg.payload && msg.payload.remainingSeconds !== undefined) {
           const newValue = msg.payload.remainingSeconds;
-
-          // Debug logging for timer values
-          console.log(`Timer: previous=${this.previousTimerValue}, new=${newValue}`);
 
           // Only play match end sound when the match timer (not countdown) reaches 0
           // The match timer starts at 180+ seconds, countdown is 3 seconds
           const wasCountdown = this.previousTimerValue !== null && this.previousTimerValue <= 3;
-          const isMatchTime = newValue > 3;
-
-          console.log(`Timer check: wasCountdown=${wasCountdown}, isMatchTime=${isMatchTime}`);
 
           // If transitioning from countdown (0) to match time (180+), don't play sound
           // Only play match end sound when actual match time reaches 0
@@ -161,7 +149,6 @@ export class MatchControl implements OnInit {
               this.previousTimerValue > 0 &&
               newValue === 0 &&
               !wasCountdown) {
-            console.log("Triggering match end sound!");
             this.playMatchEndSound();
           }
 
@@ -221,15 +208,6 @@ export class MatchControl implements OnInit {
     const blueStatus = match.blueScore?.status;
     this.redScoreExistedBeforeEdit = redStatus === 1 && !!hasRedData;
     this.blueScoreExistedBeforeEdit = blueStatus === 1 && !!hasBlueData;
-
-    // Debug logging to diagnose override modal issues
-    console.log('enterScores debug:', {
-      matchId: match.match.id,
-      redScore: match.redScore ? { status: redStatus, hasData: hasRedData, statusType: typeof redStatus } : null,
-      blueScore: match.blueScore ? { status: blueStatus, hasData: hasBlueData, statusType: typeof blueStatus } : null,
-      redScoreExistedBeforeEdit: this.redScoreExistedBeforeEdit,
-      blueScoreExistedBeforeEdit: this.blueScoreExistedBeforeEdit
-    });
 
     // Initialize with current data to ensure we have something to save
     // even if the user doesn't edit anything (or if they only edit one side)
@@ -490,15 +468,6 @@ export class MatchControl implements OnInit {
       alliancesToOverride.push('Blue');
     }
 
-    // Debug logging to diagnose override modal issues
-    console.log('saveScores debug:', {
-      matchId: m.match.id,
-      redScoreExistedBeforeEdit: this.redScoreExistedBeforeEdit,
-      blueScoreExistedBeforeEdit: this.blueScoreExistedBeforeEdit,
-      alliancesToOverride,
-      willShowModal: alliancesToOverride.length > 0
-    });
-
     // If there are existing scores, show confirmation modal
     if (alliancesToOverride.length > 0) {
       this.openOverrideConfirmModal(alliancesToOverride, this.redScoreData, this.blueScoreData);
@@ -521,7 +490,6 @@ export class MatchControl implements OnInit {
 
     // Submit red
     if (m.redScore) {
-      console.log('Submitting red score override for alliance ID:', m.redScore.id);
       requests.push(
         this.scorekeeper.overrideScore(m.match.id + "_R", redData).pipe(
           catchError(e => {
@@ -534,7 +502,6 @@ export class MatchControl implements OnInit {
 
     // Submit blue
     if (m.blueScore) {
-      console.log("Submitting blue score override");
       requests.push(
         this.scorekeeper.overrideScore(m.match.id + "_B", blueData).pipe(
           catchError(e => {
@@ -554,7 +521,6 @@ export class MatchControl implements OnInit {
 
     forkJoin(requests).pipe(
       finalize(() => {
-        console.log('Finalizing saveScores - resetting isSaving to false');
         this.isSaving.set(false);
       })
     ).subscribe({
@@ -581,7 +547,6 @@ export class MatchControl implements OnInit {
         this.blueScoreExistedBeforeEdit = false;
         this.redTempScores.set([]);
         this.blueTempScores.set([]);
-        console.log('saveScores completed successfully');
       }
     });
   }
@@ -595,40 +560,11 @@ export class MatchControl implements OnInit {
     this.setTab('schedule');
   }
 
-  recalculateRankings() {
-    if (this.isRecalculatingRanking()) {
-      return;
-    }
-    this.isRecalculatingRanking.set(true);
-    this.rankService.recalculateRankings().subscribe({
-      next: (success) => {
-        if (success) {
-          console.log('Rankings recalculated successfully');
-          this.toastService.show('Rankings recalculated successfully', 'success');
-        } else {
-          console.warn('Rankings recalculation returned false');
-          this.toastService.show('Failed to recalculate rankings', 'error');
-        }
-      },
-      error: (err) => {
-        console.error('Error recalculating rankings', err);
-        this.toastService.show('Error recalculating rankings: ' + (err.message || 'Unknown error'), 'error');
-      },
-      complete: () => {
-        this.redScoreExistedBeforeEdit = false;
-        this.blueScoreExistedBeforeEdit = false;
-        this.isRecalculatingRanking.set(false);
-      }
-    });
-  }
-
   onRedScoreChange(data: any) {
-    console.log('MatchControl: Red score changed', data);
     this.redScoreData = data;
   }
 
   onBlueScoreChange(data: any) {
-    console.log('MatchControl: Blue score changed', data);
     this.blueScoreData = data;
   }
 
@@ -651,7 +587,7 @@ export class MatchControl implements OnInit {
 
   showUpNext() {
     this.scorekeeper.showUpNext().subscribe({
-      next: () => console.debug('Show up next command sent'),
+      next: () => {},
       error: (e) => {
         console.error('Failed to show up next', e);
         this.toastService.show('Failed to show up next on display', 'error');
@@ -661,7 +597,7 @@ export class MatchControl implements OnInit {
 
   showCurrentMatch() {
     this.scorekeeper.showCurrentMatch().subscribe({
-      next: () => console.debug('Show current match command sent'),
+      next: () => {},
       error: (e) => {
         console.error('Failed to show current match', e);
         this.toastService.show('Failed to show current match on display', 'error');
@@ -704,39 +640,28 @@ export class MatchControl implements OnInit {
   }
 
   private playMatchEndSound(): void {
-    console.log("playMatchEndSound called");
-
     // Initialize AudioContext on user interaction
     if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      console.log("Created new AudioContext");
     }
 
     // Resume audio context if suspended (browser autoplay policy)
     if (this.audioContext.state === 'suspended') {
-      console.log("AudioContext is suspended, resuming...");
       this.audioContext.resume().then(() => {
-        console.log("AudioContext resumed successfully");
       }).catch(err => {
         console.error("Failed to resume AudioContext:", err);
       });
-    } else {
-      console.log("AudioContext state:", this.audioContext.state);
     }
 
-    console.log("Fetching /assets/match_end.m4a...");
     fetch('/assets/match_end.m4a')
       .then(response => {
-        console.log("Fetch response status:", response.status);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.arrayBuffer();
       })
       .then(arrayBuffer => {
-        console.log("Audio file loaded, decoding...");
         this.audioContext?.decodeAudioData(arrayBuffer, (audioBuffer) => {
-          console.log("Audio decoded successfully, playing...");
           const source = this.audioContext!.createBufferSource();
           source.buffer = audioBuffer;
           source.connect(this.audioContext!.destination);
@@ -786,7 +711,6 @@ export class MatchControl implements OnInit {
         // Match is already active, no need to set again
         this.loaded.set(null); // Clear loaded match after starting
         this.previousTimerValue = null; // Reset timer tracking
-        console.debug('Match timer started for active match');
       },
       error: (e) => {
         console.error('Failed to start current match', e);
@@ -800,13 +724,11 @@ export class MatchControl implements OnInit {
     // Initialize AudioContext on user interaction to unlock it for later playback
     if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      console.log('AudioContext initialized during user interaction');
     }
 
     // Resume audio context if suspended (browser autoplay policy)
     if (this.audioContext.state === 'suspended') {
       this.audioContext.resume().then(() => {
-        console.log('AudioContext resumed successfully during user interaction');
       }).catch(err => {
         console.error('Failed to resume AudioContext:', err);
       });
@@ -828,7 +750,6 @@ export class MatchControl implements OnInit {
         this.active.set(null);
         this.activeMatchTimer.set(null);
         this.previousTimerValue = null; // Reset timer tracking
-        console.debug('Match aborted successfully');
 
         this.toastService.show(
           `Match ${toAbort.match.matchCode} aborted`,
@@ -879,14 +800,10 @@ export class MatchControl implements OnInit {
       return;
     }
 
-    console.log('Submitting buffered submission:', submission);
-
     // If we have a tempScoreId, use the temp score commit flow
     if (submission.tempScoreId) {
-      console.log('Using temp score commit for tempScoreId:', submission.tempScoreId);
       this.scorekeeper.commitTempScore(submission.tempScoreId, 'scorekeeper').subscribe({
         next: (res) => {
-          console.log('Temp score committed successfully:', res);
           this.bufferService.markAsSubmittedDirect(submissionId);
           this.toastService.show(`Committed ${submission.matchCode} ${submission.color} score from temp!`, 'success');
           this.loadSchedule();
@@ -903,7 +820,6 @@ export class MatchControl implements OnInit {
     // Fallback: if no tempScoreId, use direct submission (legacy path)
     this.refereeService.submitFinalScore(submission.color, submission.allianceId, submission.payload).subscribe({
       next: (res) => {
-        console.log('Score submitted successfully:', res);
         this.toastService.show(`Submitted ${submission.matchCode} ${submission.color} score!`, 'success');
         this.bufferService.markAsSubmittedDirect(submissionId);
         this.loadSchedule();

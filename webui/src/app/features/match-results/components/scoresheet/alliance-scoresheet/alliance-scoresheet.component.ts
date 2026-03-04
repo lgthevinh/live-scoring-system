@@ -479,7 +479,6 @@ export class AllianceScoresheetComponent implements OnChanges {
     current[parts[parts.length - 1]] = value;
 
     this.updateComputedValues();
-    console.log('AllianceScoresheet: Score changed', this.scoreData);
     this.scoreChange.emit(this.scoreData);
   }
 
@@ -509,7 +508,6 @@ export class AllianceScoresheetComponent implements OnChanges {
     if (!this.scoreData.teams[teamId]) this.scoreData.teams[teamId] = {};
 
     this.scoreData.teams[teamId][key] = value;
-    console.log('AllianceScoresheet: Team score changed', this.scoreData);
     this.scoreChange.emit(this.scoreData);
   }
 
