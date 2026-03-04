@@ -105,22 +105,15 @@ public class EventHandler {
                 if (dbFile.exists()) {
                     if (!dbFile.delete()) {
                         // TODO: This might failed due to Hikari connection still open, need to close it first
-                        callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete event database file.");
-                        return;
+                        // Log warning but don't fail the entire operation
+                        ILog.w(TAG, "Failed to delete event database file: " + dbFile.getAbsolutePath());
                     }
                 }
                 // delete event files folder
                 File eventFilesDir = new File("files/" + eventCode);
                 if (eventFilesDir.exists() && eventFilesDir.isDirectory()) {
-                    File[] files = eventFilesDir.listFiles();
-                    if (files == null) {
-                        return;
-                    }
-                    for (File file : files) {
-                        if (!file.delete()) {
-                            callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete event file: " + file.getName());
-                            return;
-                        }
+                    if (!deleteRecursively(eventFilesDir)) {
+                        ILog.w(TAG, "Failed to delete event files directory: " + eventFilesDir.getAbsolutePath());
                     }
                 }
             }
@@ -230,6 +223,18 @@ public class EventHandler {
 
     public Event getCurrentEvent() {
         return currentEvent;
+    }
+
+    private boolean deleteRecursively(File file) {
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursively(child);
+                }
+            }
+        }
+        return file.delete();
     }
 
     public interface EventCallback {

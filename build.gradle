@@ -21,7 +21,7 @@ plugins {
 }
 
 group = 'org.thingai.app.scoringsystem'
-version = '1.6'
+version = '1.7.1'
 description = 'Scoring System for Robotics Competitions'
 
 application {
@@ -50,6 +50,10 @@ dependencies {
     implementation files('libs/desktopplatform.jar')
 
     implementation 'com.formdev:flatlaf:3.2.5'
+
+    // Apache POI for Excel support
+    implementation 'org.apache.poi:poi:5.3.0'
+    implementation 'org.apache.poi:poi-ooxml:5.3.0'
 }
 
 test {

@@ -93,13 +93,8 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     };
 
     ngOnInit(): void {
-        console.log('=== ScoringDisplay ngOnInit ===');
-        console.log('Current URL:', window.location.href);
-        console.log('WebSocket URL expected:', 'ws://' + window.location.host + '/ws');
-
         this.syncService.getCurrentMatchField(0).subscribe({
             next: (match) => {
-                console.log("Fetched current match field data:", match);
 
                 if (match !== null) {
                     this.redTeams.set(match.redTeams);
@@ -135,8 +130,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 document.body.appendChild(backdrop);
                 document.body.classList.add('modal-open');
                 document.body.style.overflow = 'hidden';
-
-                console.log('=== Sound permission popup shown ===');
             }
         }, 100);
 
@@ -222,8 +215,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         this.syncService.getCurrentMatchField(this.fieldBindValue).subscribe({
             next: (match) => {
-                console.log("Fetched current match field data:", match);
-
                 if (match !== null) {
                     this.redTeams.set(match.redTeams);
                     this.blueTeams.set(match.blueTeams);
@@ -315,7 +306,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     }
 
     private subscribeToFieldTopic(fieldId: number) {
-        console.log('=== subscribeToFieldTopic called with fieldId:', fieldId, '===');
         if (fieldId === null || fieldId === undefined) return;
 
         let timerTopic: string;
@@ -338,13 +328,9 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             soundTopic = `/topic/display/field/${fieldId}/sound`;
         }
 
-        console.log('Subscribing to topics:', { timerTopic, commandTopic, scoreTopicRed, scoreTopicBlue, soundTopic });
-
         this.broadcastService.subscribeToTopic(commandTopic).subscribe({
             next: (msg) => {
-                console.log("FieldDisplay received message:", msg);
                 if (msg.type === FieldDisplayCommand.SHOW_TIMER) {
-                    console.log("FieldDisplay SHOW_TIMER command received");
                     this.displayMode.set('match');
 
                     this.redTeams.set(msg.payload.redTeams);
@@ -353,11 +339,9 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                     this.redScore.set(0);
                     this.blueScore.set(0);
                 } else if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
-                    console.log("FieldDisplay SHOW_UPNEXT command received");
                     this.applyUpNextData(msg.payload);
                     this.displayMode.set('upnext');
                 } else if (msg.type === FieldDisplayCommand.SHOW_MATCH) {
-                    console.log("FieldDisplay SHOW_MATCH command received");
                     if (msg.payload) {
                         this.redTeams.set(msg.payload.redTeams);
                         this.blueTeams.set(msg.payload.blueTeams);
@@ -376,7 +360,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         if (fieldId !== 0) {
             this.broadcastService.subscribeToTopic('/topic/display/field/0/command').subscribe({
                 next: (msg) => {
-                    console.log("FieldDisplay received broadcast-all command:", msg);
                     if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
                         this.applyUpNextData(msg.payload);
                         this.displayMode.set('upnext');
@@ -398,7 +381,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         this.broadcastService.subscribeToTopic(timerTopic).subscribe({
             next: (msg) => {
-                console.log("FieldDisplay received timer message:", msg);
                 if (msg.payload && msg.payload.remainingSeconds !== undefined) {
                     const newTime = msg.payload.remainingSeconds;
                     this.timeLeft.set(newTime);
@@ -412,7 +394,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         // Subscribe to PLAY_SOUND command for synchronized sound playback
         this.broadcastService.subscribeToTopic(soundTopic).subscribe({
             next: (msg) => {
-                console.log("=== FieldDisplay received SOUND command:", msg, "===");
                 // Handle STOP_SOUND command
                 if (msg.type === 'STOP_SOUND') {
                     this.stopMatchSound();
@@ -432,7 +413,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         this.broadcastService.subscribeToTopic(scoreTopicRed).subscribe({
             next: (msg) => {
-                console.debug("FieldDisplay received score message:", msg);
                 if (msg.payload) {
                     this.redScore.set(msg.payload.totalScore);
                 }
@@ -444,7 +424,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         this.broadcastService.subscribeToTopic(scoreTopicBlue).subscribe({
             next: (msg) => {
-                console.debug("FieldDisplay received score message:", msg);
                 if (msg.payload) {
                     this.blueScore.set(msg.payload.totalScore);
                 }
@@ -501,21 +480,18 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     // Enable sound playback (required for mobile browsers)
     enableSound(): Promise<void> {
-        console.log('=== Enabling sound playback ===');
         this.soundEnabled.set(true);
 
         // Initialize AudioContext on user interaction
         if (!this.audioContext) {
             try {
                 this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-                console.log('AudioContext created:', this.audioContext.state);
 
                 // Set output device if not default
                 const deviceId = this.outputDeviceId();
                 const audioContext = this.audioContext as any;
                 if (typeof audioContext.setSinkId === 'function') {
                     audioContext.setSinkId(deviceId).then(() => {
-                        console.log('=== Output device set ===');
                     }).catch((err: any) => {
                         console.warn('Failed to set output device:', err);
                     });
@@ -528,7 +504,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         // Resume AudioContext if suspended
         if (this.audioContext && this.audioContext.state === 'suspended') {
             return this.audioContext.resume().then(() => {
-                console.log('AudioContext resumed');
             }).catch(err => {
                 console.error('Failed to resume AudioContext:', err);
             });
@@ -538,7 +513,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     // Stop match sound playback
     stopMatchSound(): void {
-        console.log('=== Stopping match sound ===');
         // Stop HTML5 Audio
         if (this.html5Audio) {
             this.html5Audio.pause();
@@ -562,7 +536,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     onOutputDeviceChange(event: Event): void {
         const target = event.target as HTMLSelectElement;
         const deviceId = target.value;
-        console.log('=== Output device changed to:', deviceId, '===');
         this.outputDeviceId.set(deviceId);
 
         // Apply the device change to AudioContext if supported
@@ -570,7 +543,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             const audioContext = this.audioContext as any;
             if (typeof audioContext.setSinkId === 'function') {
                 audioContext.setSinkId(deviceId).then(() => {
-                    console.log('=== Audio output device changed successfully ===');
                 }).catch((err: any) => {
                     console.error('Failed to change audio output device:', err);
                 });
@@ -579,18 +551,12 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             }
         }
 
-        // Recreate HTML5 Audio element with new device (if not default)
-        if (deviceId !== 'default') {
-            console.log('Note: HTML5 Audio does not support device selection. Use AudioContext for device switching.');
-        }
-
         // Preload sound again with new device setting
         this.preloadSound();
     }
 
     // Refresh available audio devices
     refreshAudioDevices(): void {
-        console.log('=== Refreshing audio devices ===');
         if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
             console.warn('enumerateDevices() is not supported in this browser');
             return;
@@ -603,7 +569,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             })
             .then(devices => {
                 const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-                console.log('=== Available audio output devices ===');
 
                 // Build device list with labels
                 const deviceList = audioOutputDevices.map(device => ({
@@ -615,10 +580,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 deviceList.unshift({ deviceId: 'default', label: 'System Default' });
 
                 this.availableAudioDevices.set(deviceList);
-
-                audioOutputDevices.forEach(device => {
-                    console.log(`  - ${device.label || 'Unknown Device'} (ID: ${device.deviceId})`);
-                });
             })
             .catch(err => {
                 console.error('Error enumerating devices:', err);
@@ -629,7 +590,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
 
     onSoundPermissionResponse(enable: boolean): void {
-        console.log('=== User sound permission response:', enable, '===');
         if (enable) {
             this.enableSound();
         } else {
@@ -657,7 +617,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     // Play match sound (public method for testing)
     playMatchSound(): void {
-        console.log('=== User triggered match sound playback ===');
         this.enableSound().then(() => {
             this.playMatchStartSound();
         });
@@ -666,17 +625,14 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     // Preload sound file for better mobile compatibility
     private preloadSound(): void {
-        console.log('=== Preloading sound file ===');
         // Try HTML5 Audio first (better for mobile)
         this.html5Audio = new Audio('assets/MatchSoundEffect.m4a');
         this.html5Audio.preload = 'auto';
         this.html5Audio.onended = () => {
-            console.log('=== HTML5 Audio playback ended ===');
             this.isPlayingStartSound = false;
             this.isSoundPlaying.set(false);
         };
         this.html5Audio.load();
-        console.log('Sound preloaded using HTML5 Audio');
 
         // Also try to preload with AudioContext for desktop
         try {
@@ -686,7 +642,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 .then(arrayBuffer => {
                     this.audioContext?.decodeAudioData(arrayBuffer, (audioBuffer) => {
                         this.preloadedAudioBuffer = audioBuffer;
-                        console.log('Sound preloaded using AudioContext');
                     });
                 })
                 .catch(err => console.warn('Failed to preload sound with AudioContext:', err));
@@ -697,22 +652,13 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     // Audio playback for match start
     private playMatchStartSound(): void {
-        console.log('=== Attempting to play match start sound ===');
-        console.log('Sound enabled:', this.soundEnabled());
-        console.log('HTML5 Audio available:', !!this.html5Audio);
-        console.log('AudioContext available:', !!this.audioContext);
-        console.log('Preloaded buffer available:', !!this.preloadedAudioBuffer);
-        console.log('Selected output device:', this.outputDeviceId());
-
         // Prevent playing if already playing
         if (this.isPlayingStartSound) {
-            console.log('=== Start sound already playing, skipping ===');
             return;
         }
 
         // Only play sound if enabled
         if (!this.soundEnabled()) {
-            console.log('=== Sound playback disabled, skipping ===');
             return;
         }
 
@@ -721,7 +667,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         // If a specific device is selected, use AudioContext (HTML5 Audio doesn't support device selection)
         if (this.outputDeviceId() !== 'default') {
-            console.log('=== Using AudioContext for device-specific playback ===');
             this.playWithAudioContext();
             return;
         }
@@ -735,7 +680,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 if (playPromise !== undefined) {
                     playPromise
                         .then(() => {
-                            console.log('=== Sound played successfully using HTML5 Audio ===');
                         })
                         .catch(err => {
                             console.warn('HTML5 Audio play failed, trying AudioContext:', err);
@@ -743,8 +687,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                             this.enableSound();
                             this.playWithAudioContext();
                         });
-                } else {
-                    console.log('=== Sound played using HTML5 Audio (no promise) ===');
                 }
                 return;
             } catch (e) {
@@ -758,7 +700,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     }
 
     private playWithAudioContext(): void {
-        console.log('=== Attempting to play with AudioContext ===');
         if (!this.audioContext) {
             try {
                 this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -770,9 +711,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         // Resume AudioContext if suspended (required for mobile)
         if (this.audioContext.state === 'suspended') {
-            console.log('Resuming suspended AudioContext...');
             this.audioContext.resume().then(() => {
-                console.log('AudioContext resumed');
                 this.playBuffer();
             }).catch(err => {
                 console.error('Failed to resume AudioContext:', err);
@@ -783,7 +722,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     }
 
     private playBuffer(): void {
-        console.log('=== Attempting to play buffer ===');
         if (this.preloadedAudioBuffer && this.audioContext) {
             try {
                 const source = this.audioContext.createBufferSource();
@@ -796,7 +734,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                     this.currentAudioSource = null;
                 };
                 source.start(0);
-                console.log('=== Sound played using preloaded AudioContext buffer ===');
             } catch (e) {
                 console.error('Failed to play with AudioContext:', e);
                 this.isPlayingStartSound = false;
@@ -804,7 +741,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             }
         } else {
             // Fallback: fetch and play on demand
-            console.log('=== Fetching and playing sound on demand ===');
             fetch('assets/MatchSoundEffect.m4a')
                 .then(response => response.arrayBuffer())
                 .then(arrayBuffer => {
@@ -820,7 +756,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                                 this.currentAudioSource = null;
                             };
                             source.start(0);
-                            console.log('=== Sound played using fetched AudioContext buffer ===');
                         });
                     }
                 })

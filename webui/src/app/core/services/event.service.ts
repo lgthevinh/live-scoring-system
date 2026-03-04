@@ -50,7 +50,7 @@ export class EventService {
         return this.http.post<boolean>(`${this.apiUrl}/update`, event);
     }
 
-    deleteEvent(eventCode: string, cleanDelete: boolean = false): Observable<any> {
+    deleteEvent(eventCode: string, cleanDelete: boolean = true): Observable<any> {
         return this.http.post(`${this.apiUrl}/delete`, { eventCode, cleanDelete });
     }
 

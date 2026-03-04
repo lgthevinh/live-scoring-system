@@ -27,7 +27,6 @@ export class ScorekeeperService {
   }
 
   overrideScore(allianceId: string, scoreData: any): Observable<any> {
-    console.log('ScorekeeperService: overrideScore called for', allianceId);
     return this.http.post(`${this.apiUrl}/override-score/${allianceId}`, scoreData);
   }
 

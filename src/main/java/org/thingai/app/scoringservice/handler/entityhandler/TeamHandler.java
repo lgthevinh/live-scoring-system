@@ -14,6 +14,26 @@ public class TeamHandler {
     }
 
     public void addTeam(String teamId, String teamName, String teamSchool, String teamRegion, RequestCallback<Team> callback) {
+        // Validate inputs
+        if (teamId == null || teamId.trim().isEmpty()) {
+            callback.onFailure(ErrorCode.CREATE_FAILED, "Team ID is required");
+            return;
+        }
+        if (teamName == null || teamName.trim().isEmpty()) {
+            callback.onFailure(ErrorCode.CREATE_FAILED, "Team name is required");
+            return;
+        }
+        // teamSchool and teamRegion are optional but should not be null
+        if (teamSchool == null) teamSchool = "";
+        if (teamRegion == null) teamRegion = "";
+
+        // Check for duplicate team ID
+        Team[] existing = dao.query(Team.class, "id", teamId);
+        if (existing != null && existing.length > 0) {
+            callback.onFailure(ErrorCode.CREATE_FAILED, "Team ID already exists: " + teamId);
+            return;
+        }
+
         try {
             Team team = new Team();
             team.setTeamId(teamId);
@@ -38,6 +58,22 @@ public class TeamHandler {
     }
 
     public void addTeams(Team[] teams, RequestCallback<Boolean> callback) {
+        if (teams == null || teams.length == 0) {
+            callback.onFailure(ErrorCode.CREATE_FAILED, "No teams to add");
+            return;
+        }
+        // Check for null elements
+        for (int i = 0; i < teams.length; i++) {
+            if (teams[i] == null) {
+                callback.onFailure(ErrorCode.CREATE_FAILED, "Team at index " + i + " is null");
+                return;
+            }
+            if (teams[i].getTeamId() == null || teams[i].getTeamId().trim().isEmpty()) {
+                callback.onFailure(ErrorCode.CREATE_FAILED, "Team ID is required for team at index " + i);
+                return;
+            }
+        }
+
         try {
             dao.insertBatch(teams);
             callback.onSuccess(true,"Teams added successfully");
@@ -57,12 +93,13 @@ public class TeamHandler {
 
     public void getTeamById(String teamId, RequestCallback<Team> callback) {
         try {
-            Team team = dao.query(Team.class, "id", teamId)[0];
-
-            if (team == null) {
-                callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Team not found with ID: " + teamId);
+            Team[] results = dao.query(Team.class, "id", teamId);
+            if (results == null || results.length == 0) {
+                callback.onFailure(ErrorCode.NOT_FOUND, "Team not found with ID: " + teamId);
                 return;
             }
+            Team team = results[0];
+
             callback.onSuccess(team, "Team retrieved successfully");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, e.getMessage());

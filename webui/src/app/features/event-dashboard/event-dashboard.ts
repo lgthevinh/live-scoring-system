@@ -34,6 +34,8 @@ export class EventDashboard implements OnInit {
   showForm: WritableSignal<boolean> = signal(false);
   users: WritableSignal<UserAccount[]> = signal([]);
   currentEventCode: WritableSignal<string | null> = signal(null);
+  showDeleteConfirmModal: WritableSignal<boolean> = signal(false);
+  pendingDeleteEvent: GameEvent | null = null;
 
   // Form model
   formEvent: GameEvent = {
@@ -196,6 +198,23 @@ export class EventDashboard implements OnInit {
         }
       }
     });
+  }
+
+  openDeleteConfirmModal(event: GameEvent) {
+    this.pendingDeleteEvent = event;
+    this.showDeleteConfirmModal.set(true);
+  }
+
+  closeDeleteConfirmModal() {
+    this.showDeleteConfirmModal.set(false);
+    this.pendingDeleteEvent = null;
+  }
+
+  confirmDeleteEvent() {
+    if (this.pendingDeleteEvent) {
+      this.deleteEvent(this.pendingDeleteEvent);
+      this.closeDeleteConfirmModal();
+    }
   }
 
   setSystemEvent(event: GameEvent) {

@@ -75,7 +75,7 @@
                   </button>
                   <button class="btn btn-sm btn-outline-primary" (click)="openEditForm(event)">Edit</button>
                 </div>
-                <button class="btn btn-sm btn-outline-danger" (click)="deleteEvent(event)">Delete</button>
+                <button class="btn btn-sm btn-outline-danger" (click)="openDeleteConfirmModal(event)">Delete</button>
               </div>
             </td>
           </tr>
@@ -184,4 +184,43 @@
 
   </div>
 
+</div>
+
+<!-- Event Delete Confirmation Modal -->
+<div class="modal fade show d-block" *ngIf="showDeleteConfirmModal()" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          Confirm Event Deletion
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeDeleteConfirmModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-flex align-items-center">
+          <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+          <div><strong>Warning:</strong> This action cannot be undone.</div>
+        </div>
+        <p class="mb-2">You are about to delete the following event:</p>
+        <div class="card border-danger mb-3" *ngIf="pendingDeleteEvent">
+          <div class="card-body py-2">
+            <h6 class="card-title mb-1 fw-bold">{{ pendingDeleteEvent.name }}</h6>
+            <p class="card-text text-muted mb-0 small">Code: {{ pendingDeleteEvent.eventCode }}</p>
+            <p class="card-text text-muted mb-0 small" *ngIf="pendingDeleteEvent.date">Date: {{ pendingDeleteEvent.date }}</p>
+          </div>
+        </div>
+        <p class="text-muted small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          All event data including matches, scores, and rankings will be permanently deleted.
+        </p>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" (click)="closeDeleteConfirmModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" (click)="confirmDeleteEvent()">
+          <i class="bi bi-trash me-1"></i>Delete Event
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

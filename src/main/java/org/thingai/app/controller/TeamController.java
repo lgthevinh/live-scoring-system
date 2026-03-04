@@ -1,5 +1,10 @@
 package org.thingai.app.controller;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -9,11 +14,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.entity.team.Team;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -31,10 +38,19 @@ public class TeamController {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
         try {
-            String teamId = requestBody.get("teamId").toString();
-            String teamName = requestBody.get("teamName").toString();
-            String teamSchool = requestBody.get("teamSchool").toString();
-            String teamRegion = requestBody.get("teamRegion").toString();
+            Object teamIdObj = requestBody.get("teamId");
+            Object teamNameObj = requestBody.get("teamName");
+            Object teamSchoolObj = requestBody.get("teamSchool");
+            Object teamRegionObj = requestBody.get("teamRegion");
+
+            if (teamIdObj == null || teamNameObj == null || teamSchoolObj == null || teamRegionObj == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "All fields are required"));
+            }
+
+            String teamId = teamIdObj.toString();
+            String teamName = teamNameObj.toString();
+            String teamSchool = teamSchoolObj.toString();
+            String teamRegion = teamRegionObj.toString();
 
             ScoringService.teamHandler().addTeam(teamId, teamName, teamSchool, teamRegion, new RequestCallback<Team>() {
                 @Override
@@ -126,8 +142,17 @@ public class TeamController {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
         try {
             Object teamsObj = requestBody.get("teams");
+            if (teamsObj == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Teams array is required"));
+            }
 
-            Team[] teamsList = (Team[]) teamsObj;
+            ObjectMapper mapper = new ObjectMapper();
+            Team[] teamsList;
+            try {
+                teamsList = mapper.convertValue(teamsObj, Team[].class);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid team data format"));
+            }
             ScoringService.teamHandler().addTeams(teamsList, new RequestCallback<Boolean>() {
                 @Override
                 public void onSuccess(Boolean teams, String message) {
@@ -233,35 +258,24 @@ public class TeamController {
         if (filename == null || filename.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Filename is required"));
         }
-        
+
         String lowercaseFilename = filename.toLowerCase();
-        if (!lowercaseFilename.endsWith(".csv")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Only CSV files are allowed"));
+        boolean isCsv = lowercaseFilename.endsWith(".csv");
+        boolean isXlsx = lowercaseFilename.endsWith(".xlsx");
+        if (!isCsv && !isXlsx) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Only CSV and XLSX files are allowed"));
         }
 
         try {
-            List<Team> teams = new ArrayList<>();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
-            List<String> lines = reader.lines().collect(Collectors.toList());
-
-            if (lines.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "CSV file is empty"));
+            List<Team> teams;
+            if (isCsv) {
+                teams = parseCsvFile(file);
+            } else {
+                teams = parseXlsxFile(file);
             }
 
-            // Skip header line
-            for (int i = 1; i < lines.size(); i++) {
-                String line = lines.get(i);
-                if (line.trim().isEmpty()) continue;
-
-                String[] parts = parseCsvLine(line);
-                if (parts.length >= 4) {
-                    Team team = new Team();
-                    team.setTeamId(parts[0].trim());
-                    team.setTeamName(parts[1].trim());
-                    team.setTeamSchool(parts[2].trim());
-                    team.setTeamRegion(parts[3].trim());
-                    teams.add(team);
-                }
+            if (teams.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "No valid team data found in file"));
             }
 
             Team[] teamsArray = teams.toArray(new Team[0]);
@@ -317,5 +331,103 @@ public class TeamController {
         }
         result.add(current.toString());
         return result.toArray(new String[0]);
+    }
+
+    private List<Team> parseCsvFile(MultipartFile file) throws Exception {
+        List<Team> teams = new ArrayList<>();
+        List<String> lines;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            lines = reader.lines().collect(Collectors.toList());
+        }
+
+        if (lines.isEmpty()) {
+            return teams;
+        }
+
+        // Skip header line
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.trim().isEmpty()) continue;
+
+            String[] parts = parseCsvLine(line);
+            if (parts.length >= 4) {
+                Team team = new Team();
+                team.setTeamId(parts[0].trim());
+                team.setTeamName(parts[1].trim());
+                team.setTeamSchool(parts[2].trim());
+                team.setTeamRegion(parts[3].trim());
+                teams.add(team);
+            }
+        }
+        return teams;
+    }
+
+    private List<Team> parseXlsxFile(MultipartFile file) throws Exception {
+        List<Team> teams = new ArrayList<>();
+
+        try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+            Iterator<Row> rowIterator = sheet.iterator();
+
+            // Skip header row
+            if (rowIterator.hasNext()) {
+                rowIterator.next();
+            }
+
+            while (rowIterator.hasNext()) {
+                Row row = rowIterator.next();
+
+                // Skip empty rows
+                if (row.getCell(0) == null && row.getCell(1) == null) {
+                    continue;
+                }
+
+                // Read cells: A=Team ID, B=Team Name, C=School, D=Region
+                String teamId = getCellValue(row.getCell(0));
+                String teamName = getCellValue(row.getCell(1));
+                String school = getCellValue(row.getCell(2));
+                String region = getCellValue(row.getCell(3));
+
+                // Skip rows with empty required fields
+                if (teamId == null || teamId.trim().isEmpty()) {
+                    continue;
+                }
+
+                Team team = new Team();
+                team.setTeamId(teamId.trim());
+                team.setTeamName(teamName != null ? teamName.trim() : "");
+                team.setTeamSchool(school != null ? school.trim() : "");
+                team.setTeamRegion(region != null ? region.trim() : "");
+                teams.add(team);
+            }
+        }
+        return teams;
+    }
+
+    private String getCellValue(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                // Format numeric values without decimal if it's an integer
+                double value = cell.getNumericCellValue();
+                if (value == Math.floor(value)) {
+                    return String.valueOf((long) value);
+                }
+                return String.valueOf(value);
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                try {
+                    return cell.getStringCellValue();
+                } catch (Exception e) {
+                    return String.valueOf(cell.getNumericCellValue());
+                }
+            default:
+                return "";
+        }
     }
 }
