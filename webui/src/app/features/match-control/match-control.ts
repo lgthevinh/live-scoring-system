@@ -714,7 +714,8 @@ export class MatchControl implements OnInit {
       },
       error: (e) => {
         console.error('Failed to start current match', e);
-        this.toastService.show('Failed to start match timer', 'error');
+        const errorMsg = (typeof e.error === 'string' ? e.error : e.error?.message) || e.message || 'Unknown error';
+        this.toastService.show('Failed to start match timer: ' + errorMsg, 'error');
       }
     });
 
