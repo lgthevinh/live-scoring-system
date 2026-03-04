@@ -109,6 +109,13 @@ public class LiveScoreHandler {
                 return;
             }
 
+            // Prevent starting a match that has already been started
+            if (currentMatch.getMatch().getActualStartTime() != null) {
+                ILog.w(TAG, "Match has already been started, ignoring start request");
+                callback.onFailure(ErrorCode.CUSTOM_ERR, "Match has already been started");
+                return;
+            }
+
             int fieldNumber = currentMatch.getMatch().getFieldNumber();
             String rootTopic = "/topic/display/field/" + fieldNumber;
 
