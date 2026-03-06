@@ -4,7 +4,7 @@ import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.config.AuthData;
-import org.thingai.app.scoringservice.repository.AuthRepository;
+import org.thingai.app.scoringservice.repository.LocalRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,7 +29,7 @@ public class AuthHandler {
 
     public void handleAuthenticate(String username, String password, AuthHandlerCallback callback) {
         try {
-            AuthData authData = AuthRepository.getAuthDataById(username);
+            AuthData authData = LocalRepository.authDao().getAuthDataById(username);
 
             if (authData == null) {
                 callback.onFailure("Authentication failed: User not found.");
@@ -55,7 +55,7 @@ public class AuthHandler {
 
     public void handleCreateAuth(String username, String password, int role, AuthHandlerCallback callback) {
         try {
-            if (AuthRepository.authDataExists(username)) {
+            if (LocalRepository.authDao().authDataExists(username)) {
                 callback.onFailure("User already exists.");
                 return;
             }
@@ -77,8 +77,8 @@ public class AuthHandler {
             accountRole.setUsername(username);
             accountRole.setRole(role);
 
-            AuthRepository.insertAuthData(authData);
-            AuthRepository.insertAccountRole(accountRole);
+            LocalRepository.authDao().insertAuthData(authData);
+            LocalRepository.authDao().insertAccountRole(accountRole);
 
             String token = generateToken(username);
             callback.onSuccess(token, "Authentication created successfully.");
@@ -119,14 +119,14 @@ public class AuthHandler {
 
     public void handleGetAllUsers(RequestCallback<UserDto[]> callback) {
         try {
-            AuthData[] authDataList = AuthRepository.listAuthData();
+            AuthData[] authDataList = LocalRepository.authDao().listAuthData();
 
             UserDto[] users = new UserDto[authDataList.length];
             for (int i = 0; i < authDataList.length; i++) {
                 String username = authDataList[i].getUsername();
                 int role = 0;
 
-                AccountRole accountRole = AuthRepository.getAccountRoleById(username);
+                AccountRole accountRole = LocalRepository.authDao().getAccountRoleById(username);
                 if (accountRole != null) {
                     role = accountRole.getRole();
                 }
@@ -142,13 +142,13 @@ public class AuthHandler {
 
     public void handleDeleteAccount(String username, RequestCallback<Void> callback) {
         try {
-            if (!AuthRepository.authDataExists(username)) {
+            if (!LocalRepository.authDao().authDataExists(username)) {
                 callback.onFailure(404, "User not found: " + username);
                 return;
             }
 
-            AuthRepository.deleteAccountRole(username);
-            AuthRepository.deleteAuthData(username);
+            LocalRepository.authDao().deleteAccountRole(username);
+            LocalRepository.authDao().deleteAuthData(username);
 
             callback.onSuccess(null, "Account '" + username + "' deleted successfully.");
         } catch (Exception e) {
@@ -181,10 +181,10 @@ public class AuthHandler {
 
     public AccountRole[] getAllAccounts() {
         try {
-            AccountRole[] accountRoles = AuthRepository.listAccountRoles();
+            AccountRole[] accountRoles = LocalRepository.authDao().listAccountRoles();
 
             if (accountRoles.length == 0) {
-                AuthData[] authDataList = AuthRepository.listAuthData();
+                AuthData[] authDataList = LocalRepository.authDao().listAuthData();
                 accountRoles = new AccountRole[authDataList.length];
                 for (int i = 0; i < authDataList.length; i++) {
                     AccountRole role = new AccountRole();
@@ -202,7 +202,7 @@ public class AuthHandler {
 
     public AuthData getAuthDataByUsername(String username) {
         try {
-            return AuthRepository.getAuthDataById(username);
+            return LocalRepository.authDao().getAuthDataById(username);
         } catch (Exception e) {
             return null;
         }
@@ -210,7 +210,7 @@ public class AuthHandler {
 
     public void handleUpdateAccount(String username, String newPassword, int newRole, AuthHandlerCallback callback) {
         try {
-            AuthData existingAuth = AuthRepository.getAuthDataById(username);
+            AuthData existingAuth = LocalRepository.authDao().getAuthDataById(username);
             if (existingAuth == null) {
                 callback.onFailure("User not found.");
                 return;
@@ -233,8 +233,8 @@ public class AuthHandler {
             accountRole.setUsername(username);
             accountRole.setRole(newRole);
 
-            AuthRepository.updateAuthData(existingAuth);
-            AuthRepository.updateAccountRole(accountRole);
+            LocalRepository.authDao().updateAuthData(existingAuth);
+            LocalRepository.authDao().updateAccountRole(accountRole);
 
             callback.onSuccess(null, "Account updated successfully.");
         } catch (Exception e) {
@@ -244,15 +244,15 @@ public class AuthHandler {
 
     public void handleDeleteAccount(String username, AuthHandlerCallback callback) {
         try {
-            AuthData authData = AuthRepository.getAuthDataById(username);
+            AuthData authData = LocalRepository.authDao().getAuthDataById(username);
 
             if (authData != null) {
-                AuthRepository.deleteAuthData(username);
+                LocalRepository.authDao().deleteAuthData(username);
             }
 
-            AccountRole accountRole = AuthRepository.getAccountRoleById(username);
+            AccountRole accountRole = LocalRepository.authDao().getAccountRoleById(username);
             if (accountRole != null) {
-                AuthRepository.deleteAccountRole(username);
+                LocalRepository.authDao().deleteAccountRole(username);
             }
 
             callback.onSuccess(null, "Account deleted successfully.");

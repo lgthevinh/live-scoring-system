@@ -1,12 +1,12 @@
-package org.thingai.app.scoringservice.define;
+package org.thingai.app.scoringservice.define.ui;
 
-public enum EValueType {
+public enum ScoreValueType {
     INTEGER(1),
     BOOLEAN(2);
 
     private final int value;
 
-    EValueType(int value) {
+    ScoreValueType(int value) {
         this.value = value;
     }
 
