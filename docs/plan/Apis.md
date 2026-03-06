@@ -208,6 +208,26 @@ Base topic: `live/`
           "state": number // MatchLifeCycleState
         }
       ```
+
+- Ranking event - Topic `live/display/ranking`
+    - Payload:
+      ```json
+        [
+          {
+            "teamId": "string",
+            "teamName": "string",
+            "matchesPlayed": number,
+            "wins": number,
+            "totalScore": number,
+            "totalPenalties": number,
+            "hightestScore": number,
+            "rankingPoints": number,
+            ...
+          },
+          ...
+        ]
+      ```
+
 - Control event - Topic `live/display/control`
     - Payload:
       ```json
