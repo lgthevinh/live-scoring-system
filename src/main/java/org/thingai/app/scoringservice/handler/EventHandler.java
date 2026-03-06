@@ -1,5 +1,6 @@
 package org.thingai.app.scoringservice.handler;
 
+import org.thingai.app.scoringservice.callback.EventHandlerCallback;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.entity.config.DbMapEntity;
@@ -21,21 +22,16 @@ import java.io.File;
 public class EventHandler {
     private static final String TAG = "EventHandler";
 
-    private final Dao systemDao;
-    private final EventCallback eventCallback;
-
-    private Dao eventDao;
-    private DaoFile eventDaoFile;
+    private final EventHandlerCallback eventCallback;
 
     private Event currentEvent;
 
-    public EventHandler(Dao dao, EventCallback eventCallback) {
-        this.systemDao = dao;
+    public EventHandler(EventHandlerCallback eventCallback) {
         this.eventCallback = eventCallback;
 
         try {
             if (isCurrentEventSet()) {
-                eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
+                Dao eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
                 eventDao.initDao(new Class[]{
                         Match.class,
                         AllianceTeam.class,
@@ -44,9 +40,10 @@ public class EventHandler {
                         RankingEntry.class,
                 });
 
-                eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
+                DaoFile eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
 
-                eventCallback.isCurrentEventSet(this.currentEvent, eventDao, eventDaoFile);
+                LocalRepository.initializeEvent(eventDao, eventDaoFile);
+                eventCallback.isCurrentEventSet(this.currentEvent);
             } else {
                 eventCallback.isNotCurrentEventSet();
             }
@@ -79,7 +76,7 @@ public class EventHandler {
         try {
             Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
             if (event == null) {
-                callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
+                callback.onFailure(ErrorCode.DAO_NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
             callback.onSuccess(event, "Event retrieved successfully.");
@@ -97,7 +94,7 @@ public class EventHandler {
 
             Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
             if (event == null) {
-                callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
+                callback.onFailure(ErrorCode.DAO_NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
 
@@ -155,11 +152,11 @@ public class EventHandler {
             ILog.d(TAG, eventCode);
             Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
             if (event == null) {
-                callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
+                callback.onFailure(ErrorCode.DAO_NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
             this.currentEvent = event;
-            eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
+            Dao eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
             eventDao.initDao(new Class[]{
                     Match.class,
                     AllianceTeam.class,
@@ -169,14 +166,15 @@ public class EventHandler {
                     DbMapEntity.class
             });
 
-            eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
+            DaoFile eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
 
             DbMapEntity mapEntity = new DbMapEntity();
             mapEntity.setKey("current_event");
             mapEntity.setValue(eventCode);
-            systemDao.insertOrUpdate(mapEntity);
+            LocalRepository.systemDatabase().insertOrUpdate(mapEntity);
 
-            eventCallback.onSetEvent(eventDao, eventDaoFile);
+            LocalRepository.initializeEvent(eventDao, eventDaoFile);
+            eventCallback.onSetEvent();
 
             callback.onSuccess(this.currentEvent, "Current event set successfully.");
         } catch (Exception e) {
@@ -192,12 +190,10 @@ public class EventHandler {
             }
             
             this.currentEvent = null;
-            this.eventDao = null;
-            this.eventDaoFile = null;
-            
-            DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event");
+
+            DbMapEntity[] mapEntities = LocalRepository.systemDatabase().query(DbMapEntity.class, "key", "current_event");
             if (mapEntities.length > 0) {
-                systemDao.delete(mapEntities[0]);
+                LocalRepository.systemDatabase().delete(mapEntities[0]);
             }
             
             eventCallback.isNotCurrentEventSet();
@@ -209,7 +205,7 @@ public class EventHandler {
     }
 
     public boolean isCurrentEventSet() throws DaoException {
-        DbMapEntity[] mapEntities = systemDao.query(DbMapEntity.class, "key", "current_event");
+        DbMapEntity[] mapEntities = LocalRepository.systemDatabase().query(DbMapEntity.class, "key", "current_event");
         if (mapEntities.length > 0) {
             String eventCode = mapEntities[0].getValue();
             try {
@@ -228,11 +224,5 @@ public class EventHandler {
 
     public Event getCurrentEvent() {
         return currentEvent;
-    }
-
-    public interface EventCallback {
-        void onSetEvent(Dao eventDao, DaoFile eventDaoFile);
-        void isCurrentEventSet(Event currentEvent, Dao eventDao, DaoFile eventDaoFile);
-        void isNotCurrentEventSet();
     }
 }

@@ -6,9 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
-import org.thingai.app.scoringservice.handler.AuthHandler;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -26,7 +26,6 @@ public class AuthController {
         String username = request.get("username");
         String password = request.get("password");
 
-        // Local login implementation
         String remoteAddr = servletRequest.getRemoteAddr();
         boolean isLocalhost;
         try {
@@ -42,18 +41,19 @@ public class AuthController {
             return ResponseEntity.ok(Map.of("token", token, "message", "Local login successful."));
         }
 
-        // Standard authentication flow, now made thread-safe.
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
-        ScoringService.authHandler().handleAuthenticate(username, password, new AuthHandler.AuthHandlerCallback() {
+        ScoringService.authHandler().handleAuthenticate(username, password, new RequestCallback<String>() {
             @Override
-            public void onSuccess(String token, String successMessage) {
-                future.complete(ResponseEntity.ok(Map.of("token", token, "message", successMessage)));
+            public void onSuccess(String token, String message) {
+                future.complete(ResponseEntity.ok(Map.of("token", token, "message", message)));
             }
 
             @Override
-            public void onFailure(String errorMessage) {
-                future.complete(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", errorMessage)));
+            public void onFailure(int errorCode, String errorMessage) {
+                HttpStatus status = errorCode == ErrorCode.AUTHEN_INVALID_CREDENTIALS
+                        ? HttpStatus.UNAUTHORIZED : HttpStatus.INTERNAL_SERVER_ERROR;
+                future.complete(ResponseEntity.status(status).body(Map.of("error", errorMessage)));
             }
         });
 
@@ -62,10 +62,8 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<Object> refreshToken(@RequestHeader Map<String, String> requestHeaders) {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-        String authHeader = requestHeaders.get("authorization"); // Headers are converted to lowercase
+        String authHeader = requestHeaders.get("authorization");
 
-        // Expecting the format "Bearer <token>"
         String token = (authHeader != null && authHeader.toLowerCase().startsWith("bearer ")) ? authHeader.substring(7)
                 : null;
 
@@ -74,14 +72,16 @@ public class AuthController {
                     .body(Map.of("error", "Authorization header is missing or malformed."));
         }
 
-        ScoringService.authHandler().handleRefreshToken(token, new AuthHandler.AuthHandlerCallback() {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.authHandler().handleRefreshToken(token, new RequestCallback<String>() {
             @Override
-            public void onSuccess(String refreshedToken, String successMessage) {
-                future.complete(ResponseEntity.ok(Map.of("token", refreshedToken, "message", successMessage)));
+            public void onSuccess(String refreshedToken, String message) {
+                future.complete(ResponseEntity.ok(Map.of("token", refreshedToken, "message", message)));
             }
 
             @Override
-            public void onFailure(String errorMessage) {
+            public void onFailure(int errorCode, String errorMessage) {
                 future.complete(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", errorMessage)));
             }
         });
@@ -103,22 +103,23 @@ public class AuthController {
 
     @PostMapping("/create-account")
     public ResponseEntity<Object> createAccount(@RequestBody Map<String, String> request) {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
         String username = request.get("username");
         String password = request.get("password");
         int role = Integer.parseInt(request.get("role"));
 
-        ScoringService.authHandler().handleCreateAuth(username, password, role, new AuthHandler.AuthHandlerCallback() {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.authHandler().handleCreateAuth(username, password, role, new RequestCallback<String>() {
             @Override
-            public void onSuccess(String token, String successMessage) {
-                future.complete(ResponseEntity.ok(Map.of("token", token, "message", successMessage)));
+            public void onSuccess(String token, String message) {
+                future.complete(ResponseEntity.ok(Map.of("token", token, "message", message)));
             }
 
             @Override
-            public void onFailure(String errorMessage) {
-                future.complete(
-                        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            public void onFailure(int errorCode, String errorMessage) {
+                HttpStatus status = errorCode == ErrorCode.AUTHEN_USER_ALREADY_EXISTS
+                        ? HttpStatus.CONFLICT : HttpStatus.INTERNAL_SERVER_ERROR;
+                future.complete(ResponseEntity.status(status).body(Map.of("error", errorMessage)));
             }
         });
 
@@ -137,7 +138,7 @@ public class AuthController {
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(ResponseEntity.status(errorCode).body(Map.of("error", errorMessage)));
+                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
             }
         });
 
@@ -156,15 +157,13 @@ public class AuthController {
 
     @PutMapping("/accounts/{username}")
     public ResponseEntity<Object> updateAccount(@PathVariable String username, @RequestBody Map<String, String> request) {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
         String password = request.get("password");
         String roleStr = request.get("role");
-        
+
         if (roleStr == null || roleStr.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Role is required"));
         }
-        
+
         int role;
         try {
             role = Integer.parseInt(roleStr);
@@ -172,15 +171,19 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid role format"));
         }
 
-        ScoringService.authHandler().handleUpdateAccount(username, password, role, new AuthHandler.AuthHandlerCallback() {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.authHandler().handleUpdateAccount(username, password, role, new RequestCallback<Void>() {
             @Override
-            public void onSuccess(String token, String successMessage) {
-                future.complete(ResponseEntity.ok(Map.of("message", successMessage)));
+            public void onSuccess(Void result, String message) {
+                future.complete(ResponseEntity.ok(Map.of("message", message)));
             }
 
             @Override
-            public void onFailure(String errorMessage) {
-                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            public void onFailure(int errorCode, String errorMessage) {
+                HttpStatus status = errorCode == ErrorCode.DAO_NOT_FOUND
+                        ? HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR;
+                future.complete(ResponseEntity.status(status).body(Map.of("error", errorMessage)));
             }
         });
 
@@ -191,15 +194,17 @@ public class AuthController {
     public ResponseEntity<Object> deleteAccount(@PathVariable String username) {
         CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
-        ScoringService.authHandler().handleDeleteAccount(username, new AuthHandler.AuthHandlerCallback() {
+        ScoringService.authHandler().handleDeleteAccount(username, new RequestCallback<Void>() {
             @Override
-            public void onSuccess(String token, String successMessage) {
-                future.complete(ResponseEntity.ok(Map.of("message", successMessage)));
+            public void onSuccess(Void result, String message) {
+                future.complete(ResponseEntity.ok(Map.of("message", message)));
             }
 
             @Override
-            public void onFailure(String errorMessage) {
-                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            public void onFailure(int errorCode, String errorMessage) {
+                HttpStatus status = errorCode == ErrorCode.DAO_NOT_FOUND
+                        ? HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR;
+                future.complete(ResponseEntity.status(status).body(Map.of("error", errorMessage)));
             }
         });
 

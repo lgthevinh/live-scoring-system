@@ -29,7 +29,7 @@ public class TeamHandler {
         try {
             Team team = LocalRepository.teamDao().getTeamById(teamId);
             if (team == null) {
-                callback.onFailure(ErrorCode.NOT_FOUND, "Team not found with id: " + teamId);
+                callback.onFailure(ErrorCode.DAO_NOT_FOUND, "Team not found with id: " + teamId);
                 return;
             }
             callback.onSuccess(team, "Team retrieved successfully.");
