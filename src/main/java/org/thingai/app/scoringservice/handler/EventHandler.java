@@ -5,17 +5,9 @@ import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.app.scoringservice.entity.event.Event;
-import org.thingai.app.scoringservice.entity.match.AllianceTeam;
-import org.thingai.app.scoringservice.entity.match.Match;
-import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.base.dao.Dao;
 import org.thingai.base.dao.exceptions.DaoException;
 import org.thingai.base.log.ILog;
-import org.thingai.platform.dao.DaoFile;
-import org.thingai.platform.dao.DaoSqlite;
 
 import java.io.File;
 
@@ -31,18 +23,7 @@ public class EventHandler {
 
         try {
             if (isCurrentEventSet()) {
-                Dao eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
-                eventDao.initDao(new Class[]{
-                        Match.class,
-                        AllianceTeam.class,
-                        Team.class,
-                        Score.class,
-                        RankingEntry.class,
-                });
-
-                DaoFile eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
-
-                LocalRepository.initializeEvent(eventDao, eventDaoFile);
+                LocalRepository.initializeEvent(this.currentEvent.getEventCode());
                 eventCallback.isCurrentEventSet(this.currentEvent);
             } else {
                 eventCallback.isNotCurrentEventSet();
@@ -156,24 +137,13 @@ public class EventHandler {
                 return;
             }
             this.currentEvent = event;
-            Dao eventDao = new DaoSqlite(this.currentEvent.getEventCode() + ".db");
-            eventDao.initDao(new Class[]{
-                    Match.class,
-                    AllianceTeam.class,
-                    Team.class,
-                    Score.class,
-                    RankingEntry.class,
-                    DbMapEntity.class
-            });
-
-            DaoFile eventDaoFile = new DaoFile("files/" + this.currentEvent.getEventCode());
 
             DbMapEntity mapEntity = new DbMapEntity();
             mapEntity.setKey("current_event");
             mapEntity.setValue(eventCode);
             LocalRepository.systemDatabase().insertOrUpdate(mapEntity);
 
-            LocalRepository.initializeEvent(eventDao, eventDaoFile);
+            LocalRepository.initializeEvent(eventCode);
             eventCallback.onSetEvent();
 
             callback.onSuccess(this.currentEvent, "Current event set successfully.");
