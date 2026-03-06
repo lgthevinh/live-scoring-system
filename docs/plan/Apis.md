@@ -60,6 +60,30 @@
           },
       ```
 
+### Ranking Endpoints
+
+- `GET /api/rankings` - Get current team rankings
+    - Response:
+      ```json
+        [
+          {
+            "teamId": "string",
+            "teamName": "string",
+            "matchesPlayed": number,
+            "wins": number,
+            "totalScore": number,
+            "totalPenalties": number,
+            "hightestScore": number,
+            "rankingPoints": number,
+            ...
+          },
+          ...
+        ]
+      ```
+- `GET /api/rankings/{teamId}` - Get ranking details for a specific team
+- `POST /api/rankings/calculate` - Trigger ranking calculation (if not done automatically after each match)
+- `POST /api/rankings/clear` - Clear existing rankings (if not cleared automatically before recalculation)
+
 ### Referee Endpoints
 
 - `POST /api/scores/prematch` - Submit pre-match alliance status
