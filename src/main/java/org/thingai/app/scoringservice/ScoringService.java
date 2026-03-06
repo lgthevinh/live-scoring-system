@@ -2,18 +2,13 @@ package org.thingai.app.scoringservice;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.callback.EventHandlerCallback;
-import org.thingai.app.scoringservice.entity.config.AccountRole;
-import org.thingai.app.scoringservice.entity.config.AuthData;
-import org.thingai.app.scoringservice.entity.config.DbMapEntity;
 import org.thingai.app.scoringservice.entity.event.Event;
 import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.*;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.Service;
-import org.thingai.base.dao.Dao;
 import org.thingai.base.log.ILog;
-import org.thingai.platform.dao.DaoSqlite;
 import org.thingai.platform.log.ILogImpl;
 
 public class ScoringService extends Service {
@@ -36,20 +31,10 @@ public class ScoringService extends Service {
     @Override
     protected void onServiceInit() {
         new ILogImpl(appDir, true);
-        Dao dao = new DaoSqlite(appDir + "/scoring_system.db");
 
         ILog.i(SERVICE_NAME, "Initializing ScoringService with app directory: " + appDir);
 
-        dao.initDao(new Class[]{
-                Event.class,
-
-                // System entities
-                AuthData.class,
-                AccountRole.class,
-                DbMapEntity.class
-        });
-        // Initialize system level repositories and handlers
-        LocalRepository.initializeSystem(dao);
+        LocalRepository.initializeSystem(appDir + "/scoring_system.db");
 
         authHandler = new AuthHandler();
         eventHandler = new EventHandler(new EventHandlerCallback() {

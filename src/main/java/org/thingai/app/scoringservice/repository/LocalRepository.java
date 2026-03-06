@@ -1,7 +1,17 @@
 package org.thingai.app.scoringservice.repository;
 
+import org.thingai.app.scoringservice.entity.config.AccountRole;
+import org.thingai.app.scoringservice.entity.config.AuthData;
+import org.thingai.app.scoringservice.entity.config.DbMapEntity;
+import org.thingai.app.scoringservice.entity.event.Event;
+import org.thingai.app.scoringservice.entity.match.AllianceTeam;
+import org.thingai.app.scoringservice.entity.match.Match;
+import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
+import org.thingai.app.scoringservice.entity.score.Score;
+import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.base.dao.Dao;
 import org.thingai.platform.dao.DaoFile;
+import org.thingai.platform.dao.DaoSqlite;
 
 public class LocalRepository {
     private static Dao systemDatabase;
@@ -17,28 +27,42 @@ public class LocalRepository {
     private static DaoRankEntry daoRankEntry;
 
     /**
-     * Initialize system-level DAOs backed by the main application database.
-     * Must be called once at application startup before any event is loaded.
+     * Opens the system database, registers system-level entities, and
+     * initializes system-level DAOs. Must be called once at startup.
      */
-    public static void initializeSystem(Dao dao) {
-        systemDatabase = dao;
-        daoAuth = new DaoAuth(dao);
-        daoEvent = new DaoEvent(dao);
+    public static void initializeSystem(String dbPath) {
+        systemDatabase = new DaoSqlite(dbPath);
+        systemDatabase.initDao(new Class[]{
+                Event.class,
+                AuthData.class,
+                AccountRole.class,
+                DbMapEntity.class
+        });
+        daoAuth = new DaoAuth(systemDatabase);
+        daoEvent = new DaoEvent(systemDatabase);
     }
 
     /**
-     * Initialize event-level DAOs backed by the active event's database.
-     * Called each time a new event is activated, replacing the previous instances.
+     * Opens the event database for the given event code, registers event-level
+     * entities, and initializes event-level DAOs. Called each time an event is activated.
      */
-    public static void initializeEvent(Dao dao, DaoFile daoFile) {
-        eventDatabase = dao;
-        eventFileStore = daoFile;
-        daoAuth = new DaoAuth(dao);
-        daoTeam = new DaoTeam(dao);
-        daoMatch = new DaoMatch(dao);
-        daoAllianceTeam = new DaoAllianceTeam(dao);
-        daoScore = new DaoScore(dao);
-        daoRankEntry = new DaoRankEntry(dao);
+    public static void initializeEvent(String eventCode) {
+        eventDatabase = new DaoSqlite(eventCode + ".db");
+        eventDatabase.initDao(new Class[]{
+                Match.class,
+                AllianceTeam.class,
+                Team.class,
+                Score.class,
+                RankingEntry.class,
+                DbMapEntity.class
+        });
+        eventFileStore = new DaoFile("files/" + eventCode);
+        daoAuth = new DaoAuth(eventDatabase);
+        daoTeam = new DaoTeam(eventDatabase);
+        daoMatch = new DaoMatch(eventDatabase);
+        daoAllianceTeam = new DaoAllianceTeam(eventDatabase);
+        daoScore = new DaoScore(eventDatabase);
+        daoRankEntry = new DaoRankEntry(eventDatabase);
     }
 
     // --- Raw database connections ---
