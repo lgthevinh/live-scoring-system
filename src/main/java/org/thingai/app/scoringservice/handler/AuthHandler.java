@@ -1,6 +1,7 @@
 package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.dto.UserDto;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.config.AuthData;
@@ -22,18 +23,12 @@ public class AuthHandler {
         // Default constructor - initialization handled by repository
     }
 
-    public interface AuthHandlerCallback {
-        void onSuccess(String token, String message);
-
-        void onFailure(int errorCode, String errorMessage);
-    }
-
-    public void handleAuthenticate(String username, String password, AuthHandlerCallback callback) {
+    public void handleAuthenticate(String username, String password, RequestCallback<String> callback) {
         try {
             AuthData authData = LocalRepository.authDao().getAuthDataById(username);
 
             if (authData == null) {
-                callback.onFailure("Authentication failed: User not found.");
+                callback.onFailure(ErrorCode.AUTHEN_INVALID_CREDENTIALS, "Authentication failed: Invalid credentials.");
                 return;
             }
 
@@ -46,18 +41,18 @@ public class AuthHandler {
                 String token = generateToken(username);
                 callback.onSuccess(token, "Authentication successful.");
             } else {
-                callback.onFailure("Authentication failed: Incorrect password.");
+                callback.onFailure(ErrorCode.AUTHEN_INVALID_CREDENTIALS, "Authentication failed: Invalid credentials.");
             }
         } catch (Exception e) {
             e.printStackTrace();
-            callback.onFailure("Authentication failed: " + e.getMessage());
+            callback.onFailure(ErrorCode.AUTHEN_UNAUTHORIZED, "Authentication failed: " + e.getMessage());
         }
     }
 
-    public void handleCreateAuth(String username, String password, int role, AuthHandlerCallback callback) {
+    public void handleCreateAuth(String username, String password, int role, RequestCallback<String> callback) {
         try {
             if (LocalRepository.authDao().authDataExists(username)) {
-                callback.onFailure("User already exists.");
+                callback.onFailure(ErrorCode.AUTHEN_USER_ALREADY_EXISTS, "User already exists.");
                 return;
             }
 
@@ -82,28 +77,28 @@ public class AuthHandler {
             LocalRepository.authDao().insertAccountRole(accountRole);
 
             String token = generateToken(username);
-            callback.onSuccess(token, "Authentication created successfully.");
+            callback.onSuccess(token, "Account created successfully.");
         } catch (Exception e) {
-            callback.onFailure("Failed to create authentication: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to create account: " + e.getMessage());
         }
     }
 
-    public void handleValidateToken(String token, AuthHandlerCallback callback) {
+    public void handleValidateToken(String token, RequestCallback<String> callback) {
         if (validateToken(token)) {
             callback.onSuccess(token, "Token is valid.");
         } else {
-            callback.onFailure("Invalid or expired token.");
+            callback.onFailure(ErrorCode.AUTHEN_INVALID_TOKEN, "Invalid or expired token.");
         }
     }
 
-    public void handleRefreshToken(String token, AuthHandlerCallback callback) {
+    public void handleRefreshToken(String token, RequestCallback<String> callback) {
         if (validateToken(token)) {
             String[] parts = token.split(":");
             String username = parts[0];
             String newToken = generateToken(username);
             callback.onSuccess(newToken, "Token refreshed successfully.");
         } else {
-            callback.onFailure("Invalid or expired token.");
+            callback.onFailure(ErrorCode.AUTHEN_INVALID_TOKEN, "Invalid or expired token.");
         }
     }
 
@@ -137,14 +132,48 @@ public class AuthHandler {
 
             callback.onSuccess(users, "Users retrieved successfully.");
         } catch (Exception e) {
-            callback.onFailure(500, "Failed to retrieve users: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Failed to retrieve users: " + e.getMessage());
+        }
+    }
+
+    public void handleUpdateAccount(String username, String newPassword, int newRole, RequestCallback<Void> callback) {
+        try {
+            AuthData existingAuth = LocalRepository.authDao().getAuthDataById(username);
+            if (existingAuth == null) {
+                callback.onFailure(ErrorCode.DAO_NOT_FOUND, "User not found.");
+                return;
+            }
+
+            if (newPassword != null && !newPassword.isEmpty()) {
+                SecureRandom random = new SecureRandom();
+                byte[] salt = new byte[16];
+                random.nextBytes(salt);
+
+                MessageDigest md = MessageDigest.getInstance("SHA-512");
+                md.update(salt);
+                byte[] hashedPassword = md.digest(newPassword.getBytes(StandardCharsets.UTF_8));
+
+                existingAuth.setPassword(bytesToHex(hashedPassword));
+                existingAuth.setSalt(bytesToHex(salt));
+            }
+
+            AccountRole accountRole = new AccountRole();
+            accountRole.setUsername(username);
+            accountRole.setRole(newRole);
+
+            LocalRepository.authDao().updateAuthData(existingAuth);
+            LocalRepository.authDao().updateAccountRole(accountRole);
+
+            callback.onSuccess(null, "Account updated successfully.");
+        } catch (Exception e) {
+            callback.onFailure(ErrorCode.DAO_UPDATE_FAILED, "Failed to update account: " + e.getMessage());
         }
     }
 
     public void handleDeleteAccount(String username, RequestCallback<Void> callback) {
         try {
             if (!LocalRepository.authDao().authDataExists(username)) {
-                callback.onFailure(404, "User not found: " + username);
+                callback.onFailure(ErrorCode.DAO_NOT_FOUND, "User not found: " + username);
                 return;
             }
 
@@ -153,7 +182,7 @@ public class AuthHandler {
 
             callback.onSuccess(null, "Account '" + username + "' deleted successfully.");
         } catch (Exception e) {
-            callback.onFailure(500, "Failed to delete account: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_DELETE_FAILED, "Failed to delete account: " + e.getMessage());
         }
     }
 
@@ -206,59 +235,6 @@ public class AuthHandler {
             return LocalRepository.authDao().getAuthDataById(username);
         } catch (Exception e) {
             return null;
-        }
-    }
-
-    public void handleUpdateAccount(String username, String newPassword, int newRole, AuthHandlerCallback callback) {
-        try {
-            AuthData existingAuth = LocalRepository.authDao().getAuthDataById(username);
-            if (existingAuth == null) {
-                callback.onFailure("User not found.");
-                return;
-            }
-
-            if (newPassword != null && !newPassword.isEmpty()) {
-                SecureRandom random = new SecureRandom();
-                byte[] salt = new byte[16];
-                random.nextBytes(salt);
-
-                MessageDigest md = MessageDigest.getInstance("SHA-512");
-                md.update(salt);
-                byte[] hashedPassword = md.digest(newPassword.getBytes(StandardCharsets.UTF_8));
-
-                existingAuth.setPassword(bytesToHex(hashedPassword));
-                existingAuth.setSalt(bytesToHex(salt));
-            }
-
-            AccountRole accountRole = new AccountRole();
-            accountRole.setUsername(username);
-            accountRole.setRole(newRole);
-
-            LocalRepository.authDao().updateAuthData(existingAuth);
-            LocalRepository.authDao().updateAccountRole(accountRole);
-
-            callback.onSuccess(null, "Account updated successfully.");
-        } catch (Exception e) {
-            callback.onFailure("Failed to update account: " + e.getMessage());
-        }
-    }
-
-    public void handleDeleteAccount(String username, AuthHandlerCallback callback) {
-        try {
-            AuthData authData = LocalRepository.authDao().getAuthDataById(username);
-
-            if (authData != null) {
-                LocalRepository.authDao().deleteAuthData(username);
-            }
-
-            AccountRole accountRole = LocalRepository.authDao().getAccountRoleById(username);
-            if (accountRole != null) {
-                LocalRepository.authDao().deleteAccountRole(username);
-            }
-
-            callback.onSuccess(null, "Account deleted successfully.");
-        } catch (Exception e) {
-            callback.onFailure("Failed to delete account: " + e.getMessage());
         }
     }
 }

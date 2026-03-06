@@ -1,6 +1,7 @@
 package org.thingai.app.scoringservice;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.thingai.app.scoringservice.callback.EventHandlerCallback;
 import org.thingai.app.scoringservice.entity.config.AccountRole;
 import org.thingai.app.scoringservice.entity.config.AuthData;
 import org.thingai.app.scoringservice.entity.config.DbMapEntity;
@@ -12,7 +13,6 @@ import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.Service;
 import org.thingai.base.dao.Dao;
 import org.thingai.base.log.ILog;
-import org.thingai.platform.dao.DaoFile;
 import org.thingai.platform.dao.DaoSqlite;
 import org.thingai.platform.log.ILogImpl;
 
@@ -52,17 +52,17 @@ public class ScoringService extends Service {
         LocalRepository.initializeSystem(dao);
 
         authHandler = new AuthHandler();
-        eventHandler = new EventHandler(dao, new EventHandler.EventCallback() {
+        eventHandler = new EventHandler(new EventHandlerCallback() {
             @Override
-            public void onSetEvent(Dao eventDao, DaoFile eventDaoFile) {
+            public void onSetEvent() {
                 ILog.i(SERVICE_NAME, "Event is set. Injecting handlers with new event data.");
-                injectDao(eventDao, eventDaoFile);
+                injectDao();
             }
 
             @Override
-            public void isCurrentEventSet(Event currentEvent, Dao eventDao, DaoFile eventDaoFile) {
+            public void isCurrentEventSet(Event currentEvent) {
                 ILog.i(SERVICE_NAME, "Current event is set to: ", currentEvent.getEventCode());
-                injectDao(eventDao, eventDaoFile);
+                injectDao();
             }
 
             @Override
@@ -118,11 +118,9 @@ public class ScoringService extends Service {
         RankingHandler.setRankingStrategy(rankingStrategy);
     }
 
-    private void injectDao(Dao dao, DaoFile daoFile) {
-        LocalRepository.initializeEvent(dao);
-
+    private void injectDao() {
         teamHandler = new TeamHandler();
         scheduleHandler = new ScheduleHandler();
-        rankingHandler = new RankingHandler(dao, scheduleHandler);
+        rankingHandler = new RankingHandler(LocalRepository.eventDatabase(), scheduleHandler);
     }
 }

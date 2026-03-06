@@ -1,8 +1,13 @@
 package org.thingai.app.scoringservice.repository;
 
 import org.thingai.base.dao.Dao;
+import org.thingai.platform.dao.DaoFile;
 
 public class LocalRepository {
+    private static Dao systemDatabase;
+    private static Dao eventDatabase;
+    private static DaoFile eventFileStore;
+
     private static DaoAuth daoAuth;
     private static DaoEvent daoEvent;
     private static DaoTeam daoTeam;
@@ -16,6 +21,7 @@ public class LocalRepository {
      * Must be called once at application startup before any event is loaded.
      */
     public static void initializeSystem(Dao dao) {
+        systemDatabase = dao;
         daoAuth = new DaoAuth(dao);
         daoEvent = new DaoEvent(dao);
     }
@@ -24,7 +30,9 @@ public class LocalRepository {
      * Initialize event-level DAOs backed by the active event's database.
      * Called each time a new event is activated, replacing the previous instances.
      */
-    public static void initializeEvent(Dao dao) {
+    public static void initializeEvent(Dao dao, DaoFile daoFile) {
+        eventDatabase = dao;
+        eventFileStore = daoFile;
         daoAuth = new DaoAuth(dao);
         daoTeam = new DaoTeam(dao);
         daoMatch = new DaoMatch(dao);
@@ -32,6 +40,22 @@ public class LocalRepository {
         daoScore = new DaoScore(dao);
         daoRankEntry = new DaoRankEntry(dao);
     }
+
+    // --- Raw database connections ---
+
+    public static Dao systemDatabase() {
+        return systemDatabase;
+    }
+
+    public static Dao eventDatabase() {
+        return eventDatabase;
+    }
+
+    public static DaoFile eventFileStore() {
+        return eventFileStore;
+    }
+
+    // --- Entity-level DAO accessors ---
 
     public static DaoAuth authDao() {
         return daoAuth;
