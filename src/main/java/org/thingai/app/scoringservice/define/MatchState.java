@@ -16,7 +16,7 @@ needed:
     next match.
     - COMPLETED: The match is completed, match score is finalized (commited). Scorekeeper can start next match.
  */
-public class MatchLifeCycleState {
+public class MatchState {
     public static final int NOT_STARTED = 0;
     public static final int LOADED = 1;
     public static final int ACTIVE = 2;

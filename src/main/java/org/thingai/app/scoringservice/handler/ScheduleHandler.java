@@ -8,10 +8,7 @@ import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
 import org.thingai.app.scoringservice.entity.time.TimeBlock;
-import org.thingai.app.scoringservice.repository.AllianceTeamRepository;
-import org.thingai.app.scoringservice.repository.MatchRepository;
-import org.thingai.app.scoringservice.repository.ScoreRepository;
-import org.thingai.app.scoringservice.repository.TeamRepository;
+import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.log.ILog;
 
 import java.io.IOException;
@@ -78,11 +75,11 @@ public class ScheduleHandler {
         ILog.d("ScheduleHandler", "Generating match schedule V2 with rounds=" + rounds + ", start=" + startTime + ", duration=" + matchDuration + " min");
         try {
             // 1) Load teams and reset schedule-related tables and caches
-            Team[] allTeams = TeamRepository.listTeams();
+            Team[] allTeams = LocalRepository.teamDao().listTeams();
 
-            MatchRepository.deleteAllMatch();
-            AllianceTeamRepository.deleteAllAllianceTeams();
-            ScoreRepository.deleteAllScores();
+            LocalRepository.matchDao().deleteAllMatch();
+            LocalRepository.allianceTeamDao().deleteAllAllianceTeams();
+            LocalRepository.scoreDao().deleteAllScores();
 
             if (allTeams == null || allTeams.length < 4) {
                 callback.onFailure(ErrorCode.CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
@@ -306,8 +303,8 @@ public class ScheduleHandler {
         String blueAllianceId = matchCode + "_B";
         String redAllianceId = matchCode + "_R";
 
-        AllianceTeamRepository.deleteAllianceTeamsByAllianceId(redAllianceId);
-        AllianceTeamRepository.deleteAllianceTeamsByAllianceId(blueAllianceId);
+        LocalRepository.allianceTeamDao().deleteAllianceTeamsByAllianceId(redAllianceId);
+        LocalRepository.allianceTeamDao().deleteAllianceTeamsByAllianceId(blueAllianceId);
 
         for (String teamId : uniqueReds) {
             AllianceTeam team = new AllianceTeam();
@@ -315,7 +312,7 @@ public class ScheduleHandler {
             team.setAllianceId(redAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
             ILog.d("ScheduleHandler", "Inserting red alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
-            AllianceTeamRepository.insertAllianceTeam(team);
+            LocalRepository.allianceTeamDao().insertAllianceTeam(team);
         }
 
         for (String teamId : uniqueBlues) {
@@ -324,7 +321,7 @@ public class ScheduleHandler {
             team.setAllianceId(blueAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
             ILog.d("ScheduleHandler", "Inserting blue alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
-            AllianceTeamRepository.insertAllianceTeam(team);
+            LocalRepository.allianceTeamDao().insertAllianceTeam(team);
         }
 
         Score redScore = ScoringHandler.factoryScore();
@@ -333,9 +330,9 @@ public class ScheduleHandler {
         Score blueScore = ScoringHandler.factoryScore();
         blueScore.setAllianceId(blueAllianceId);
 
-        MatchRepository.insertMatch(match);
-        ScoreRepository.insertScore(redScore);
-        ScoreRepository.insertScore(blueScore);
+        LocalRepository.matchDao().insertMatch(match);
+        LocalRepository.scoreDao().insertScore(redScore);
+        LocalRepository.scoreDao().insertScore(blueScore);
     }
 
     // Utility methods

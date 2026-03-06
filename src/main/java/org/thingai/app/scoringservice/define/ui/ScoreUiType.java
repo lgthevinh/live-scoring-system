@@ -1,12 +1,12 @@
-package org.thingai.app.scoringservice.define;
+package org.thingai.app.scoringservice.define.ui;
 
-public enum EUiType {
+public enum ScoreUiType {
     COUNTER(1),
     TOGGLE(2);
 
     private final int value;
 
-    EUiType(int value) {
+    ScoreUiType(int value) {
         this.value = value;
     }
 

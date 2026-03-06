@@ -9,7 +9,7 @@ import org.thingai.app.scoringservice.entity.match.Match;
 import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.entity.team.Team;
-import org.thingai.app.scoringservice.repository.EventRepository;
+import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.dao.Dao;
 import org.thingai.base.dao.exceptions.DaoException;
 import org.thingai.base.log.ILog;
@@ -32,7 +32,6 @@ public class EventHandler {
     public EventHandler(Dao dao, EventCallback eventCallback) {
         this.systemDao = dao;
         this.eventCallback = eventCallback;
-        EventRepository.initialize(dao);
 
         try {
             if (isCurrentEventSet()) {
@@ -59,7 +58,7 @@ public class EventHandler {
 
     public void createEvent(Event event, RequestCallback<Event> callback) {
         try {
-            EventRepository.insertEvent(event);
+            LocalRepository.eventDao().insertEvent(event);
             this.currentEvent = event;
             callback.onSuccess(event, "Event created successfully");
         } catch (Exception e) {
@@ -69,7 +68,7 @@ public class EventHandler {
 
     public void listEvents(RequestCallback<Event[]> callback) {
         try {
-            Event[] events = EventRepository.listEvents();
+            Event[] events = LocalRepository.eventDao().listEvents();
             callback.onSuccess(events, "Events retrieved successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error retrieving events: " + e.getMessage());
@@ -78,7 +77,7 @@ public class EventHandler {
 
     public void getEventByCode(String eventCode, RequestCallback<Event> callback) {
         try {
-            Event event = EventRepository.getEventByEventCode(eventCode);
+            Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
             if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
@@ -96,13 +95,13 @@ public class EventHandler {
                 return;
             }
 
-            Event event = EventRepository.getEventByEventCode(eventCode);
+            Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
             if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
             }
 
-            EventRepository.deleteEvent(event.getUuid());
+            LocalRepository.eventDao().deleteEvent(event.getUuid());
 
             if (cleanDelete) {
                 File dbFile = new File(eventCode + ".db");
@@ -144,7 +143,7 @@ public class EventHandler {
                 currentEvent = event;
             }
 
-            EventRepository.updateEvent(event);
+            LocalRepository.eventDao().updateEvent(event);
             callback.onSuccess(true, "Event updated successfully.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.UPDATE_FAILED, "Error updating event: " + e.getMessage());
@@ -154,7 +153,7 @@ public class EventHandler {
     public void setSystemEvent(String eventCode, RequestCallback<Event> callback) {
         try {
             ILog.d(TAG, eventCode);
-            Event event = EventRepository.getEventByEventCode(eventCode);
+            Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
             if (event == null) {
                 callback.onFailure(ErrorCode.NOT_FOUND, "Event with code " + eventCode + " not found.");
                 return;
@@ -214,7 +213,7 @@ public class EventHandler {
         if (mapEntities.length > 0) {
             String eventCode = mapEntities[0].getValue();
             try {
-                Event event = EventRepository.getEventByEventCode(eventCode);
+                Event event = LocalRepository.eventDao().getEventByEventCode(eventCode);
                 if (event != null) {
                     this.currentEvent = event;
                     return true;

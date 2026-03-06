@@ -8,7 +8,7 @@ import org.thingai.app.scoringservice.entity.event.Event;
 import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.score.Score;
 import org.thingai.app.scoringservice.handler.*;
-import org.thingai.app.scoringservice.repository.*;
+import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.Service;
 import org.thingai.base.dao.Dao;
 import org.thingai.base.log.ILog;
@@ -48,8 +48,7 @@ public class ScoringService extends Service {
                 DbMapEntity.class
         });
         // Initialize system level repositories and handlers
-        AuthRepository.initialize(dao);
-        EventRepository.initialize(dao);
+        LocalRepository.initializeSystem(dao);
 
         authHandler = new AuthHandler();
         eventHandler = new EventHandler(dao, new EventHandler.EventCallback() {
@@ -115,12 +114,7 @@ public class ScoringService extends Service {
     }
 
     private void injectDao(Dao dao, DaoFile daoFile) {
-        AuthRepository.initialize(dao);
-        TeamRepository.initialize(dao);
-        MatchRepository.initialize(dao);
-        AllianceTeamRepository.initialize(dao);
-        ScoreRepository.initialize(dao);
-        RankEntryRepository.initialize(dao);
+        LocalRepository.initializeEvent(dao);
 
         scheduleHandler = new ScheduleHandler();
         rankingHandler = new RankingHandler(dao, scheduleHandler);
