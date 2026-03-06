@@ -3,14 +3,14 @@ package org.thingai.app.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.thingai.app.scoringservice.ScoringService;
+import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.entity.team.Team;
-import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.base.dao.exceptions.DaoException;
-import org.thingai.base.dao.exceptions.DaoQueryException;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
-import static org.thingai.app.controller.utils.ResponseEntityUtil.createErrorResponse;
+import static org.thingai.app.controller.utils.ResponseEntityUtil.getObjectResponse;
 
 @RestController
 @RequestMapping("/api/team")
@@ -18,92 +18,121 @@ public class TeamController {
 
     @PostMapping("/create")
     public ResponseEntity<Object> createTeam(@RequestBody Map<String, Object> requestBody) {
-        try {
-            String teamId = requestBody.get("teamId").toString();
-            String teamName = requestBody.get("teamName").toString();
-            String teamSchool = requestBody.get("teamSchool").toString();
-            String teamRegion = requestBody.get("teamRegion").toString();
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
 
-            Team newTeam = LocalRepository.teamDao().insertTeam(teamId, teamName, teamSchool, teamRegion);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(Map.of(
-                            "message", "Team created successfully",
-                            "team", newTeam
-                    ));
-        } catch (DaoQueryException e) {
-            return createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Invalid team data:" + e.getMessage());
-        } catch (DaoException e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Database error: " + e.getMessage());
-        } catch (Exception e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage());
-        }
+        String teamId = requestBody.get("teamId").toString();
+        String teamName = requestBody.get("teamName").toString();
+        String teamSchool = requestBody.get("teamSchool").toString();
+        String teamRegion = requestBody.get("teamRegion").toString();
+
+        ScoringService.teamHandler().handleCreateTeam(teamId, teamName, teamSchool, teamRegion, new RequestCallback<Team>() {
+            @Override
+            public void onSuccess(Team team, String message) {
+                future.complete(ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", message, "team", team)));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
     }
 
     @GetMapping("/list")
     public ResponseEntity<Object> listTeams() {
-        try {
-            Team[] teams = LocalRepository.teamDao().listTeams();
-            return ResponseEntity.ok(teams);
-        } catch (DaoQueryException e) {
-            return createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Failed to retrieve teams: " + e.getMessage());
-        } catch (DaoException e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Database error: " + e.getMessage());
-        } catch (Exception e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage());
-        }
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.teamHandler().handleListTeams(new RequestCallback<Team[]>() {
+            @Override
+            public void onSuccess(Team[] teams, String message) {
+                future.complete(ResponseEntity.ok(teams));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Object> getTeam(@PathVariable String id) {
-        try {
-            Team team = LocalRepository.teamDao().getTeamById(id);
-            if (team != null) {
-                return ResponseEntity.ok(team);
-            } else {
-                return createErrorResponse(HttpStatus.NOT_FOUND.value(), "Team not found with id: " + id);
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.teamHandler().handleGetTeam(id, new RequestCallback<Team>() {
+            @Override
+            public void onSuccess(Team team, String message) {
+                future.complete(ResponseEntity.ok(team));
             }
-        } catch (DaoQueryException e) {
-            return createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Failed to retrieve team: " + e.getMessage());
-        } catch (DaoException e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Database error: " + e.getMessage());
-        } catch (Exception e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage());
-        }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                HttpStatus status = errorCode == 105 ? HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR;
+                future.complete(ResponseEntity.status(status).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
     }
 
     @PutMapping("/update")
     public ResponseEntity<Object> updateTeam(@RequestBody Team team) {
-        try {
-            Team updatedTeam = LocalRepository.teamDao().updateTeam(team);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Team updated successfully",
-                    "team", updatedTeam
-            ));
-        } catch (DaoQueryException e) {
-            return createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Invalid team data: " + e.getMessage());
-        } catch (DaoException e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Database error: " + e.getMessage());
-        } catch (Exception e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage());
-        }
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.teamHandler().handleUpdateTeam(team, new RequestCallback<Team>() {
+            @Override
+            public void onSuccess(Team updatedTeam, String message) {
+                future.complete(ResponseEntity.ok(Map.of("message", message, "team", updatedTeam)));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
     }
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Object> deleteTeam(@PathVariable String id) {
-        try {
-            LocalRepository.teamDao().deleteTeam(id);
-            return ResponseEntity.ok(Map.of("message", "Team deleted successfully"));
-        } catch (DaoQueryException e) {
-            return createErrorResponse(HttpStatus.BAD_REQUEST.value(), "Failed to delete team: " + e.getMessage());
-        } catch (DaoException e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Database error: " + e.getMessage());
-        } catch (Exception e) {
-            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage());
-        }
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.teamHandler().handleDeleteTeam(id, new RequestCallback<Void>() {
+            @Override
+            public void onSuccess(Void ignored, String message) {
+                future.complete(ResponseEntity.ok(Map.of("message", message)));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
     }
 
     @PostMapping("/import")
-    public ResponseEntity<Object> importTeams() {
-        return null;
+    public ResponseEntity<Object> importTeams(@RequestBody Team[] teams) {
+        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+
+        ScoringService.teamHandler().handleImportTeams(teams, new RequestCallback<Void>() {
+            @Override
+            public void onSuccess(Void ignored, String message) {
+                future.complete(ResponseEntity.ok(Map.of("message", message)));
+            }
+
+            @Override
+            public void onFailure(int errorCode, String errorMessage) {
+                future.complete(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", errorMessage)));
+            }
+        });
+
+        return getObjectResponse(future);
     }
 }

@@ -1,15 +1,12 @@
 package org.thingai.app.scoringservice.define;
 
 public class ErrorCode {
-    // DAO ERROR CODE
-    public static final int CREATE_FAILED = 101;
-    public static final int UPDATE_FAILED = 102;
-    public static final int DELETE_FAILED = 103;
-    public static final int RETRIEVE_FAILED = 104;
-    public static final int NOT_FOUND = 105;
-
-    // SYSTEM CODE
-    public static final int FAILED_TO_START = 111;
+    public static final int GENERAL = 0;
+    // DAO error codes
+    public static final int DAO_CREATE_FAILED = 1;
+    public static final int DAO_UPDATE_FAILED = 2;
+    public static final int DAO_DELETE_FAILED = 3;
+    public static final int DAO_RETRIEVE_FAILED = 4;
 
     public static final int CUSTOM_ERR = 255;
 }

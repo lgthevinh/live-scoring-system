@@ -21,6 +21,7 @@ public class ScoringService extends Service {
 
     private static EventHandler eventHandler;
     private static AuthHandler authHandler;
+    private static TeamHandler teamHandler;
     private static ScoringHandler scoringHandler;
     private static ScheduleHandler scheduleHandler;
     private static RankingHandler rankingHandler;
@@ -75,6 +76,10 @@ public class ScoringService extends Service {
         ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
     }
 
+    public static TeamHandler teamHandler() {
+        return teamHandler;
+    }
+
     public static AuthHandler authHandler() {
         return authHandler;
     }
@@ -116,8 +121,8 @@ public class ScoringService extends Service {
     private void injectDao(Dao dao, DaoFile daoFile) {
         LocalRepository.initializeEvent(dao);
 
+        teamHandler = new TeamHandler();
         scheduleHandler = new ScheduleHandler();
         rankingHandler = new RankingHandler(dao, scheduleHandler);
-
     }
 }

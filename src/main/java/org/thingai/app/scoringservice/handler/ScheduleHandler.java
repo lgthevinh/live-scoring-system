@@ -82,7 +82,7 @@ public class ScheduleHandler {
             LocalRepository.scoreDao().deleteAllScores();
 
             if (allTeams == null || allTeams.length < 4) {
-                callback.onFailure(ErrorCode.CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
                 return;
             }
 
@@ -93,14 +93,14 @@ public class ScheduleHandler {
             // 3) Run external generator (2 teams per alliance)
             int exitCode = matchMakerHandler.generateMatchSchedule(rounds, shuffledTeams.size(), 2);
             if (exitCode != 0) {
-                callback.onFailure(ErrorCode.CREATE_FAILED, "MatchMaker.exe failed (exitCode=" + exitCode + "). Check matchmaker.log for details.");
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "MatchMaker.exe failed (exitCode=" + exitCode + "). Check matchmaker.log for details.");
                 return;
             }
 
             // Read generated schedule from output file
             Path schedulePath = Paths.get(matchMakerHandler.getOutPath()).toAbsolutePath().normalize();
             if (Files.isDirectory(schedulePath)) {
-                callback.onFailure(ErrorCode.RETRIEVE_FAILED, "OutPath is a directory. Please set MatchMakerHandler.outPath to the schedule file.");
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "OutPath is a directory. Please set MatchMakerHandler.outPath to the schedule file.");
                 return;
             }
 
@@ -117,7 +117,7 @@ public class ScheduleHandler {
                 try { Thread.sleep(100); } catch (InterruptedException ignored) {}
             }
             if (lines == null || lines.isEmpty()) {
-                callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Schedule file not readable at: " + schedulePath);
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Schedule file not readable at: " + schedulePath);
                 return;
             }
 
@@ -125,7 +125,7 @@ public class ScheduleHandler {
             if (parsedMatches.isEmpty()) {
                 // Last defensive check: if we still don't see "Match Schedule", dump first few lines to logs
                 ILog.w("ScheduleHandler", "Schedule header not found. First lines: " + String.join(" | ", lines.subList(0, Math.min(5, lines.size()))));
-                callback.onFailure(ErrorCode.RETRIEVE_FAILED, "No matches parsed from schedule file. Ensure it contains a 'Match Schedule' section.");
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "No matches parsed from schedule file. Ensure it contains a 'Match Schedule' section.");
                 return;
             }
 
@@ -187,7 +187,7 @@ public class ScheduleHandler {
 
             callback.onSuccess(null, "Match schedule generated successfully by MatchMaker (shuffled mapping) and times assigned.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.CREATE_FAILED, "Failed to generate match schedule: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to generate match schedule: " + e.getMessage());
         }
     }
 

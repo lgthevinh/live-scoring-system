@@ -23,8 +23,9 @@ public class AuthHandler {
     }
 
     public interface AuthHandlerCallback {
-        void onSuccess(String token, String successMessage);
-        void onFailure(String errorMessage);
+        void onSuccess(String token, String message);
+
+        void onFailure(int errorCode, String errorMessage);
     }
 
     public void handleAuthenticate(String username, String password, AuthHandlerCallback callback) {

@@ -62,7 +62,7 @@ public class EventHandler {
             this.currentEvent = event;
             callback.onSuccess(event, "Event created successfully");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.CREATE_FAILED, "Failed to create event: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to create event: " + e.getMessage());
         }
     }
 
@@ -71,7 +71,7 @@ public class EventHandler {
             Event[] events = LocalRepository.eventDao().listEvents();
             callback.onSuccess(events, "Events retrieved successfully.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error retrieving events: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Error retrieving events: " + e.getMessage());
         }
     }
 
@@ -84,14 +84,14 @@ public class EventHandler {
             }
             callback.onSuccess(event, "Event retrieved successfully.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error retrieving event: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Error retrieving event: " + e.getMessage());
         }
     }
 
     public void deleteEventByCode(String eventCode, boolean cleanDelete, RequestCallback<Void> callback) {
         try {
             if (currentEvent != null && currentEvent.getEventCode().equals(eventCode)) {
-                callback.onFailure(ErrorCode.DELETE_FAILED, "Cannot delete the current active event.");
+                callback.onFailure(ErrorCode.DAO_DELETE_FAILED, "Cannot delete the current active event.");
                 return;
             }
 
@@ -107,7 +107,7 @@ public class EventHandler {
                 File dbFile = new File(eventCode + ".db");
                 if (dbFile.exists()) {
                     if (!dbFile.delete()) {
-                        callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete event database file.");
+                        callback.onFailure(ErrorCode.DAO_DELETE_FAILED, "Failed to delete event database file.");
                         return;
                     }
                 }
@@ -119,7 +119,7 @@ public class EventHandler {
                     }
                     for (File file : files) {
                         if (!file.delete()) {
-                            callback.onFailure(ErrorCode.DELETE_FAILED, "Failed to delete event file: " + file.getName());
+                            callback.onFailure(ErrorCode.DAO_DELETE_FAILED, "Failed to delete event file: " + file.getName());
                             return;
                         }
                     }
@@ -128,14 +128,14 @@ public class EventHandler {
 
             callback.onSuccess(null, "Event deleted successfully.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.DELETE_FAILED, "Error deleting event: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_DELETE_FAILED, "Error deleting event: " + e.getMessage());
         }
     }
 
     public void updateEvent(Event event, RequestCallback<Boolean> callback) {
         try {
             if (event.getEventCode() == null || event.getEventCode().isEmpty()) {
-                callback.onFailure(ErrorCode.UPDATE_FAILED, "Event code is required for update.");
+                callback.onFailure(ErrorCode.DAO_UPDATE_FAILED, "Event code is required for update.");
                 return;
             }
 
@@ -146,7 +146,7 @@ public class EventHandler {
             LocalRepository.eventDao().updateEvent(event);
             callback.onSuccess(true, "Event updated successfully.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.UPDATE_FAILED, "Error updating event: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_UPDATE_FAILED, "Error updating event: " + e.getMessage());
         }
     }
 
@@ -180,7 +180,7 @@ public class EventHandler {
 
             callback.onSuccess(this.currentEvent, "Current event set successfully.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.RETRIEVE_FAILED, "Error setting current event: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Error setting current event: " + e.getMessage());
         }
     }
 
@@ -204,7 +204,7 @@ public class EventHandler {
             
             callback.onSuccess(null, "Current event cleared successfully.");
         } catch (Exception e) {
-            callback.onFailure(ErrorCode.UPDATE_FAILED, "Error clearing current event: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_UPDATE_FAILED, "Error clearing current event: " + e.getMessage());
         }
     }
 
