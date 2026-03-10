@@ -1,10 +1,10 @@
-package org.thingai.app.scoringservice.handler;
+package org.thingai.app.scoringservice.matchcontrol;
 
-public class MatchControlHandler {
-    private static final String TAG = "MatchControlHandler";
+public class MatchControl {
+    private static final String TAG = "MatchControl";
     private static final int MATCH_DURATION_SECONDS = 180;
 
-    public MatchControlHandler() {
+    public MatchControl() {
 
     }
 
