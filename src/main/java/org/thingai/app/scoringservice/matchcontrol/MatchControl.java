@@ -4,8 +4,10 @@ public class MatchControl {
     private static final String TAG = "MatchControl";
     private static final int MATCH_DURATION_SECONDS = 180;
 
-    public MatchControl() {
+    private Orchestrator orchestrator;
 
+    public MatchControl() {
+        
     }
 
     // Match control methods
