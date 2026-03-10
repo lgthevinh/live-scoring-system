@@ -3,7 +3,7 @@ package org.thingai.app.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.thingai.app.scoringservice.entity.match.Match;
+import org.thingai.app.scoringservice.entity.Match;
 
 import java.util.Map;
 

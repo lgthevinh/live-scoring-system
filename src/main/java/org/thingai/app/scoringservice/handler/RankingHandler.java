@@ -2,17 +2,14 @@ package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
-import org.thingai.app.scoringservice.define.MatchType;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
-import org.thingai.app.scoringservice.entity.match.AllianceTeam;
-import org.thingai.app.scoringservice.entity.match.Match;
-import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
-import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
-import org.thingai.app.scoringservice.entity.ranking.RankingStat;
-import org.thingai.app.scoringservice.entity.score.Score;
+import org.thingai.app.scoringservice.entity.AllianceTeam;
+import org.thingai.app.scoringservice.strategy.IRankingStrategy;
+import org.thingai.app.scoringservice.entity.RankingEntry;
+import org.thingai.app.scoringservice.entity.RankingStat;
+import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.dao.exceptions.DaoException;
-import org.thingai.base.dao.exceptions.DaoQueryException;
 import org.thingai.base.log.ILog;
 
 import java.util.HashMap;

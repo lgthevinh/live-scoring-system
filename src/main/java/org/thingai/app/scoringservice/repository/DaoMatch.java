@@ -1,8 +1,8 @@
 package org.thingai.app.scoringservice.repository;
 
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
-import org.thingai.app.scoringservice.entity.match.AllianceTeam;
-import org.thingai.app.scoringservice.entity.match.Match;
+import org.thingai.app.scoringservice.entity.AllianceTeam;
+import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.base.dao.Dao;
 
 /*

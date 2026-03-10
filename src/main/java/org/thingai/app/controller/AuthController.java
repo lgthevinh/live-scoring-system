@@ -8,7 +8,7 @@ import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.dto.UserDto;
-import org.thingai.app.scoringservice.entity.config.AccountRole;
+import org.thingai.app.scoringservice.entity.AccountRole;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

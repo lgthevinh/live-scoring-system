@@ -1,8 +1,10 @@
-package org.thingai.app.scoringservice.entity.score;
+package org.thingai.app.scoringservice.strategy;
+
+import org.thingai.app.scoringservice.entity.ScoreDefine;
 
 import java.util.HashMap;
 
-public interface IScoreConfig {
+public interface IScoreStrategy {
     void calculateTotalScore(); // return as int
     void calculatePenalties(); // return as int
     void fromJson(String json);

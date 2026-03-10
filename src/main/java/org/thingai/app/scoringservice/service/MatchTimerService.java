@@ -1,11 +1,11 @@
-package org.thingai.app.scoringservice.handler;
+package org.thingai.app.scoringservice.service;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class MatchTimerHandler {
+public class MatchTimerService {
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> timerTask;
 
@@ -17,7 +17,7 @@ public class MatchTimerHandler {
 
     private TimerCallback callback;
 
-    public MatchTimerHandler(int startSeconds) {
+    public MatchTimerService(int startSeconds) {
         this.startSeconds = startSeconds;
 
     }

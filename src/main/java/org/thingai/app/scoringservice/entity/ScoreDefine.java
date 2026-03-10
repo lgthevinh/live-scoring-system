@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.entity.score;
+package org.thingai.app.scoringservice.entity;
 
 import org.thingai.app.scoringservice.define.ui.ScoreUiType;
 import org.thingai.app.scoringservice.define.ui.ScoreValueType;

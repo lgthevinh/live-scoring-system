@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.repository;
 
-import org.thingai.app.scoringservice.entity.config.AccountRole;
-import org.thingai.app.scoringservice.entity.config.AuthData;
+import org.thingai.app.scoringservice.entity.AccountRole;
+import org.thingai.app.scoringservice.entity.AuthData;
 import org.thingai.base.dao.Dao;
 
 public class DaoAuth {

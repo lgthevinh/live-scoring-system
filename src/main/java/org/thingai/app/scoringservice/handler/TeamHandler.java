@@ -2,7 +2,7 @@ package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
-import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.entity.Team;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 
 public class TeamHandler {

@@ -25,7 +25,7 @@ public class ResponseEntityUtil {
             case ErrorCode.DAO_CREATE_FAILED,
                  ErrorCode.DAO_UPDATE_FAILED,
                  ErrorCode.DAO_DELETE_FAILED -> HttpStatus.BAD_REQUEST;
-            case ErrorCode.NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case ErrorCode.DAO_NOT_FOUND -> HttpStatus.NOT_FOUND;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
         return ResponseEntity.status(status).body(body);

@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.dto;
 
-import org.thingai.app.scoringservice.entity.score.Score;
+import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.ScoringHandler;
 
 public class ScoreDetailDto {

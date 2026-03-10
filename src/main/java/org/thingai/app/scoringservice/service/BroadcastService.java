@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.handler;
+package org.thingai.app.scoringservice.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -7,13 +7,13 @@ import org.thingai.app.scoringservice.dto.BroadcastMessageDto;
 import org.thingai.base.log.ILog;
 
 @Service
-public class BroadcastHandler {
-    private static final String TAG = "BroadcastHandler";
+public class BroadcastService {
+    private static final String TAG = "BroadcastService";
 
     private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
-    public BroadcastHandler(SimpMessagingTemplate messagingTemplate) {
+    public BroadcastService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
 

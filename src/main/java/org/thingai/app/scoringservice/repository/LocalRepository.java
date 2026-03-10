@@ -1,14 +1,14 @@
 package org.thingai.app.scoringservice.repository;
 
-import org.thingai.app.scoringservice.entity.config.AccountRole;
-import org.thingai.app.scoringservice.entity.config.AuthData;
-import org.thingai.app.scoringservice.entity.config.DbMapEntity;
-import org.thingai.app.scoringservice.entity.event.Event;
-import org.thingai.app.scoringservice.entity.match.AllianceTeam;
-import org.thingai.app.scoringservice.entity.match.Match;
-import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.entity.AccountRole;
+import org.thingai.app.scoringservice.entity.AuthData;
+import org.thingai.app.scoringservice.entity.DbMapEntity;
+import org.thingai.app.scoringservice.entity.Event;
+import org.thingai.app.scoringservice.entity.AllianceTeam;
+import org.thingai.app.scoringservice.entity.Match;
+import org.thingai.app.scoringservice.entity.RankingEntry;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.Team;
 import org.thingai.base.dao.Dao;
 import org.thingai.platform.dao.DaoFile;
 import org.thingai.platform.dao.DaoSqlite;

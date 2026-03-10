@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.repository;
 
-import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
+import org.thingai.app.scoringservice.entity.RankingEntry;
 import org.thingai.base.dao.Dao;
 
 public class DaoRankEntry {

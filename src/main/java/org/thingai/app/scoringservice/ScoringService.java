@@ -2,11 +2,12 @@ package org.thingai.app.scoringservice;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.callback.EventHandlerCallback;
-import org.thingai.app.scoringservice.entity.event.Event;
-import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
-import org.thingai.app.scoringservice.entity.score.Score;
+import org.thingai.app.scoringservice.entity.Event;
+import org.thingai.app.scoringservice.strategy.IRankingStrategy;
+import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.*;
 import org.thingai.app.scoringservice.repository.LocalRepository;
+import org.thingai.app.scoringservice.service.BroadcastService;
 import org.thingai.base.Service;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.log.ILogImpl;
@@ -20,7 +21,7 @@ public class ScoringService extends Service {
     private static ScoringHandler scoringHandler;
     private static ScheduleHandler scheduleHandler;
     private static RankingHandler rankingHandler;
-    private static BroadcastHandler broadcastHandler;
+    private static BroadcastService broadcastService;
 
     public ScoringService() {
         super();
@@ -79,8 +80,8 @@ public class ScoringService extends Service {
         return scheduleHandler;
     }
 
-    public static BroadcastHandler broadcastHandler() {
-        return broadcastHandler;
+    public static BroadcastService broadcastHandler() {
+        return broadcastService;
     }
 
 
@@ -89,7 +90,7 @@ public class ScoringService extends Service {
     }
 
     public void setSimpMessagingTemplate(SimpMessagingTemplate simpMessagingTemplate) {
-        broadcastHandler = new BroadcastHandler(simpMessagingTemplate);
+        broadcastService = new BroadcastService(simpMessagingTemplate);
         ILog.d("ScoringService::setSimpMessagingTemplate", broadcastHandler().toString());
     }
 

@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.entity.ranking;
+package org.thingai.app.scoringservice.entity;
 
 public class RankingStat {
     private String teamId;
