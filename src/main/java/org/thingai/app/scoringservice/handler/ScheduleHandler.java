@@ -9,7 +9,7 @@ import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.Team;
 import org.thingai.app.scoringservice.entity.TimeBlock;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.app.scoringservice.service.MatchMakerHandler;
+import org.thingai.app.scoringservice.service.MatchMakerService;
 import org.thingai.base.log.ILog;
 
 import java.io.IOException;
@@ -25,20 +25,20 @@ import java.util.regex.Pattern;
 public class ScheduleHandler {
     private static final String TAG = "ScheduleHandler";
 
-    private final MatchMakerHandler matchMakerHandler = new MatchMakerHandler();
+    private final MatchMakerService matchMaker = new MatchMakerService();
 
     public ScheduleHandler() {
         String osName = System.getProperty("os.name").toLowerCase();
         Path binary = Paths.get("binary");
         if (osName.contains("win")) {
-            ILog.d("ScheduleHandler", "Detected Windows OS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMakerService.exe");
+            ILog.d("ScheduleHandler", "Detected Windows OS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMakerService.exe");
         } else if (osName.contains("mac")) {
-            ILog.d("ScheduleHandler", "Detected macOS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker_mac");
+            ILog.d("ScheduleHandler", "Detected macOS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker_mac");
         } else {
-            ILog.d("ScheduleHandler", "Assuming Linux OS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMakerService");
+            ILog.d("ScheduleHandler", "Assuming Linux OS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMakerService");
         }
 
         Path dataDir = Paths.get("data");
@@ -62,12 +62,12 @@ public class ScheduleHandler {
 
         String outDir = outPath.toAbsolutePath().toString();
         ILog.d("ScheduleHandler", "Match schedule output path set to: " + outDir);
-        this.matchMakerHandler.setOutPath(outDir);
+        this.matchMaker.setOutPath(outDir);
     }
 
     /**
      * V2 schedule generator:
-     * - Uses external MatchMakerHandler to produce a schedule file.
+     * - Uses external MatchMakerService to produce a schedule file.
      * - Parses "Match Schedule" lines into 2v2 team pairings.
      * - Maps team numbers in the file as 1-based indices into a SHUFFLED team list from DAO.
      * - Keeps existing time generation (start time, duration, TimeBlocks).
@@ -92,16 +92,16 @@ public class ScheduleHandler {
             List<Team> shuffledTeams = Arrays.asList(allTeams);
 
             // 3) Run external generator (2 teams per alliance)
-            int exitCode = matchMakerHandler.generateMatchSchedule(rounds, shuffledTeams.size(), 2);
+            int exitCode = matchMaker.generateMatchSchedule(rounds, shuffledTeams.size(), 2);
             if (exitCode != 0) {
                 callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "MatchMakerService.exe failed (exitCode=" + exitCode + "). Check matchmaker.log for details.");
                 return;
             }
 
             // Read generated schedule from output file
-            Path schedulePath = Paths.get(matchMakerHandler.getOutPath()).toAbsolutePath().normalize();
+            Path schedulePath = Paths.get(matchMaker.getOutPath()).toAbsolutePath().normalize();
             if (Files.isDirectory(schedulePath)) {
-                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "OutPath is a directory. Please set MatchMakerHandler.outPath to the schedule file.");
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "OutPath is a directory. Please set MatchMakerService.outPath to the schedule file.");
                 return;
             }
 

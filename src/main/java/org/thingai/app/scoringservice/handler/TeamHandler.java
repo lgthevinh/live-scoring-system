@@ -7,7 +7,7 @@ import org.thingai.app.scoringservice.repository.LocalRepository;
 
 public class TeamHandler {
 
-    public void handleCreateTeam(String teamId, String teamName, String teamSchool, String teamRegion, RequestCallback<Team> callback) {
+    public void createTeam(String teamId, String teamName, String teamSchool, String teamRegion, RequestCallback<Team> callback) {
         try {
             Team team = LocalRepository.teamDao().insertTeam(teamId, teamName, teamSchool, teamRegion);
             callback.onSuccess(team, "Team created successfully.");
@@ -16,7 +16,7 @@ public class TeamHandler {
         }
     }
 
-    public void handleListTeams(RequestCallback<Team[]> callback) {
+    public void listTeams(RequestCallback<Team[]> callback) {
         try {
             Team[] teams = LocalRepository.teamDao().listTeams();
             callback.onSuccess(teams, "Teams retrieved successfully.");
@@ -25,7 +25,7 @@ public class TeamHandler {
         }
     }
 
-    public void handleGetTeam(String teamId, RequestCallback<Team> callback) {
+    public void getTeam(String teamId, RequestCallback<Team> callback) {
         try {
             Team team = LocalRepository.teamDao().getTeamById(teamId);
             if (team == null) {
@@ -38,7 +38,7 @@ public class TeamHandler {
         }
     }
 
-    public void handleUpdateTeam(Team team, RequestCallback<Team> callback) {
+    public void updateTeam(Team team, RequestCallback<Team> callback) {
         try {
             Team updatedTeam = LocalRepository.teamDao().updateTeam(team);
             callback.onSuccess(updatedTeam, "Team updated successfully.");
@@ -47,7 +47,7 @@ public class TeamHandler {
         }
     }
 
-    public void handleDeleteTeam(String teamId, RequestCallback<Void> callback) {
+    public void deleteTeam(String teamId, RequestCallback<Void> callback) {
         try {
             LocalRepository.teamDao().deleteTeam(teamId);
             callback.onSuccess(null, "Team deleted successfully.");
@@ -56,7 +56,7 @@ public class TeamHandler {
         }
     }
 
-    public void handleImportTeams(Team[] teams, RequestCallback<Void> callback) {
+    public void importTeams(Team[] teams, RequestCallback<Void> callback) {
         try {
             LocalRepository.teamDao().insertTeams(teams);
             callback.onSuccess(null, "Teams imported successfully.");
