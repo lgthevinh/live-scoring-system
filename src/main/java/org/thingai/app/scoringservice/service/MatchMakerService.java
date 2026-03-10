@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.handler;
+package org.thingai.app.scoringservice.service;
 
 import org.thingai.base.log.ILog;
 
@@ -9,8 +9,8 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-public class MatchMakerHandler {
-    private static final String TAG = "MatchMakerHandler";
+public class MatchMakerService {
+    private static final String TAG = "MatchMakerService";
     private String binPath;
     private String outPath;
 

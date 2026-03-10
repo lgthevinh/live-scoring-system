@@ -3,8 +3,8 @@ package org.thingai.app.scoringservice.handler;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.dto.UserDto;
-import org.thingai.app.scoringservice.entity.config.AccountRole;
-import org.thingai.app.scoringservice.entity.config.AuthData;
+import org.thingai.app.scoringservice.entity.AccountRole;
+import org.thingai.app.scoringservice.entity.AuthData;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 
 import java.nio.charset.StandardCharsets;

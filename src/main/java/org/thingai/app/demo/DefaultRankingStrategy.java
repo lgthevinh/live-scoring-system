@@ -1,11 +1,11 @@
 package org.thingai.app.demo;
 
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
-import org.thingai.app.scoringservice.entity.ranking.IRankingStrategy;
-import org.thingai.app.scoringservice.entity.ranking.RankingEntry;
-import org.thingai.app.scoringservice.entity.ranking.RankingStat;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.strategy.IRankingStrategy;
+import org.thingai.app.scoringservice.entity.RankingEntry;
+import org.thingai.app.scoringservice.entity.RankingStat;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.Team;
 
 import java.util.Arrays;
 

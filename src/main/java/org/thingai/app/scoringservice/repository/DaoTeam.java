@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.repository;
 
-import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.entity.Team;
 import org.thingai.base.dao.Dao;
 
 public class DaoTeam {

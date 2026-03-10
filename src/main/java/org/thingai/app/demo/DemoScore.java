@@ -1,13 +1,13 @@
 package org.thingai.app.demo;
 
 import com.google.gson.Gson;
-import org.thingai.app.scoringservice.entity.score.IScoreConfig;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.score.ScoreDefine;
+import org.thingai.app.scoringservice.strategy.IScoreStrategy;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.ScoreDefine;
 
 import java.util.HashMap;
 
-public class DemoScore extends Score implements IScoreConfig {
+public class DemoScore extends Score implements IScoreStrategy {
     // New scoring system fields
     private int whiteBallsScored; // 1 point each via human player
     private int goldenBallsScored; // 3 points each via robot autonomous

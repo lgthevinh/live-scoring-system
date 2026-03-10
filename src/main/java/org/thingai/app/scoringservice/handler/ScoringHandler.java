@@ -1,8 +1,8 @@
 package org.thingai.app.scoringservice.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.score.ScoreDefine;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.ScoreDefine;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.dao.DaoFile;
 

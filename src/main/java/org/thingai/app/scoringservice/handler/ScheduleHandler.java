@@ -3,12 +3,13 @@ package org.thingai.app.scoringservice.handler;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.define.MatchType;
-import org.thingai.app.scoringservice.entity.match.AllianceTeam;
-import org.thingai.app.scoringservice.entity.match.Match;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.team.Team;
-import org.thingai.app.scoringservice.entity.time.TimeBlock;
+import org.thingai.app.scoringservice.entity.AllianceTeam;
+import org.thingai.app.scoringservice.entity.Match;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.Team;
+import org.thingai.app.scoringservice.entity.TimeBlock;
 import org.thingai.app.scoringservice.repository.LocalRepository;
+import org.thingai.app.scoringservice.service.MatchMakerHandler;
 import org.thingai.base.log.ILog;
 
 import java.io.IOException;
@@ -31,13 +32,13 @@ public class ScheduleHandler {
         Path binary = Paths.get("binary");
         if (osName.contains("win")) {
             ILog.d("ScheduleHandler", "Detected Windows OS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker.exe");
+            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMakerService.exe");
         } else if (osName.contains("mac")) {
             ILog.d("ScheduleHandler", "Detected macOS for MatchMakerHandler.");
             this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker_mac");
         } else {
             ILog.d("ScheduleHandler", "Assuming Linux OS for MatchMakerHandler.");
-            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMaker");
+            this.matchMakerHandler.setBinPath(binary.toAbsolutePath() + "/MatchMakerService");
         }
 
         Path dataDir = Paths.get("data");
@@ -93,7 +94,7 @@ public class ScheduleHandler {
             // 3) Run external generator (2 teams per alliance)
             int exitCode = matchMakerHandler.generateMatchSchedule(rounds, shuffledTeams.size(), 2);
             if (exitCode != 0) {
-                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "MatchMaker.exe failed (exitCode=" + exitCode + "). Check matchmaker.log for details.");
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "MatchMakerService.exe failed (exitCode=" + exitCode + "). Check matchmaker.log for details.");
                 return;
             }
 
@@ -185,7 +186,7 @@ public class ScheduleHandler {
                 matchNumber++;
             }
 
-            callback.onSuccess(null, "Match schedule generated successfully by MatchMaker (shuffled mapping) and times assigned.");
+            callback.onSuccess(null, "Match schedule generated successfully by MatchMakerService (shuffled mapping) and times assigned.");
         } catch (Exception e) {
             callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to generate match schedule: " + e.getMessage());
         }
@@ -196,7 +197,7 @@ public class ScheduleHandler {
     }
 
     /**
-     * Parse the "Match Schedule" section from the MatchMaker .txt output.
+     * Parse the "Match Schedule" section from the MatchMakerService .txt output.
      * Expected lines like: "  1:    4     7     5     8 "
      * Optional '*' after a team number denotes surrogate; ignored here.
      */

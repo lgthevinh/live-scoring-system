@@ -1,4 +1,4 @@
-package org.thingai.app.scoringservice.entity.time;
+package org.thingai.app.scoringservice.entity;
 
 public class TimeBlock {
     private String name;

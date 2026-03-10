@@ -1,5 +1,6 @@
-package org.thingai.app.scoringservice.entity.score;
+package org.thingai.app.scoringservice.entity;
 
+import org.thingai.app.scoringservice.strategy.IScoreStrategy;
 import org.thingai.app.scoringservice.define.ScoreStatus;
 import org.thingai.base.dao.annotations.DaoColumn;
 import org.thingai.base.dao.annotations.DaoTable;
@@ -7,7 +8,7 @@ import org.thingai.base.dao.annotations.DaoTable;
 import java.util.HashMap;
 
 @DaoTable(name = "score")
-public class Score implements IScoreConfig {
+public class Score implements IScoreStrategy {
     // As alliance ID, Q1_R
     @DaoColumn(name = "id", primaryKey = true)
     private String id;

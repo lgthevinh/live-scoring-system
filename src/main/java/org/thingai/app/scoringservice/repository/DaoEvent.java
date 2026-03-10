@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.repository;
 
-import org.thingai.app.scoringservice.entity.event.Event;
+import org.thingai.app.scoringservice.entity.Event;
 import org.thingai.base.dao.Dao;
 
 public class DaoEvent {
