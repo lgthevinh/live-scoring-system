@@ -1,4 +1,4 @@
-package org.thingai.app.controller;
+package org.thingai.app.api;
 
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;

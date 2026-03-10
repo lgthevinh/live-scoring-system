@@ -1,11 +1,11 @@
-package org.thingai.app.controller;
+package org.thingai.app.api;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/scores")
-public class ScoreController {
+public class ScoreApi {
 
     @GetMapping("/match/{matchId}")
     public ResponseEntity<Object> getMatchScore(@PathVariable String matchId) {

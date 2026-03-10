@@ -1,10 +1,10 @@
-package org.thingai.app.controller;
+package org.thingai.app.api;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/event")
-public class EventController {
+@RequestMapping("/api/rank")
+public class RankApi {
 
 }
