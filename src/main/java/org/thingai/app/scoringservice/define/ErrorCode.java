@@ -16,5 +16,9 @@ public class ErrorCode {
     public static final int AUTHEN_USER_ALREADY_EXISTS = 13;
     public static final int AUTHEN_INVALID_TOKEN = 14;
 
+    // Score calculation error codes
+    public static final int SCORE_CALCULATION_FAILED = 20;
+    public static final int SCORE_UPDATE_FAILED = 21;
+
     public static final int CUSTOM_ERR = 255;
 }
