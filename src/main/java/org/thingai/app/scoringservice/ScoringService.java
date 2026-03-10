@@ -41,13 +41,11 @@ public class ScoringService extends Service {
             @Override
             public void onSetEvent() {
                 ILog.i(SERVICE_NAME, "Event is set. Injecting handlers with new event data.");
-                injectDao();
             }
 
             @Override
             public void isCurrentEventSet(Event currentEvent) {
                 ILog.i(SERVICE_NAME, "Current event is set to: ", currentEvent.getEventCode());
-                injectDao();
             }
 
             @Override
@@ -101,11 +99,5 @@ public class ScoringService extends Service {
 
     public void registerRankingStrategy(IRankingStrategy rankingStrategy) {
         RankingHandler.setRankingStrategy(rankingStrategy);
-    }
-
-    private void injectDao() {
-        teamHandler = new TeamHandler();
-        scheduleHandler = new ScheduleHandler();
-        rankingHandler = new RankingHandler();
     }
 }
