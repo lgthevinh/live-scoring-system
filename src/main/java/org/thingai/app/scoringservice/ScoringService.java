@@ -106,6 +106,6 @@ public class ScoringService extends Service {
     private void injectDao() {
         teamHandler = new TeamHandler();
         scheduleHandler = new ScheduleHandler();
-        rankingHandler = new RankingHandler(LocalRepository.eventDatabase(), scheduleHandler);
+        rankingHandler = new RankingHandler();
     }
 }
