@@ -8,6 +8,11 @@ import org.thingai.platform.dao.DaoFile;
 
 import java.util.HashMap;
 
+/**
+ * ScoringHandler is responsible for managing score-related operations, including
+ * creating Score instances and retrieving score definitions. It uses a factory
+ * method to create Score objects based on a configurable Score class.
+ */
 public class ScoringHandler {
     private static final String TAG = "ScoringHandler";
     private static Class<? extends Score> scoreClass;
@@ -39,5 +44,9 @@ public class ScoringHandler {
     public HashMap<String, ScoreDefine> getScoreDefinitions() {
         Score score = factoryScore();
         return score.getScoreDefinitions();
+    }
+
+    public void calculateScoreOfMatch(String matchId) {
+        
     }
 }
