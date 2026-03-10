@@ -3,6 +3,7 @@ package org.thingai.app.scoringservice;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.callback.EventHandlerCallback;
 import org.thingai.app.scoringservice.entity.Event;
+import org.thingai.app.scoringservice.matchcontrol.Orchestrator;
 import org.thingai.app.scoringservice.strategy.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.*;
@@ -21,6 +22,9 @@ public class ScoringService extends Service {
     private static ScoringHandler scoringHandler;
     private static ScheduleHandler scheduleHandler;
     private static RankingHandler rankingHandler;
+
+    private static Orchestrator orchestrator;
+
     private static BroadcastService broadcastService;
 
     public ScoringService() {
@@ -80,18 +84,12 @@ public class ScoringService extends Service {
         return scheduleHandler;
     }
 
-    public static BroadcastService broadcastHandler() {
-        return broadcastService;
-    }
-
-
     public static RankingHandler rankingHandler() {
         return rankingHandler;
     }
 
     public void setSimpMessagingTemplate(SimpMessagingTemplate simpMessagingTemplate) {
         broadcastService = new BroadcastService(simpMessagingTemplate);
-        ILog.d("ScoringService::setSimpMessagingTemplate", broadcastHandler().toString());
     }
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {

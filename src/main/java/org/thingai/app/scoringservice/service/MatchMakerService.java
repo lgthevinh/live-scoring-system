@@ -11,12 +11,16 @@ import java.util.concurrent.TimeUnit;
 
 public class MatchMakerService {
     private static final String TAG = "MatchMakerService";
-    private String binPath;
-    private String outPath;
+    private static String binPath;
+    private static String outPath;
+
+    public MatchMakerService() {
+        // Default paths can be set here if desired
+    }
 
     public void setBinPath(String path) {
-        this.binPath = path;
-        ILog.d(TAG, "Binary path set to: " + this.binPath);
+        binPath = path;
+        ILog.d(TAG, "Binary path set to: " + binPath);
     }
 
     public String getBinPath() {
@@ -24,8 +28,8 @@ public class MatchMakerService {
     }
 
     public void setOutPath(String path) {
-        this.outPath = path;
-        ILog.d(TAG, "Output path set to: " + this.outPath);
+        outPath = path;
+        ILog.d(TAG, "Output path set to: " + outPath);
     }
 
     public String getOutPath() {
