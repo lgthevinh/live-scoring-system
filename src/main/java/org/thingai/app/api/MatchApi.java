@@ -1,4 +1,4 @@
-package org.thingai.app.controller;
+package org.thingai.app.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
@@ -9,7 +9,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/match")
-public class MatchController {
+public class MatchApi {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

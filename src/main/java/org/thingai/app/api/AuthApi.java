@@ -1,4 +1,4 @@
-package org.thingai.app.controller;
+package org.thingai.app.api;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -15,11 +15,11 @@ import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static org.thingai.app.controller.utils.ResponseEntityUtil.getObjectResponse;
+import static org.thingai.app.api.utils.ResponseEntityUtil.getObjectResponse;
 
 @RestController
 @RequestMapping("/api/auth")
-public class AuthController {
+public class AuthApi {
 
     @PostMapping("/login")
     public ResponseEntity<Object> login(@RequestBody Map<String, String> request, HttpServletRequest servletRequest) {

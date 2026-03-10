@@ -1,4 +1,4 @@
-package org.thingai.app.controller.utils;
+package org.thingai.app.api.utils;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
