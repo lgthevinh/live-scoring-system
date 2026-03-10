@@ -1,4 +1,4 @@
-package org.thingai.app.demo;
+package eventimpl.demo;
 
 import com.google.gson.Gson;
 import org.thingai.app.scoringservice.strategy.IScoreStrategy;

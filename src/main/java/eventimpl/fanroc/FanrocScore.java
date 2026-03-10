@@ -1,4 +1,4 @@
-package org.thingai.app.fanroc;
+package eventimpl.fanroc;
 
 import com.google.gson.Gson;
 import org.thingai.app.scoringservice.strategy.IScoreStrategy;

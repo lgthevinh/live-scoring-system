@@ -1,11 +1,11 @@
-package org.thingai.app.api;
+package org.thingai.app.api.msg;
 
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
 
 @Controller
-public class LiveScoreController {
+public class LiveScoreMsg {
 
     @MessageMapping("live/score/blue")
     public void handleLiveScoreUpdateBlue(@Payload String jsonUpdate) {

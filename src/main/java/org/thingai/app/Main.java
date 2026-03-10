@@ -1,5 +1,7 @@
 package org.thingai.app;
 
+import eventimpl.fanroc.FanrocRankingStrategy;
+import eventimpl.fanroc.FanrocScore;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
@@ -7,7 +9,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.base.log.ILog;
-import org.thingai.app.fanroc.*;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

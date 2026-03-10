@@ -1,4 +1,4 @@
-package org.thingai.app.demo;
+package eventimpl.demo;
 
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.strategy.IRankingStrategy;
