@@ -1,8 +1,11 @@
 package org.thingai.app.scoringservice.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.ScoreDefine;
+import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.dao.DaoFile;
 
@@ -46,7 +49,14 @@ public class ScoringHandler {
         return score.getScoreDefinitions();
     }
 
-    public void calculateScoreOfMatch(String matchId) {
-        
+    public void updateScore(Score score, RequestCallback<Boolean> callback) {
+        try {
+            String jsonData = objectMapper.writeValueAsString(score);
+            daoFile.writeJsonFile(score.getAllianceId() + ".json", jsonData);
+
+            LocalRepository.scoreDao().updateScore(score);
+        } catch (Exception e) {
+            callback.onFailure(ErrorCode.SCORE_UPDATE_FAILED, "Failed to save score: " + e.getMessage());
+        }
     }
 }
