@@ -1,4 +1,4 @@
-package org.thingai.app.controller.rolebase;
+package org.thingai.app.controller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
