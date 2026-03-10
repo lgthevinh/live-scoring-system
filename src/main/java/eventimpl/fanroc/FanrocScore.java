@@ -1,4 +1,4 @@
-package org.thingai.app.demo;
+package eventimpl.fanroc;
 
 import com.google.gson.Gson;
 import org.thingai.app.scoringservice.strategy.IScoreStrategy;
@@ -7,11 +7,12 @@ import org.thingai.app.scoringservice.entity.ScoreDefine;
 
 import java.util.HashMap;
 
-public class DemoScore extends Score implements IScoreStrategy {
+public class FanrocScore extends Score implements IScoreStrategy {
     // New scoring system fields
     private int whiteBallsScored; // 1 point each via human player
     private int goldenBallsScored; // 3 points each via robot autonomous
-    private int barriersPushed; // 0-2, 10 points each
+    private boolean allianceBarrierPushed; // true if alliance pushed their own barrier (10 points, no coefficient penalty)
+    private boolean opponentBarrierPushed; // true if alliance pushed opponent's barrier (10 bonus points)
     private int imbalanceCategory; // 0=balanced(2.0), 1=medium(1.5), 2=large(1.3)
     private int partialParking; // number of robots partially in green zone (5 points each)
     private int fullParking; // number of robots fully in green zone (10 points each)
@@ -32,8 +33,8 @@ public class DemoScore extends Score implements IScoreStrategy {
             default -> 1.3;
         };
 
-        // Subtract 0.2 if alliance didn't push their barrier (assuming 1 barrier per alliance)
-        if (barriersPushed == 0) {
+        // Subtract 0.2 if alliance didn't push their barrier
+        if (!allianceBarrierPushed) {
             baseCoeff -= 0.2;
         }
 
@@ -43,35 +44,58 @@ public class DemoScore extends Score implements IScoreStrategy {
 
     @Override
     public void calculateTotalScore() {
+        System.out.println("=== CALCULATING TOTAL SCORE ===");
+        System.out.println("whiteBalls: " + whiteBallsScored);
+        System.out.println("goldenBalls: " + goldenBallsScored);
+        System.out.println("allianceBarrier: " + allianceBarrierPushed);
+        System.out.println("opponentBarrier: " + opponentBarrierPushed);
+        System.out.println("partialParking: " + partialParking);
+        System.out.println("fullParking: " + fullParking);
+        System.out.println("imbalanceCategory: " + imbalanceCategory);
+        System.out.println("penaltyCount: " + penaltyCount);
+        System.out.println("yellowCardCount: " + yellowCardCount);
+        System.out.println("redCard: " + redCard);
+        
         // If red card, score is 0
         if (redCard) {
             totalScore = 0;
             penaltiesScore = 0;
+            System.out.println("Red card active - score set to 0");
             return;
         }
 
         // Biological points = robot-scored balls + human-scored balls
         int biologicalPoints = (goldenBallsScored * 3) + whiteBallsScored;
+        System.out.println("biologicalPoints: " + biologicalPoints);
 
-        // Barrier points
-        int barrierPoints = barriersPushed * 10;
+        // Barrier points: 10 points for each barrier pushed
+        int barrierPoints = (allianceBarrierPushed ? 10 : 0) + (opponentBarrierPushed ? 10 : 0);
+        System.out.println("barrierPoints: " + barrierPoints);
 
         // End game points
         int endGamePoints = (partialParking * 5) + (fullParking * 10);
+        System.out.println("endGamePoints (before fleet): " + endGamePoints);
 
         // Fleet bonus: 10 points if both robots fully parked
         if (fullParking >= 2) {
             endGamePoints += 10;
+            System.out.println("Fleet bonus added!");
         }
 
         // Adjusted balancing coefficient
         double coeff = getBalancingCoefficient();
+        System.out.println("coefficient: " + coeff);
 
         // Calculate base score
         double baseScore = (biologicalPoints + barrierPoints) * coeff;
+        System.out.println("baseScore: " + baseScore);
+
+        int penalties = (penaltyCount * 5) + (yellowCardCount * 10);
+        System.out.println("penalties: " + penalties);
 
         // Total score includes penalties
-        totalScore = (int) Math.round(baseScore + endGamePoints - (penaltyCount * 5) - (yellowCardCount * 10));
+        totalScore = Math.max(0, (int) Math.round(baseScore + endGamePoints - penalties));
+        System.out.println("FINAL totalScore: " + totalScore);
     }
 
     @Override
@@ -81,12 +105,15 @@ public class DemoScore extends Score implements IScoreStrategy {
 
     @Override
     public void fromJson(String json) {
+        System.out.println("=== FANROCSCORE FROMJSON ===");
+        System.out.println("Input JSON: " + json);
         Gson gson = new Gson();
-        DemoScore temp = gson.fromJson(json, DemoScore.class);
-        // New fields
+        FanrocScore temp = gson.fromJson(json, FanrocScore.class);
+        // New fields - DO NOT copy id or status!
         this.whiteBallsScored = temp.whiteBallsScored;
         this.goldenBallsScored = temp.goldenBallsScored;
-        this.barriersPushed = temp.barriersPushed;
+        this.allianceBarrierPushed = temp.allianceBarrierPushed;
+        this.opponentBarrierPushed = temp.opponentBarrierPushed;
         this.imbalanceCategory = temp.imbalanceCategory;
         this.partialParking = temp.partialParking;
         this.fullParking = temp.fullParking;
@@ -97,12 +124,33 @@ public class DemoScore extends Score implements IScoreStrategy {
         this.ballsCollected = temp.ballsCollected;
         this.ballsScored = temp.ballsScored;
         this.foulsCommitted = temp.foulsCommitted;
+        // DO NOT copy: id, status, totalScore, penaltiesScore, rawScoreData
+        System.out.println("Parsed whiteBalls: " + this.whiteBallsScored);
+        System.out.println("After fromJson - allianceId: " + this.getAllianceId());
     }
 
     @Override
     public String getRawScoreData() {
+        // Use Gson with exposed fields to ensure private fields are serialized
         Gson gson = new Gson();
-        return gson.toJson(this);
+        // Create a map with only the scoring fields (exclude id, status, totalScore, penaltiesScore, rawScoreData)
+        java.util.Map<String, Object> scoreData = new java.util.HashMap<>();
+        scoreData.put("whiteBallsScored", this.whiteBallsScored);
+        scoreData.put("goldenBallsScored", this.goldenBallsScored);
+        scoreData.put("allianceBarrierPushed", this.allianceBarrierPushed);
+        scoreData.put("opponentBarrierPushed", this.opponentBarrierPushed);
+        scoreData.put("imbalanceCategory", this.imbalanceCategory);
+        scoreData.put("partialParking", this.partialParking);
+        scoreData.put("fullParking", this.fullParking);
+        scoreData.put("penaltyCount", this.penaltyCount);
+        scoreData.put("yellowCardCount", this.yellowCardCount);
+        scoreData.put("redCard", this.redCard);
+        // Legacy fields
+        scoreData.put("ballsCollected", this.ballsCollected);
+        scoreData.put("ballsScored", this.ballsScored);
+        scoreData.put("foulsCommitted", this.foulsCommitted);
+        
+        return gson.toJson(scoreData);
     }
 
     @Override
@@ -111,7 +159,8 @@ public class DemoScore extends Score implements IScoreStrategy {
 
         definitions.put("whiteBallsScored", new ScoreDefine("White Balls Scored by Human", null, null));
         definitions.put("goldenBallsScored", new ScoreDefine("Golden Balls Scored by Robot", null, null));
-        definitions.put("barriersPushed", new ScoreDefine("Barriers Pushed Away", null, null));
+        definitions.put("allianceBarrierPushed", new ScoreDefine("Alliance Barrier Pushed", null, null));
+        definitions.put("opponentBarrierPushed", new ScoreDefine("Opponent Barrier Pushed", null, null));
         definitions.put("imbalanceCategory", new ScoreDefine("Ball Imbalance Category (0=Balanced, 1=Medium, 2=Large)", null, null));
         definitions.put("partialParking", new ScoreDefine("Robots Partially in Green Zone", null, null));
         definitions.put("fullParking", new ScoreDefine("Robots Fully in Green Zone", null, null));

@@ -1,4 +1,4 @@
-package org.thingai.app.config;
+package org.thingai.app.api.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;

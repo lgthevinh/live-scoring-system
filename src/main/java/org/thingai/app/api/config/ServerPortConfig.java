@@ -1,4 +1,4 @@
-package org.thingai.app.config;
+package org.thingai.app.api.config;
 
 import org.springframework.boot.web.server.ConfigurableWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;

@@ -1,4 +1,4 @@
-package org.thingai.app.fanroc;
+package eventimpl.fanroc;
 
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.strategy.IRankingStrategy;
