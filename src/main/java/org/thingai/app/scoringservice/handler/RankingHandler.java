@@ -27,8 +27,14 @@ public class RankingHandler {
      * Update ranking entry of a match played on that team
      * @param matchId
      */
-    public void updateRankingEntry(String matchId) {
+    public void updateRankingEntry(String matchId, RequestCallback<Boolean> callback) {
+        MatchDetailDto matchDetailDto = new MatchDetailDto();
+        try {
+            matchDetailDto.setMatch(LocalRepository.matchDao().getMatchById(matchId));
 
+        } catch (Exception e) {
+
+        }
     }
 
     /**
