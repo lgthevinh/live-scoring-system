@@ -24,6 +24,14 @@ public class RankingHandler {
     }
 
     /**
+     * Update ranking entry of a match played on that team
+     * @param matchId
+     */
+    public void updateRankingEntry(String matchId) {
+
+    }
+
+    /**
      * Updates ranking entries for all teams in a completed match.
      *
      * This method processes the match results and updates each team's ranking statistics:

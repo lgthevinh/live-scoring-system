@@ -10,11 +10,11 @@ import org.thingai.base.log.ILog;
 public class BroadcastService {
     private static final String TAG = "BroadcastService";
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private static SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public BroadcastService(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
+        BroadcastService.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -23,7 +23,7 @@ public class BroadcastService {
      * @param topic   The topic to broadcast to (e.g., "/topic/scores").
      * @param message The message payload.
      */
-    public void broadcast(String topic, Object message, String messageType) {
+    public static void broadcast(String topic, Object message, String messageType) {
         ILog.d(TAG, topic, messageType);
         BroadcastMessageDto broadcastMessage = new BroadcastMessageDto(messageType, message);
         messagingTemplate.convertAndSend(topic, broadcastMessage);

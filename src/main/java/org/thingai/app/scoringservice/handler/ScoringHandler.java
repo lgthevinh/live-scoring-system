@@ -21,10 +21,9 @@ public class ScoringHandler {
     private static Class<? extends Score> scoreClass;
 
     private final ObjectMapper objectMapper = new ObjectMapper(); // For converting DTO to JSON
-    private DaoFile daoFile;
 
-    public ScoringHandler(DaoFile daoFile) {
-        this.daoFile = daoFile;
+    public ScoringHandler() {
+
     }
     /**
      * Factory method to create a Score object. Uses the configured scoreClass.
@@ -52,7 +51,7 @@ public class ScoringHandler {
     public void updateScore(Score score, RequestCallback<Boolean> callback) {
         try {
             String jsonData = objectMapper.writeValueAsString(score);
-            daoFile.writeJsonFile(score.getAllianceId() + ".json", jsonData);
+            LocalRepository.eventFileStore().writeJsonFile(score.getAllianceId() + ".json", jsonData);
 
             LocalRepository.scoreDao().updateScore(score);
         } catch (Exception e) {

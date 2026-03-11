@@ -13,9 +13,7 @@ import java.io.File;
 
 public class EventHandler {
     private static final String TAG = "EventHandler";
-
     private final EventHandlerCallback eventCallback;
-
     private Event currentEvent;
 
     public EventHandler(EventHandlerCallback eventCallback) {

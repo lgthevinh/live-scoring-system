@@ -1,14 +1,14 @@
 package org.thingai.app.scoringservice;
 
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.callback.EventHandlerCallback;
 import org.thingai.app.scoringservice.entity.Event;
-import org.thingai.app.scoringservice.matchcontrol.Orchestrator;
+import org.thingai.app.scoringservice.matchcontrol.MatchControl;
+import org.thingai.app.scoringservice.matchcontrol.StateManager;
+import org.thingai.app.scoringservice.service.MatchMakerService;
 import org.thingai.app.scoringservice.strategy.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.*;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.app.scoringservice.service.BroadcastService;
 import org.thingai.base.Service;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.log.ILogImpl;
@@ -23,9 +23,8 @@ public class ScoringService extends Service {
     private static ScheduleHandler scheduleHandler;
     private static RankingHandler rankingHandler;
 
-    private static Orchestrator orchestrator;
-
-    private static BroadcastService broadcastService;
+    private static StateManager stateManager;
+    private static MatchControl matchControl;
 
     public ScoringService() {
         super();
@@ -36,7 +35,6 @@ public class ScoringService extends Service {
     @Override
     protected void onServiceInit() {
         new ILogImpl(appDir, true);
-
         ILog.i(SERVICE_NAME, "Initializing ScoringService with app directory: " + appDir);
 
         LocalRepository.initializeSystem(appDir + "/scoring_system.db");
@@ -58,14 +56,17 @@ public class ScoringService extends Service {
                 ILog.w(SERVICE_NAME, "No current event is set.");
             }
         });
+        teamHandler = new TeamHandler();
+        scheduleHandler = new ScheduleHandler(new MatchMakerService());
+        scoringHandler = new ScoringHandler();
+        rankingHandler = new RankingHandler();
+
+        stateManager = new StateManager();
+        matchControl = new MatchControl(stateManager);
 
         ILog.i(SERVICE_NAME, "ScoringService initialized. version: " + version);
         ILog.i(SERVICE_NAME, "Database initialized at: " + appDir + "/scoring_system.db");
         ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
-    }
-
-    public static TeamHandler teamHandler() {
-        return teamHandler;
     }
 
     public static AuthHandler authHandler() {
@@ -76,20 +77,28 @@ public class ScoringService extends Service {
         return eventHandler;
     }
 
-    public static ScoringHandler scoreHandler() {
-        return scoringHandler;
+    public static TeamHandler teamHandler() {
+        return teamHandler;
     }
 
     public static ScheduleHandler matchHandler() {
         return scheduleHandler;
     }
 
+    public static ScoringHandler scoreHandler() {
+        return scoringHandler;
+    }
+
     public static RankingHandler rankingHandler() {
         return rankingHandler;
     }
 
-    public void setSimpMessagingTemplate(SimpMessagingTemplate simpMessagingTemplate) {
-        broadcastService = new BroadcastService(simpMessagingTemplate);
+    public static StateManager stateManager() {
+        return stateManager;
+    }
+
+    public static MatchControl matchControl() {
+        return matchControl;
     }
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {
