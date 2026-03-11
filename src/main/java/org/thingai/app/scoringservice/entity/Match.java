@@ -30,6 +30,9 @@ public class Match {
     @DaoColumn(name = "matchEndTime")
     private String matchEndTime;
 
+    @DaoColumn(name = "matchStatus")
+    private int matchStatus;
+
     public String getId() {
         return id;
     }
@@ -92,5 +95,13 @@ public class Match {
 
     public void setFieldNumber(int fieldNumber) {
         this.fieldNumber = fieldNumber;
+    }
+
+    public int getMatchStatus() {
+        return matchStatus;
+    }
+
+    public void setMatchStatus(int matchStatus) {
+        this.matchStatus = matchStatus;
     }
 }

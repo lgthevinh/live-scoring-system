@@ -1,17 +1,44 @@
 package org.thingai.app.scoringservice.matchcontrol;
 
-public class StateManager {
-    private static final String TAG = "StateManager";
-    private static StateManager instance;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.base.cache.LRUCache;
 
-    private StateManager() {
-        // Private constructor to prevent instantiation
+import java.util.HashMap;
+
+public class StateManager {
+    private static final String TAG = "Orchestrator";
+
+    private String currentMatchId;
+    private int currentMatchState;
+    private String loadedMatchId;
+
+    private LRUCache<String, Score> scoresCache; // map score id, score object
+
+    public StateManager() {
+        this.scoresCache = new LRUCache<>(10, new HashMap<>());
     }
 
-    public static synchronized StateManager getInstance() {
-        if (instance == null) {
-            instance = new StateManager();
-        }
-        return instance;
+    public String getCurrentMatchId() {
+        return currentMatchId;
+    }
+
+    public void setCurrentMatchId(String currentMatchId) {
+        this.currentMatchId = currentMatchId;
+    }
+
+    public int getCurrentMatchState() {
+        return currentMatchState;
+    }
+
+    public void setCurrentMatchState(int currentMatchState) {
+        this.currentMatchState = currentMatchState;
+    }
+
+    public String getLoadedMatchId() {
+        return loadedMatchId;
+    }
+
+    public void setLoadedMatchId(String loadedMatchId) {
+        this.loadedMatchId = loadedMatchId;
     }
 }

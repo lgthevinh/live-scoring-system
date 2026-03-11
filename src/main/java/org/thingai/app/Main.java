@@ -6,10 +6,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.env.Environment;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.support.ResourcePropertySource;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.base.log.ILog;
 
@@ -19,29 +15,20 @@ import java.net.UnknownHostException;
 @SpringBootApplication
 public class Main {
 
-    private static final String DEFAULT_VERSION = "1.7.1";
-
     public static void main(String[] args) {
         ScoringService scoringService = new ScoringService();
         scoringService.name = "Scoring System";
         scoringService.appDirName = "scoring_system";
-        scoringService.version = DEFAULT_VERSION;
+        scoringService.version = "1.5";
 
         // 1. Start Spring and get its application context
         ConfigurableApplicationContext context = SpringApplication.run(Main.class, args);
 
-        // --- THIS IS THE BRIDGE ---
-        // 2. Get the working BroadcastController that Spring created.
-        SimpMessagingTemplate simpMessagingTemplate = context.getBean(SimpMessagingTemplate.class);
-
-        scoringService.setSimpMessagingTemplate(simpMessagingTemplate);
-        
-        // Register scoring classes BEFORE init so they're available when handlers are created
-        scoringService.registerScoreClass(FanrocScore.class);
-        scoringService.registerRankingStrategy(new FanrocRankingStrategy());
-        
         scoringService.init();
-        ILog.i("Main", "Service v" + DEFAULT_VERSION + " running on URL:" + " http://" + getIpAddress() + ":" + getActualPort(context));
+        scoringService.registerScoreClass(FanrocScore.class); // Register the scoring class for the season specific logic
+        scoringService.registerRankingStrategy(new FanrocRankingStrategy());
+
+        ILog.i("Main", "Service running on URL:" + " http://" + getIpAddress() + ":" + getActualPort(context));
     }
 
     private static int getActualPort(ConfigurableApplicationContext context) {

@@ -25,9 +25,11 @@ import java.util.regex.Pattern;
 public class ScheduleHandler {
     private static final String TAG = "ScheduleHandler";
 
-    private final MatchMakerService matchMaker = new MatchMakerService();
+    private final MatchMakerService matchMaker;
 
-    public ScheduleHandler() {
+    public ScheduleHandler(MatchMakerService matchMaker) {
+        this.matchMaker = matchMaker;
+
         String osName = System.getProperty("os.name").toLowerCase();
         Path binary = Paths.get("binary");
         if (osName.contains("win")) {
