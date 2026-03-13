@@ -1,4 +1,4 @@
-package org.thingai.app.api.msg;
+package org.thingai.app.api.v1.msg;
 
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
