@@ -3,6 +3,7 @@ package org.thingai.app.scoringservice.repository;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.AllianceTeam;
 import org.thingai.app.scoringservice.entity.Match;
+import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.base.dao.Dao;
 
 /*
@@ -59,6 +60,12 @@ public class DaoMatch {
 
         AllianceTeam[] redAlliance = LocalRepository.allianceTeamDao().getAllianceTeamsByAllianceId(matchId + "_R");
         AllianceTeam[] blueAlliance = LocalRepository.allianceTeamDao().getAllianceTeamsByAllianceId(matchId + "_B");
+
+        Score redScore = LocalRepository.scoreDao().getScoreById(matchId + "_R");
+        Score blueScore = LocalRepository.scoreDao().getScoreById(matchId + "_B");
+
+        matchDetailDto.setRedScore(redScore);
+        matchDetailDto.setBlueScore(blueScore);
 
         matchDetailDto.setRedAllianceTeams(redAlliance);
         matchDetailDto.setBlueAllianceTeams(blueAlliance);

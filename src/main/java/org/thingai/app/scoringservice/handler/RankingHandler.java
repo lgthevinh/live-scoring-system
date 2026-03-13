@@ -2,13 +2,14 @@ package org.thingai.app.scoringservice.handler;
 
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
+import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.AllianceTeam;
-import org.thingai.app.scoringservice.strategy.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.RankingEntry;
 import org.thingai.app.scoringservice.entity.RankingStat;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.repository.LocalRepository;
+import org.thingai.app.scoringservice.strategy.IRankingStrategy;
 import org.thingai.base.dao.exceptions.DaoException;
 import org.thingai.base.log.ILog;
 
@@ -24,16 +25,28 @@ public class RankingHandler {
     }
 
     /**
-     * Update ranking entry of a match played on that team
+     * Update ranking entry of a match played on that team.
+     * Flow: match detail -> check score state = SCORED -> update ranking entry
      * @param matchId
      */
-    public void updateRankingEntry(String matchId, RequestCallback<Boolean> callback) {
-        MatchDetailDto matchDetailDto = new MatchDetailDto();
+    public void updateRanking(String matchId, RequestCallback<Boolean> callback) {
         try {
-            matchDetailDto.setMatch(LocalRepository.matchDao().getMatchById(matchId));
+            MatchDetailDto matchDetailDto = LocalRepository.matchDao().getMatchDetailById(matchId);
+            if (matchDetailDto == null) {
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Match not found for ID: " + matchId);
+                return;
+            }
 
+            Score redScore = matchDetailDto.getRedScore();
+            Score blueScore = matchDetailDto.getBlueScore();
+            if (redScore.getState() != ScoreState.SCORED || blueScore.getState() != ScoreState.SCORED) {
+                callback.onFailure(ErrorCode.GENERAL, "Scores for match ID: " + matchId + " are not in SCORED state.");
+            }
+
+            updateRankingEntry(matchDetailDto, blueScore, redScore);
+            callback.onSuccess(true, "Ranking updated successfully for match ID: " + matchId);
         } catch (Exception e) {
-
+            callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Failed to update ranking for match ID: " + matchId + ". Error: " + e.getMessage());
         }
     }
 
@@ -51,7 +64,7 @@ public class RankingHandler {
      * @param blueScore Final score for blue alliance
      * @param redScore Final score for red alliance
      */
-    public void updateRankingEntry(MatchDetailDto matchDetailDto, Score blueScore, Score redScore) {
+    private void updateRankingEntry(MatchDetailDto matchDetailDto, Score blueScore, Score redScore) {
         RankingStat[] stats = rankingStrategy.setRankingStat(matchDetailDto, blueScore, redScore);
 
         HashMap<String, Boolean> surrogateTeam = getSurrogateMap(matchDetailDto);
