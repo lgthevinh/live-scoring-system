@@ -19,7 +19,7 @@ public class Main {
         ScoringService scoringService = new ScoringService();
         scoringService.name = "Scoring System";
         scoringService.appDirName = "scoring_system";
-        scoringService.version = "1.5";
+        scoringService.version = "2.0";
 
         // 1. Start Spring and get its application context
         ConfigurableApplicationContext context = SpringApplication.run(Main.class, args);

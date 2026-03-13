@@ -1,4 +1,4 @@
-package org.thingai.app.api;
+package org.thingai.app.api.v1;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
