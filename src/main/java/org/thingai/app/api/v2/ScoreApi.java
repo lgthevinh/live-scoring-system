@@ -1,4 +1,4 @@
-package org.thingai.app.api.v1;
+package org.thingai.app.api.v2;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
