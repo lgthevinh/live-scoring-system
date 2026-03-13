@@ -1,4 +1,4 @@
-package org.thingai.app.api.v1;
+package org.thingai.app.api.v2;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
