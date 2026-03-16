@@ -1,5 +1,6 @@
 package org.thingai.app.scoringservice.matchcontrol;
 
+import org.thingai.app.scoringservice.define.MatchState;
 import org.thingai.app.scoringservice.service.MatchTimerService;
 
 public class MatchControl {
@@ -16,22 +17,24 @@ public class MatchControl {
 
     // Match control methods
     public void loadMatch(String matchId) {
-
+        stateManager.setCurrentMatchId(matchId);
     }
 
     public void activateMatch(String matchId) {
+        stateManager.setCurrentMatchId(matchId);
+        stateManager.setCurrentMatchState(MatchState.ACTIVE);
     }
 
     public void startMatch() {
-
+        stateManager.setCurrentMatchState(MatchState.IN_PROGRESS);
     }
 
     public void abortMatch() {
-
+        stateManager.setCurrentMatchState(MatchState.ACTIVE);
     }
 
     public void commitScore() {
-
+        stateManager.setCurrentMatchState(MatchState.COMPLETED);
     }
 
     public void overrideScore() {
