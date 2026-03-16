@@ -11,8 +11,6 @@ public class MatchTimerService {
 
     private final int startSeconds;
     private int remainingSeconds;
-    private String matchId;
-    private int fieldNumber;
     private boolean isRunning;
 
     private TimerCallback callback;
@@ -22,10 +20,8 @@ public class MatchTimerService {
 
     }
 
-    public void startTimer(String matchId, int fieldNumber, int totalSeconds) {
+    public void startTimer(int totalSeconds) {
         stopTimer();
-        this.matchId = matchId;
-        this.fieldNumber = fieldNumber;
         this.remainingSeconds = totalSeconds;
         this.timerTask = scheduler.scheduleAtFixedRate(this::tick, 0, 1, TimeUnit.SECONDS);
     }
@@ -45,23 +41,23 @@ public class MatchTimerService {
     public void stopTimer() {
         isRunning = false;
         if (timerTask != null) timerTask.cancel(true);
-        callback.onTimerUpdated(matchId, String.valueOf(fieldNumber), remainingSeconds);
+        callback.onTimerUpdated(remainingSeconds);
     }
 
     private void tick() {
         if (remainingSeconds > 0) {
             remainingSeconds--;
-            callback.onTimerUpdated(matchId, String.valueOf(fieldNumber), remainingSeconds);
+            callback.onTimerUpdated(remainingSeconds);
         } else {
             stopTimer();
-            callback.onTimerEnded(matchId);
+            callback.onTimerEnded();
         }
     }
 
     public void resetTimer() {
         stopTimer();
         remainingSeconds = startSeconds;
-        callback.onTimerUpdated(matchId, String.valueOf(fieldNumber), remainingSeconds);
+        callback.onTimerUpdated(remainingSeconds);
     }
 
     public void setCallback(TimerCallback callback) {
@@ -69,8 +65,8 @@ public class MatchTimerService {
     }
 
     public interface TimerCallback {
-        void onTimerEnded(String matchId);
-        void onTimerUpdated(String matchId, String fieldNumber, int remainingSeconds);
+        void onTimerEnded();
+        void onTimerUpdated(int remainingSeconds);
     }
 }
 
