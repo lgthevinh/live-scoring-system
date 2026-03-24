@@ -1,10 +1,10 @@
-package org.thingai.app.api.v2;
+package org.thingai.app.api.endpoints;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/sync")
-public class SyncApi {
+@RequestMapping("/api/rank")
+public class RankApi {
 
 }

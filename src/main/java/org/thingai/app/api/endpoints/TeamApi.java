@@ -1,4 +1,4 @@
-package org.thingai.app.api.v2;
+package org.thingai.app.api.endpoints;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

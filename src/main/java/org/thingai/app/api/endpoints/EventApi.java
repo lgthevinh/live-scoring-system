@@ -1,4 +1,4 @@
-package org.thingai.app.api.v2;
+package org.thingai.app.api.endpoints;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
