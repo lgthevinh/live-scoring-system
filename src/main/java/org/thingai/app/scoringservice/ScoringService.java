@@ -2,13 +2,13 @@ package org.thingai.app.scoringservice;
 
 import org.thingai.app.scoringservice.callback.EventHandlerCallback;
 import org.thingai.app.scoringservice.entity.Event;
-import org.thingai.app.scoringservice.matchcontrol.MatchControl;
-import org.thingai.app.scoringservice.matchcontrol.StateManager;
-import org.thingai.app.scoringservice.service.MatchMakerService;
-import org.thingai.app.scoringservice.strategy.IRankingStrategy;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.*;
+import org.thingai.app.scoringservice.matchcontrol.MatchControl;
+import org.thingai.app.scoringservice.matchcontrol.StateManager;
 import org.thingai.app.scoringservice.repository.LocalRepository;
+import org.thingai.app.scoringservice.service.MatchMakerService;
+import org.thingai.app.scoringservice.strategy.IRankingStrategy;
 import org.thingai.base.Service;
 import org.thingai.base.log.ILog;
 import org.thingai.platform.log.ILogImpl;
@@ -21,6 +21,7 @@ public class ScoringService extends Service {
     private static TeamHandler teamHandler;
     private static ScoringHandler scoringHandler;
     private static ScheduleHandler scheduleHandler;
+    private static MatchHandler matchHandler;
     private static RankingHandler rankingHandler;
 
     private static StateManager stateManager;
@@ -30,6 +31,26 @@ public class ScoringService extends Service {
         super();
         ILog.ENABLE_LOGGING = true;
         ILog.logLevel = ILog.INFO;
+    }
+
+    public static MatchHandler matchHandler() {
+        return matchHandler;
+    }
+
+    public static AuthHandler authHandler() {
+        return authHandler;
+    }
+
+    public static EventHandler eventHandler() {
+        return eventHandler;
+    }
+
+    public static TeamHandler teamHandler() {
+        return teamHandler;
+    }
+
+    public static ScheduleHandler scheduleHandler() {
+        return scheduleHandler;
     }
 
     @Override
@@ -58,6 +79,7 @@ public class ScoringService extends Service {
         });
         teamHandler = new TeamHandler();
         scheduleHandler = new ScheduleHandler(new MatchMakerService());
+        matchHandler = new MatchHandler();
         scoringHandler = new ScoringHandler();
         rankingHandler = new RankingHandler();
 
@@ -67,22 +89,6 @@ public class ScoringService extends Service {
         ILog.i(SERVICE_NAME, "ScoringService initialized. version: " + version);
         ILog.i(SERVICE_NAME, "Database initialized at: " + appDir + "/scoring_system.db");
         ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
-    }
-
-    public static AuthHandler authHandler() {
-        return authHandler;
-    }
-
-    public static EventHandler eventHandler() {
-        return eventHandler;
-    }
-
-    public static TeamHandler teamHandler() {
-        return teamHandler;
-    }
-
-    public static ScheduleHandler matchHandler() {
-        return scheduleHandler;
     }
 
     public static ScoringHandler scoreHandler() {

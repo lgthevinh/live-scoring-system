@@ -3,11 +3,7 @@ package org.thingai.app.scoringservice.handler;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.define.MatchType;
-import org.thingai.app.scoringservice.entity.AllianceTeam;
-import org.thingai.app.scoringservice.entity.Match;
-import org.thingai.app.scoringservice.entity.Score;
-import org.thingai.app.scoringservice.entity.Team;
-import org.thingai.app.scoringservice.entity.TimeBlock;
+import org.thingai.app.scoringservice.entity.*;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.MatchMakerService;
 import org.thingai.base.log.ILog;
@@ -195,7 +191,96 @@ public class ScheduleHandler {
     }
 
     public void generatePlayoffSchedule(int playoffType, int fieldCount, AllianceTeam[] allianceTeams, String startTime, int matchDuration, TimeBlock[] timeBlocks, RequestCallback<Void> callback) {
+        ILog.d("ScheduleHandler", "Generating playoff schedule with type=" + playoffType + ", start=" + startTime + ", duration=" + matchDuration + " min");
+        try {
+            if (allianceTeams == null || allianceTeams.length == 0) {
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Alliance teams are required to generate playoff schedule.");
+                return;
+            }
 
+            Map<String, List<String>> allianceMap = new HashMap<>();
+            for (AllianceTeam allianceTeam : allianceTeams) {
+                if (allianceTeam == null || allianceTeam.getAllianceId() == null || allianceTeam.getTeamId() == null) {
+                    continue;
+                }
+                allianceMap.computeIfAbsent(allianceTeam.getAllianceId(), key -> new ArrayList<>())
+                        .add(allianceTeam.getTeamId());
+            }
+
+            if (allianceMap.size() < 2) {
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "At least two alliances are required.");
+                return;
+            }
+
+            List<String> allianceIds = new ArrayList<>(allianceMap.keySet());
+            allianceIds.sort((a, b) -> {
+                Integer ai = parseAllianceId(a);
+                Integer bi = parseAllianceId(b);
+                if (ai != null && bi != null) {
+                    return ai.compareTo(bi);
+                }
+                return a.compareToIgnoreCase(b);
+            });
+
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+            LocalDateTime currentTime = LocalDateTime.parse(startTime, timeFormatter);
+
+            int matchNumber = 1;
+            int total = allianceIds.size();
+            for (int i = 0; i < total / 2; i++) {
+                String highAlliance = allianceIds.get(i);
+                String lowAlliance = allianceIds.get(total - 1 - i);
+
+                int fieldNumberResolved = ((matchNumber - 1) % Math.max(fieldCount, 1)) + 1;
+
+                if (timeBlocks != null) {
+                    for (TimeBlock block : timeBlocks) {
+                        LocalDateTime breakStart = LocalDateTime.parse(block.getStartTime(), timeFormatter);
+                        long breakDuration = Long.parseLong(block.getDuration());
+                        LocalDateTime breakEnd = breakStart.plusMinutes(breakDuration);
+                        if (!currentTime.isBefore(breakStart) && currentTime.isBefore(breakEnd)) {
+                            currentTime = breakEnd;
+                        }
+                    }
+                }
+
+                String[] redTeamIds = allianceMap.getOrDefault(highAlliance, List.of()).toArray(new String[0]);
+                String[] blueTeamIds = allianceMap.getOrDefault(lowAlliance, List.of()).toArray(new String[0]);
+
+                if (redTeamIds.length == 0 || blueTeamIds.length == 0) {
+                    callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Alliance data is incomplete for playoff schedule.");
+                    return;
+                }
+
+                HashMap<String, Boolean> surrogateMap = new HashMap<>();
+                for (String teamId : redTeamIds) {
+                    surrogateMap.put(teamId, false);
+                }
+                for (String teamId : blueTeamIds) {
+                    surrogateMap.put(teamId, false);
+                }
+
+                createMatchInternal(playoffType, matchNumber, fieldNumberResolved, currentTime.format(timeFormatter), redTeamIds, blueTeamIds, surrogateMap);
+
+                currentTime = currentTime.plusMinutes(matchDuration);
+                matchNumber++;
+            }
+
+            callback.onSuccess(null, "Playoff schedule generated successfully.");
+        } catch (Exception e) {
+            callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to generate playoff schedule: " + e.getMessage());
+        }
+    }
+
+    private Integer parseAllianceId(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
