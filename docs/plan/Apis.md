@@ -2,6 +2,15 @@
 
 ## API Endpoints
 
+### Event management
+
+- `POST /api/events` - Create a new event
+- `GET /api/events` - Get list of events
+- `GET /api/events/{id}` - Get event details
+- `PUT /api/events/{id}` - Update event details
+- `DELETE /api/events/{id}` - Delete an event
+- `POST /api/events/{id}/set` - Set current active event
+
 ### Match and Schedule Management
 
 - `POST /api/matches` - Create a new match, usually used for playoffs or special matches
