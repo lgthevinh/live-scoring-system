@@ -5,6 +5,8 @@ import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.Team;
 
+import java.util.Map;
+
 public class MatchDetailDto {
     private Match match;
     private AllianceTeam[] redAllianceTeams;
@@ -13,6 +15,7 @@ public class MatchDetailDto {
     private Team[] blueTeams;
     private Score redScore;
     private Score blueScore;
+    private Map<String, Boolean> surrogateMap;
 
     public MatchDetailDto() {
     }
@@ -78,5 +81,13 @@ public class MatchDetailDto {
 
     public void setBlueAllianceTeams(AllianceTeam[] blueAllianceTeams) {
         this.blueAllianceTeams = blueAllianceTeams;
+    }
+
+    public Map<String, Boolean> getSurrogateMap() {
+        return surrogateMap;
+    }
+
+    public void setSurrogateMap(Map<String, Boolean> surrogateMap) {
+        this.surrogateMap = surrogateMap;
     }
 }
