@@ -1,8 +1,8 @@
-import { Component, OnInit, signal, WritableSignal, inject, computed } from '@angular/core';
+import { Component, OnInit, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Observable, map, forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import {
   MatchService,
   MockMatchService,
@@ -10,14 +10,10 @@ import {
 } from '../../core/services/match.service';
 import { environment } from '../../../environments/environment';
 import { MatchDetailDto } from '../../core/models/match.model';
-import { ScorekeeperService } from '../../core/services/scorekeeper.service';
 import { BroadcastService } from '../../core/services/broadcast.service';
-import { SyncService } from '../../core/services/sync.service';
+import { RankService } from '../../core/services/rank.service';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
-import { ToastService } from '../../core/services/toast.service';
-import { ScoreSubmitBufferService } from '../../core/services/score-submit-buffer.service';
-import { RefereeService } from '../../core/services/referee.service';
-import { TempScore } from '../../core/models/score.model';
+import { DisplayControlAction, MatchControlService, MatchControlState } from '../../core/services/match-control.service';
 
 type TabKey =
   | 'schedule'
@@ -44,14 +40,6 @@ type TabKey =
   styleUrl: './match-control.css'
 })
 export class MatchControl implements OnInit {
-  private matchService = inject(MatchService);
-  private scorekeeper = inject(ScorekeeperService);
-  private broadcastService = inject(BroadcastService);
-  private syncService = inject(SyncService);
-  private toastService = inject(ToastService);
-  public bufferService = inject(ScoreSubmitBufferService);
-  private refereeService = inject(RefereeService);
-
   tabs: { key: TabKey; label: string; icon?: string }[] = [
     { key: 'schedule', label: 'Schedule', icon: 'bi-list-ul' },
     { key: 'incomplete', label: 'Incomplete Matches', icon: 'bi-exclamation-circle' },
@@ -75,13 +63,12 @@ export class MatchControl implements OnInit {
   // View Control
   viewMatchType: number = 1; // Default to Qualification
 
-  // Editing
+// Editing
   editingMatch = signal<MatchDetailDto | null>(null);
   isSaving = signal<boolean>(false);
   redScoreData: any = {};
   blueScoreData: any = {};
-  private redScoreExistedBeforeEdit = false;
-  private blueScoreExistedBeforeEdit = false;
+  isRecalculatingRanking = signal<boolean>(false);
 
   // Playoff Generation
   playoffType: number = 3; // Default to Elimination Bracket
@@ -97,74 +84,85 @@ export class MatchControl implements OnInit {
   manualRedTeams: string = '';
   manualBlueTeams: string = '';
 
-  // Buffer Modal
-  showCommitModal = signal<boolean>(false);
-
-  // Override Confirmation Modal
-  showOverrideConfirmModal = signal<boolean>(false);
-  pendingOverrideAlliances: string[] = [];
-  pendingSaveData: { redData?: any, blueData?: any } | null = null;
-
-  // Temp Score Management
-  redTempScores = signal<TempScore[]>([]);
-  blueTempScores = signal<TempScore[]>([]);
-  hasRedTempScore = computed(() => this.redTempScores().length > 0);
-  hasBlueTempScore = computed(() => this.blueTempScores().length > 0);
-  hasTempScores = computed(() => this.hasRedTempScore() || this.hasBlueTempScore());
-  isLoadingTempScores = signal<boolean>(false);
-  showTempScoreCommitModal = signal<boolean>(false);
-  showTempScoreRejectModal = signal<boolean>(false);
-  pendingTempScoreId: string | null = null;
-  pendingTempScoreAlliance: 'red' | 'blue' | null = null;
-  tempScoreRejectReason = signal<string>('');
+  constructor(
+    private matchService: MatchService,
+    private matchControl: MatchControlService,
+    private broadcastService: BroadcastService,
+    private rankService: RankService
+  ) { }
 
   ngOnInit(): void {
     this.loadSchedule();
-    this.syncService.syncPlayingMatches().subscribe({
-      next: (matches) => {
-        if (matches && matches.length > 0) {
-          // Assume first match is active, second is loaded
-          this.active.set(matches[0]);
-          if (matches.length > 1) {
-            this.loaded.set(matches[1]);
-          } else {
-            this.loaded.set(null);
-          }
-        }
-      },
-      error: (e) => console.error('Failed to sync playing matches', e.message)
-    });
-    this.broadcastService.subscribeToTopic("/topic/display/field/*/timer").subscribe({
-      next: (msg) => {
-        if (msg.payload && msg.payload.remainingSeconds !== undefined) {
-          const newValue = msg.payload.remainingSeconds;
-
-          // Only play match end sound when the match timer (not countdown) reaches 0
-          // The match timer starts at 180+ seconds, countdown is 3 seconds
-          const wasCountdown = this.previousTimerValue !== null && this.previousTimerValue <= 3;
-
-          // If transitioning from countdown (0) to match time (180+), don't play sound
-          // Only play match end sound when actual match time reaches 0
-          if (this.previousTimerValue !== null &&
-              this.previousTimerValue > 0 &&
-              newValue === 0 &&
-              !wasCountdown) {
-            this.playMatchEndSound();
-          }
-
-          this.previousTimerValue = newValue;
-          this.activeMatchTimer.set(newValue);
-        }
-      },
-      error: (e) => console.error("Failed to subscribe to timer updates:", e)
+    this.refreshControlState();
+    this.broadcastService.subscribeToTopic('/topic/live/match').subscribe({
+      next: (msg) => this.handleMatchControlBroadcast(msg),
+      error: (e) => console.error('Failed to subscribe to match updates:', e)
     });
   }
 
   setTab(key: TabKey) {
     this.selectedTab.set(key);
-    if (key === 'schedule') {
-      this.loadSchedule();
+  }
+
+  private refreshControlState() {
+    this.matchControl.getState().subscribe({
+      next: (state) => this.applyControlState(state),
+      error: (e) => console.error('Failed to load match control state', e)
+    });
+  }
+
+  private applyControlState(state: MatchControlState) {
+    const loadedMatch = this.findMatchById(state.loadedMatchId);
+    const activeMatch = this.findMatchById(state.currentMatchId);
+
+    this.loaded.set(loadedMatch);
+    this.active.set(activeMatch);
+    if (state.timerSecondsRemaining !== undefined && state.timerSecondsRemaining !== null) {
+      this.updateTimerFromPayload(state.timerSecondsRemaining);
     }
+  }
+
+  private findMatchById(matchId: string | null | undefined): MatchDetailDto | null {
+    if (!matchId) {
+      return null;
+    }
+    return this.schedule().find(m => m.match.id === matchId) ?? null;
+  }
+
+  private handleMatchControlBroadcast(msg: any) {
+    if (!msg || !msg.payload) {
+      return;
+    }
+
+    const payload = msg.payload;
+    if (payload.timerSecondsRemaining !== undefined && payload.timerSecondsRemaining !== null) {
+      this.updateTimerFromPayload(payload.timerSecondsRemaining);
+    }
+
+    if (payload.matchId) {
+      const match = this.findMatchById(payload.matchId);
+      if (payload.state !== undefined && payload.state !== null) {
+        if (payload.state === 1) {
+          this.loaded.set(match);
+        } else if (payload.state >= 2) {
+          this.active.set(match);
+        }
+      }
+    }
+  }
+
+  private updateTimerFromPayload(newValue: number) {
+    const wasCountdown = this.previousTimerValue !== null && this.previousTimerValue <= 3;
+
+    if (this.previousTimerValue !== null &&
+        this.previousTimerValue > 0 &&
+        newValue === 0 &&
+        !wasCountdown) {
+      this.playMatchEndSound();
+    }
+
+    this.previousTimerValue = newValue;
+    this.activeMatchTimer.set(newValue);
   }
 
   // ---- Data loading ----
@@ -172,7 +170,10 @@ export class MatchControl implements OnInit {
     const typeToLoad = matchType !== undefined ? matchType : this.viewMatchType;
     // Fetch matches WITH scores so we can edit them
     this.matchService.getMatches(typeToLoad, true).subscribe({
-      next: (list) => this.schedule.set(list),
+      next: (list) => {
+        this.schedule.set(list);
+        this.refreshControlState();
+      },
       error: (e) => console.error('Failed to load schedule', e)
     });
   }
@@ -183,258 +184,28 @@ export class MatchControl implements OnInit {
 
   // ---- Schedule row actions ----
   playMatch(match: MatchDetailDto) {
-    // Backend: set next match on the field
-    this.scorekeeper.setNextMatch(match.match.id).subscribe({
-      next: () => this.loaded.set(match),
-      error: (e) => {
-        console.error('Failed to set next match', e);
-        // Fallback for UI in case backend not ready
+    this.matchControl.loadMatch(match.match.id).subscribe({
+      next: () => {
         this.loaded.set(match);
-      }
+        this.refreshControlState();
+      },
+      error: (e) => console.error('Failed to load match', e)
     });
   }
 
   enterScores(match: MatchDetailDto) {
+    console.log('Entering scores for match:', match.match.matchCode);
     this.editingMatch.set(match);
-
-    // Track if scores existed before editing (for override confirmation)
-    // A score exists if status === 1 (SCORED) AND rawScoreData has actual content
-    // ScoreStatus: NOT_SCORED = 0, SCORED = 1
-    const hasRedData = match.redScore?.rawScoreData && match.redScore.rawScoreData !== '{}' && match.redScore.rawScoreData.trim() !== '';
-    const hasBlueData = match.blueScore?.rawScoreData && match.blueScore.rawScoreData !== '{}' && match.blueScore.rawScoreData.trim() !== '';
-
-    // Explicit check for status === 1 (SCORED) - handles null/undefined correctly
-    const redStatus = match.redScore?.status;
-    const blueStatus = match.blueScore?.status;
-    this.redScoreExistedBeforeEdit = redStatus === 1 && !!hasRedData;
-    this.blueScoreExistedBeforeEdit = blueStatus === 1 && !!hasBlueData;
 
     // Initialize with current data to ensure we have something to save
     // even if the user doesn't edit anything (or if they only edit one side)
-    let redLoaded = false;
-    let blueLoaded = false;
-    let parseError = false;
+    this.redScoreData = match.redScore?.rawScoreData ? this.safeParse(match.redScore.rawScoreData) : {};
+    this.blueScoreData = match.blueScore?.rawScoreData ? this.safeParse(match.blueScore.rawScoreData) : {};
 
-    try {
-      if (match.redScore?.rawScoreData) {
-        this.redScoreData = this.safeParse(match.redScore.rawScoreData);
-        redLoaded = Object.keys(this.redScoreData).length > 0;
-      } else {
-        this.redScoreData = {};
-      }
-    } catch (e) {
-      console.error('Failed to parse red score JSON', e);
-      this.redScoreData = {};
-      parseError = true;
-    }
-
-    try {
-      if (match.blueScore?.rawScoreData) {
-        this.blueScoreData = this.safeParse(match.blueScore.rawScoreData);
-        blueLoaded = Object.keys(this.blueScoreData).length > 0;
-      } else {
-        this.blueScoreData = {};
-      }
-    } catch (e) {
-      console.error('Failed to parse blue score JSON', e);
-      this.blueScoreData = {};
-      parseError = true;
-    }
-
-
-    // Show toast notifications
-    if (parseError) {
-      this.toastService.show('Error loading existing scores. Starting with empty scores.', 'error', 5000);
-    } else if (redLoaded || blueLoaded) {
-      const messages = [];
-      if (redLoaded) messages.push('Red');
-      if (blueLoaded) messages.push('Blue');
-      this.toastService.show(`Preloaded existing scores: ${messages.join(' & ')} Alliance`, 'success', 3000);
-    } else {
-      this.toastService.show('No existing scores found. Starting with empty scores.', 'info', 3000);
-    }
-
-    // Check for temp scores after setting up the editing match
-    this.checkForTempScores(match);
+    console.log('Initialized Red Data:', this.redScoreData);
+    console.log('Initialized Blue Data:', this.blueScoreData);
 
     this.setTab('score-edit');
-  }
-
-  // ---- Temp Score Management ----
-
-  loadTempScores(matchId: string) {
-    const match = this.schedule().find(m => m.match.id === matchId);
-    if (match) {
-      this.checkForTempScores(match);
-    }
-  }
-
-  checkForTempScores(match: MatchDetailDto) {
-    this.isLoadingTempScores.set(true);
-    this.redTempScores.set([]);
-    this.blueTempScores.set([]);
-
-    const getRedTemps$ = match.redScore
-      ? this.bufferService.getBackendTempScores(match.redScore.id)
-      : of([]);
-
-    const getBlueTemps$ = match.blueScore
-      ? this.bufferService.getBackendTempScores(match.blueScore.id)
-      : of([]);
-
-    forkJoin({
-      redTemps: getRedTemps$,
-      blueTemps: getBlueTemps$
-    }).pipe(
-      finalize(() => this.isLoadingTempScores.set(false))
-    ).subscribe({
-      next: (results) => {
-        if (results.redTemps && results.redTemps.length > 0) {
-          this.redTempScores.set(results.redTemps);
-          this.toastService.show('Pending temp score available for Red alliance', 'info', 3000);
-        }
-        if (results.blueTemps && results.blueTemps.length > 0) {
-          this.blueTempScores.set(results.blueTemps);
-          this.toastService.show('Pending temp score available for Blue alliance', 'info', 3000);
-        }
-      },
-      error: (err) => {
-        console.error('Error checking for temp scores:', err);
-      }
-    });
-  }
-
-  commitTempScore(tempScoreId: string, alliance: 'red' | 'blue') {
-    this.scorekeeper.commitTempScore(tempScoreId, 'scorekeeper').subscribe({
-      next: () => {
-        this.toastService.show(`${alliance === 'red' ? 'Red' : 'Blue'} temp score committed successfully`, 'success');
-        if (alliance === 'red') {
-          this.redTempScores.set(this.redTempScores().filter(ts => ts.tempScoreId !== tempScoreId));
-        } else {
-          this.blueTempScores.set(this.blueTempScores().filter(ts => ts.tempScoreId !== tempScoreId));
-        }
-        this.loadSchedule();
-      },
-      error: (err) => {
-        console.error('Failed to commit temp score:', err);
-        this.toastService.show('Failed to commit temp score', 'error');
-      }
-    });
-  }
-
-  rejectTempScore(tempScoreId: string, alliance: 'red' | 'blue', reason: string) {
-    this.bufferService.rejectTempScore(tempScoreId, 'scorekeeper', reason).subscribe({
-      next: () => {
-        this.toastService.show(`${alliance === 'red' ? 'Red' : 'Blue'} temp score rejected`, 'success');
-        if (alliance === 'red') {
-          this.redTempScores.set(this.redTempScores().filter(ts => ts.tempScoreId !== tempScoreId));
-        } else {
-          this.blueTempScores.set(this.blueTempScores().filter(ts => ts.tempScoreId !== tempScoreId));
-        }
-      },
-      error: (err) => {
-        console.error('Failed to reject temp score:', err);
-        this.toastService.show('Failed to reject temp score', 'error');
-      }
-    });
-  }
-
-  getTempScoreById(tempScoreId: string, alliance: 'red' | 'blue'): TempScore | undefined {
-    if (alliance === 'red') {
-      return this.redTempScores().find(ts => ts.tempScoreId === tempScoreId);
-    } else {
-      return this.blueTempScores().find(ts => ts.tempScoreId === tempScoreId);
-    }
-  }
-
-  openTempScoreCommitModal(tempScoreId: string, alliance: 'red' | 'blue') {
-    this.pendingTempScoreId = tempScoreId;
-    this.pendingTempScoreAlliance = alliance;
-    this.showTempScoreCommitModal.set(true);
-  }
-
-  closeTempScoreCommitModal() {
-    this.showTempScoreCommitModal.set(false);
-    this.pendingTempScoreId = null;
-    this.pendingTempScoreAlliance = null;
-  }
-
-  openTempScoreRejectModal(tempScoreId: string, alliance: 'red' | 'blue') {
-    this.pendingTempScoreId = tempScoreId;
-    this.pendingTempScoreAlliance = alliance;
-    this.showTempScoreRejectModal.set(true);
-  }
-
-  closeTempScoreRejectModal() {
-    this.showTempScoreRejectModal.set(false);
-    this.pendingTempScoreId = null;
-    this.pendingTempScoreAlliance = null;
-    this.tempScoreRejectReason.set('');
-  }
-
-  confirmCommitTempScore() {
-    if (!this.pendingTempScoreAlliance || !this.pendingTempScoreId) {
-      return;
-    }
-
-    this.scorekeeper.commitTempScore(this.pendingTempScoreId, 'scorekeeper').subscribe({
-      next: () => {
-        this.toastService.show(`${this.pendingTempScoreAlliance === 'red' ? 'Red' : 'Blue'} temp score committed successfully`, 'success');
-        if (this.pendingTempScoreAlliance === 'red') {
-          this.redTempScores.set(this.redTempScores().filter(ts => ts.tempScoreId !== this.pendingTempScoreId));
-        } else {
-          this.blueTempScores.set(this.blueTempScores().filter(ts => ts.tempScoreId !== this.pendingTempScoreId));
-        }
-        // Reload schedule to reflect changes
-        this.loadSchedule();
-      },
-      error: (err) => {
-        console.error('Failed to commit temp score:', err);
-        this.toastService.show('Failed to commit temp score', 'error');
-      }
-    });
-
-    this.closeTempScoreCommitModal();
-  }
-
-  confirmRejectTempScore() {
-    if (!this.pendingTempScoreAlliance || !this.pendingTempScoreId) {
-      return;
-    }
-
-    const reason = this.tempScoreRejectReason() || 'Rejected by scorekeeper';
-
-    this.bufferService.rejectTempScore(this.pendingTempScoreId, 'scorekeeper', reason).subscribe({
-      next: () => {
-        this.toastService.show(`${this.pendingTempScoreAlliance === 'red' ? 'Red' : 'Blue'} temp score rejected`, 'success');
-        if (this.pendingTempScoreAlliance === 'red') {
-          this.redTempScores.set(this.redTempScores().filter(ts => ts.tempScoreId !== this.pendingTempScoreId));
-        } else {
-          this.blueTempScores.set(this.blueTempScores().filter(ts => ts.tempScoreId !== this.pendingTempScoreId));
-        }
-        this.tempScoreRejectReason.set('');
-      },
-      error: (err) => {
-        console.error('Failed to reject temp score:', err);
-        this.toastService.show('Failed to reject temp score', 'error');
-      }
-    });
-
-    this.closeTempScoreRejectModal();
-  }
-
-  applyTempScoreToEditor(tempScoreId: string, alliance: 'red' | 'blue') {
-    const tempScore = this.getTempScoreById(tempScoreId, alliance);
-    if (!tempScore) return;
-
-    const scoreData = tempScore.scoreData;
-    if (alliance === 'red') {
-      this.redScoreData = { ...this.redScoreData, ...scoreData };
-    } else {
-      this.blueScoreData = { ...this.blueScoreData, ...scoreData };
-    }
-
-    this.toastService.show(`${alliance === 'red' ? 'Red' : 'Blue'} temp score data applied to editor`, 'success');
   }
 
   private safeParse(json: string): any {
@@ -442,46 +213,19 @@ export class MatchControl implements OnInit {
       return JSON.parse(json);
     } catch (e) {
       console.error('Failed to parse score JSON', e);
-      throw e; // Re-throw to handle in caller
+      return {};
     }
   }
 
   saveScores() {
     const m = this.editingMatch();
+    console.log('Saving scores for match:', m?.match?.matchCode);
+    console.log('Red Data:', this.redScoreData);
+    console.log('Blue Data:', this.blueScoreData);
 
     if (!m) {
       console.error('No match is being edited.');
-      this.toastService.show('Error: No match is being edited.', 'error');
-      return;
-    }
-
-    // Check if there are existing scores that will be overridden
-    const alliancesToOverride: string[] = [];
-
-    // Check if red had existing score before editing (tracked in enterScores)
-    if (this.redScoreExistedBeforeEdit) {
-      alliancesToOverride.push('Red');
-    }
-
-    // Check if blue had existing score before editing
-    if (this.blueScoreExistedBeforeEdit) {
-      alliancesToOverride.push('Blue');
-    }
-
-    // If there are existing scores, show confirmation modal
-    if (alliancesToOverride.length > 0) {
-      this.openOverrideConfirmModal(alliancesToOverride, this.redScoreData, this.blueScoreData);
-      return;
-    }
-
-    // No existing scores, proceed with save
-    this.executeSaveScores(this.redScoreData, this.blueScoreData);
-  }
-
-  executeSaveScores(redData: any, blueData: any) {
-    const m = this.editingMatch();
-    if (!m) {
-      this.toastService.show('Error: No match is being edited.', 'error');
+      alert('Error: No match is being edited.');
       return;
     }
 
@@ -490,8 +234,9 @@ export class MatchControl implements OnInit {
 
     // Submit red
     if (m.redScore) {
+      console.log('Submitting red score override for alliance ID:', m.redScore.id);
       requests.push(
-        this.scorekeeper.overrideScore(m.match.id + "_R", redData).pipe(
+        this.matchControl.overrideScore(m.match.id + "_R", this.redScoreData).pipe(
           catchError(e => {
             console.error('Failed to update red score', e);
             return of({ error: true, alliance: 'red' });
@@ -502,8 +247,9 @@ export class MatchControl implements OnInit {
 
     // Submit blue
     if (m.blueScore) {
+      console.log("Submitting blue score override");
       requests.push(
-        this.scorekeeper.overrideScore(m.match.id + "_B", blueData).pipe(
+        this.matchControl.overrideScore(m.match.id + "_B", this.blueScoreData).pipe(
           catchError(e => {
             console.error('Failed to update blue score', e);
             return of({ error: true, alliance: 'blue' });
@@ -514,57 +260,71 @@ export class MatchControl implements OnInit {
 
     if (requests.length === 0) {
       console.warn('No score objects found to update. Match might not have scores initialized.');
-      this.toastService.show('Error: No score objects found to update.', 'error');
+      alert('Error: No score objects found to update.');
       this.isSaving.set(false);
       return;
     }
 
-    forkJoin(requests).pipe(
-      finalize(() => {
-        this.isSaving.set(false);
-      })
-    ).subscribe({
+    forkJoin(requests).subscribe({
       next: (results) => {
         const errors = results.filter(r => r && r.error);
         if (errors.length > 0) {
-          this.toastService.show('Some scores failed to save. Check console.', 'error');
+          alert('Some scores failed to save. Check console.');
         } else {
           // Success
           this.editingMatch.set(null);
           this.setTab('schedule');
           // Reload schedule to get updated scores
-          this.loadSchedule();
-          this.toastService.show('Scores saved successfully', 'success');
+          this.loadSchedule(1);
         }
       },
       error: (err) => {
         console.error('Error saving scores', err);
-        this.toastService.show('Error saving scores', 'error');
-        // isSaving is reset in finalize operator
+        alert('Error saving scores');
       },
       complete: () => {
-        this.redScoreExistedBeforeEdit = false;
-        this.blueScoreExistedBeforeEdit = false;
-        this.redTempScores.set([]);
-        this.blueTempScores.set([]);
+        this.isSaving.set(false);
       }
     });
   }
 
-  cancelEdit() {
-    this.redScoreExistedBeforeEdit = false;
-    this.blueScoreExistedBeforeEdit = false;
-    this.redTempScores.set([]);
-    this.blueTempScores.set([]);
+cancelEdit() {
     this.editingMatch.set(null);
     this.setTab('schedule');
   }
 
+  recalculateRankings() {
+    if (this.isRecalculatingRanking()) {
+      return;
+    }
+    this.isRecalculatingRanking.set(true);
+    this.rankService.recalculateRankings().subscribe({
+      next: (success) => {
+        if (success) {
+          console.log('Rankings recalculated successfully');
+          alert('Rankings recalculated successfully');
+        } else {
+          console.warn('Rankings recalculation returned false');
+          alert('Failed to recalculate rankings');
+        }
+      },
+      error: (err) => {
+        console.error('Error recalculating rankings', err);
+        alert('Error recalculating rankings: ' + (err.message || 'Unknown error'));
+      },
+      complete: () => {
+        this.isRecalculatingRanking.set(false);
+      }
+    });
+  }
+
   onRedScoreChange(data: any) {
+    console.log('MatchControl: Red score changed', data);
     this.redScoreData = data;
   }
 
   onBlueScoreChange(data: any) {
+    console.log('MatchControl: Blue score changed', data);
     this.blueScoreData = data;
   }
 
@@ -575,32 +335,40 @@ export class MatchControl implements OnInit {
     const current = this.loaded();
     const idx = current ? list.findIndex(m => m.match.id === current.match.id) : -1;
     const next = list[(idx + 1 + list.length) % list.length];
-    // Optimistic UI update, then backend (if any)
-    this.scorekeeper.setNextMatch(next.match.id).subscribe({
-      next: () => this.loaded.set(next),
+    this.matchControl.loadMatch(next.match.id).subscribe({
+      next: () => {
+        this.loaded.set(next);
+        this.refreshControlState();
+      },
       error: () => {
-        console.error('Failed to set next match');
-        this.toastService.show('Failed to load next match', 'error');
+        console.error('Failed to load next match');
+        alert('Failed to load next match');
       }
     });
   }
 
   showUpNext() {
-    this.scorekeeper.showUpNext().subscribe({
-      next: () => {},
+    const loaded = this.loaded();
+    this.matchControl.displayAction(DisplayControlAction.SHOW_PREVIEW, {
+      matchId: loaded?.match?.id
+    }).subscribe({
+      next: () => console.debug('Show up next command sent'),
       error: (e) => {
         console.error('Failed to show up next', e);
-        this.toastService.show('Failed to show up next on display', 'error');
+        alert('Failed to show up next on display');
       }
     });
   }
 
   showCurrentMatch() {
-    this.scorekeeper.showCurrentMatch().subscribe({
-      next: () => {},
+    const active = this.active();
+    this.matchControl.displayAction(DisplayControlAction.SHOW_MATCH, {
+      matchId: active?.match?.id
+    }).subscribe({
+      next: () => console.debug('Show current match command sent'),
       error: (e) => {
         console.error('Failed to show current match', e);
-        this.toastService.show('Failed to show current match on display', 'error');
+        alert('Failed to show current match on display');
       }
     });
   }
@@ -640,28 +408,39 @@ export class MatchControl implements OnInit {
   }
 
   private playMatchEndSound(): void {
+    console.log("playMatchEndSound called");
+
     // Initialize AudioContext on user interaction
     if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log("Created new AudioContext");
     }
 
     // Resume audio context if suspended (browser autoplay policy)
     if (this.audioContext.state === 'suspended') {
+      console.log("AudioContext is suspended, resuming...");
       this.audioContext.resume().then(() => {
+        console.log("AudioContext resumed successfully");
       }).catch(err => {
         console.error("Failed to resume AudioContext:", err);
       });
+    } else {
+      console.log("AudioContext state:", this.audioContext.state);
     }
 
+    console.log("Fetching /assets/match_end.m4a...");
     fetch('/assets/match_end.m4a')
       .then(response => {
+        console.log("Fetch response status:", response.status);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.arrayBuffer();
       })
       .then(arrayBuffer => {
+        console.log("Audio file loaded, decoding...");
         this.audioContext?.decodeAudioData(arrayBuffer, (audioBuffer) => {
+          console.log("Audio decoded successfully, playing...");
           const source = this.audioContext!.createBufferSource();
           source.buffer = audioBuffer;
           source.connect(this.audioContext!.destination);
@@ -682,14 +461,15 @@ export class MatchControl implements OnInit {
       console.warn('No loaded match to activate.');
       return;
     }
-    this.scorekeeper.activateMatch().subscribe({
+    this.matchControl.activateMatch(toActivate.match.id).subscribe({
       next: () => {
         this.active.set(toActivate);
         this.loaded.set(null);
+        this.refreshControlState();
       },
       error: (e) => {
         console.error('Failed to activate match', e);
-        this.toastService.show('Failed to activate match', 'error');
+        alert('Failed to activate match');
       }
     });
   }
@@ -706,15 +486,17 @@ export class MatchControl implements OnInit {
     // Sound disabled - display scoring only
     // this.playMatchStartSound();
 
-    this.scorekeeper.startCurrentMatch().subscribe({
+    this.matchControl.startMatch().subscribe({
       next: () => {
         // Match is already active, no need to set again
         this.loaded.set(null); // Clear loaded match after starting
         this.previousTimerValue = null; // Reset timer tracking
+        console.debug('Match timer started for active match');
+        this.refreshControlState();
       },
       error: (e) => {
         console.error('Failed to start current match', e);
-        this.toastService.show('Failed to start match timer', 'error');
+        alert('Failed to start match timer');
       }
     });
 
@@ -724,11 +506,13 @@ export class MatchControl implements OnInit {
     // Initialize AudioContext on user interaction to unlock it for later playback
     if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log('AudioContext initialized during user interaction');
     }
 
     // Resume audio context if suspended (browser autoplay policy)
     if (this.audioContext.state === 'suspended') {
       this.audioContext.resume().then(() => {
+        console.log('AudioContext resumed successfully during user interaction');
       }).catch(err => {
         console.error('Failed to resume AudioContext:', err);
       });
@@ -742,118 +526,35 @@ export class MatchControl implements OnInit {
       return;
     }
 
-    // Execute abort immediately, then show undo toast
-    this.scorekeeper.abortCurrentMatch().subscribe({
-      next: () => {
-        // Move match from active back to loaded
-        this.loaded.set(toAbort);
-        this.active.set(null);
-        this.activeMatchTimer.set(null);
-        this.previousTimerValue = null; // Reset timer tracking
+    if (!confirm(`Abort match ${toAbort.match.matchCode}? The match will be moved back to loaded state.`)) {
+      return;
+    }
 
-        this.toastService.show(
-          `Match ${toAbort.match.matchCode} aborted`,
-          'info',
-          5000
-        );
+    this.matchControl.abortMatch().subscribe({
+      next: () => {
+        this.refreshControlState();
+        console.debug('Match aborted successfully');
       },
       error: (e) => {
         console.error('Failed to abort match', e);
-        this.toastService.show('Failed to abort match: ' + e.message, 'error');
+        alert('Failed to abort match: ' + e.message);
       }
     });
-  }
-
-  // ---- Buffer/Commit Manager Modal ----
-
-  openCommitModal() {
-    this.showCommitModal.set(true);
-  }
-
-  closeCommitModal() {
-    this.showCommitModal.set(false);
-  }
-
-  // Override Confirmation Modal Methods
-  openOverrideConfirmModal(alliances: string[], redData?: any, blueData?: any) {
-    this.pendingOverrideAlliances = alliances;
-    this.pendingSaveData = { redData, blueData };
-    this.showOverrideConfirmModal.set(true);
-  }
-
-  closeOverrideConfirmModal() {
-    this.showOverrideConfirmModal.set(false);
-    this.pendingOverrideAlliances = [];
-    this.pendingSaveData = null;
-  }
-
-  confirmOverrideSave() {
-    this.showOverrideConfirmModal.set(false);
-    // Execute the actual save
-    this.executeSaveScores(this.pendingSaveData?.redData, this.pendingSaveData?.blueData);
-  }
-
-  submitBufferedSubmission(submissionId: string) {
-    const submission = this.bufferService.buffer().find(s => s.id === submissionId);
-    if (!submission) {
-      console.error('Submission not found:', submissionId);
-      return;
-    }
-
-    // If we have a tempScoreId, use the temp score commit flow
-    if (submission.tempScoreId) {
-      this.scorekeeper.commitTempScore(submission.tempScoreId, 'scorekeeper').subscribe({
-        next: (res) => {
-          this.bufferService.markAsSubmittedDirect(submissionId);
-          this.toastService.show(`Committed ${submission.matchCode} ${submission.color} score from temp!`, 'success');
-          this.loadSchedule();
-        },
-        error: (err) => {
-          console.error('Failed to commit temp score:', err);
-          this.bufferService.markAsError(submissionId, err?.error?.message || 'Failed to commit temp score');
-          this.toastService.show(`Failed to commit ${submission.matchCode}: ${err?.error?.message || 'Unknown error'}`, 'error');
-        }
-      });
-      return;
-    }
-
-    // Fallback: if no tempScoreId, use direct submission (legacy path)
-    this.refereeService.submitFinalScore(submission.color, submission.allianceId, submission.payload).subscribe({
-      next: (res) => {
-        this.toastService.show(`Submitted ${submission.matchCode} ${submission.color} score!`, 'success');
-        this.bufferService.markAsSubmittedDirect(submissionId);
-        this.loadSchedule();
-      },
-      error: (err) => {
-        console.error('Failed to submit score:', err);
-        this.bufferService.markAsError(submissionId, err?.error?.message || 'Unknown error');
-        this.toastService.show(`Failed to submit ${submission.matchCode}: ${err?.error?.message || 'Unknown error'}`, 'error');
-      }
-    });
-  }
-
-  submitAllPending() {
-    const pending = this.bufferService.getPendingSubmissions();
-    if (pending.length === 0) {
-      this.toastService.show('No pending submissions to commit', 'info');
-      return;
-    }
-
-    this.toastService.show(`Committing ${pending.length} pending submissions...`, 'info');
-
-    pending.forEach(submission => {
-      this.submitBufferedSubmission(submission.id);
-    });
-  }
-
-  removeFromBuffer(submissionId: string) {
-    this.bufferService.removeFromBuffer(submissionId);
-    this.toastService.show('Removed from buffer', 'info');
   }
 
   commitAndPostLastMatch() {
-    // Open the commit manager modal instead
-    this.openCommitModal();
+    this.matchControl.commitMatch().subscribe({
+      next: () => {
+        console.debug('Committed last match results')
+        alert('Successfully committed last match results');
+        this.loadSchedule(this.viewMatchType);
+        this.refreshControlState();
+      },
+      error: (e) => {
+        console.error('Failed to commit last match', e)
+        alert('Failed to commit last match results');
+      }
+    });
   }
 
   // ---- Labels and helpers for FTC-like header ----
@@ -929,7 +630,7 @@ export class MatchControl implements OnInit {
     try {
       const allianceTeams = JSON.parse(this.playoffAllianceTeamsJson);
       if (!Array.isArray(allianceTeams)) {
-        this.toastService.show('Alliance Teams JSON must be an array.', 'error');
+        alert('Alliance Teams JSON must be an array.');
         return;
       }
 
@@ -944,16 +645,16 @@ export class MatchControl implements OnInit {
 
       this.matchService.generatePlayoffSchedule(payload).subscribe({
         next: (res) => {
-          this.toastService.show(res.message, 'success');
+          alert(res.message);
           this.loadSchedule(this.playoffType); // Reload schedule
         },
         error: (e: any) => {
           console.error('Failed to generate playoff schedule', e);
-          this.toastService.show('Failed to generate playoff schedule: ' + (e.error?.message || e.message), 'error');
+          alert('Failed to generate playoff schedule: ' + (e.error?.message || e.message));
         }
       });
     } catch (e) {
-      this.toastService.show('Invalid JSON format for Alliance Teams.', 'error');
+      alert('Invalid JSON format for Alliance Teams.');
     }
   }
 
@@ -980,12 +681,12 @@ export class MatchControl implements OnInit {
 
     this.matchService.createMatch(payload).subscribe({
       next: (res) => {
-        this.toastService.show(res.message, 'success');
+        alert(res.message);
         this.loadSchedule(this.manualMatchType); // Reload schedule
       },
       error: (e: any) => {
         console.error('Failed to create match', e);
-        this.toastService.show('Failed to create match: ' + (e.error?.message || e.message), 'error');
+        alert('Failed to create match: ' + (e.error?.message || e.message));
       }
     });
   }
@@ -995,9 +696,5 @@ export class MatchControl implements OnInit {
       return false;
     }
     return match.surrogateMap[teamId];
-  }
-
-  hasMatchTempScore(match: MatchDetailDto): boolean {
-    return this.redTempScores().length > 0 || this.blueTempScores().length > 0;
   }
 }

@@ -4,7 +4,11 @@ import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.AllianceTeam;
 import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.Team;
 import org.thingai.base.dao.Dao;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /*
  * Repository class for Match entity, providing CRUD operations and additional query methods.
@@ -70,7 +74,28 @@ public class DaoMatch {
         matchDetailDto.setRedAllianceTeams(redAlliance);
         matchDetailDto.setBlueAllianceTeams(blueAlliance);
 
+        matchDetailDto.setRedTeams(resolveTeams(redAlliance));
+        matchDetailDto.setBlueTeams(resolveTeams(blueAlliance));
+
         return matchDetailDto;
+    }
+
+    private Team[] resolveTeams(AllianceTeam[] allianceTeams) throws Exception {
+        if (allianceTeams == null || allianceTeams.length == 0) {
+            return new Team[0];
+        }
+
+        List<Team> teams = new ArrayList<>();
+        for (AllianceTeam allianceTeam : allianceTeams) {
+            if (allianceTeam == null || allianceTeam.getTeamId() == null) {
+                continue;
+            }
+            Team team = LocalRepository.teamDao().getTeamById(allianceTeam.getTeamId());
+            if (team != null) {
+                teams.add(team);
+            }
+        }
+        return teams.toArray(new Team[0]);
     }
 
     public Match getMatchByMatchCode(String matchCode) throws Exception {

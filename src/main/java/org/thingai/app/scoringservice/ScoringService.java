@@ -4,6 +4,7 @@ import org.thingai.app.scoringservice.callback.EventHandlerCallback;
 import org.thingai.app.scoringservice.entity.Event;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.*;
+import org.thingai.app.scoringservice.matchcontrol.LiveScoreControl;
 import org.thingai.app.scoringservice.matchcontrol.MatchControl;
 import org.thingai.app.scoringservice.matchcontrol.StateManager;
 import org.thingai.app.scoringservice.repository.LocalRepository;
@@ -26,6 +27,7 @@ public class ScoringService extends Service {
 
     private static StateManager stateManager;
     private static MatchControl matchControl;
+    private static LiveScoreControl liveScoreControl;
 
     public ScoringService() {
         super();
@@ -85,6 +87,7 @@ public class ScoringService extends Service {
 
         stateManager = new StateManager();
         matchControl = new MatchControl(stateManager);
+        liveScoreControl = new LiveScoreControl(stateManager);
 
         ILog.i(SERVICE_NAME, "ScoringService initialized. version: " + version);
         ILog.i(SERVICE_NAME, "Database initialized at: " + appDir + "/scoring_system.db");
@@ -105,6 +108,10 @@ public class ScoringService extends Service {
 
     public static MatchControl matchControl() {
         return matchControl;
+    }
+
+    public static LiveScoreControl liveScoreControl() {
+        return liveScoreControl;
     }
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {

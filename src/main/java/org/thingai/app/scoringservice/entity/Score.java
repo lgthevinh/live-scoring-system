@@ -75,7 +75,15 @@ public class Score implements IScoreStrategy {
         return totalScore;
     }
 
+    public void setTotalScore(int totalScore) {
+        this.totalScore = totalScore;
+    }
+
     public int getPenaltiesScore() {
         return penaltiesScore;
+    }
+
+    public void setPenaltiesScore(int penaltiesScore) {
+        this.penaltiesScore = penaltiesScore;
     }
 }

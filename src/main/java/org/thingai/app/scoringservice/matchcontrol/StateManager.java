@@ -41,4 +41,18 @@ public class StateManager {
     public void setLoadedMatchId(String loadedMatchId) {
         this.loadedMatchId = loadedMatchId;
     }
+
+    public void cacheScore(String allianceId, Score score) {
+        if (allianceId == null || score == null) {
+            return;
+        }
+        scoresCache.put(allianceId, score);
+    }
+
+    public Score getCachedScore(String allianceId) {
+        if (allianceId == null) {
+            return null;
+        }
+        return scoresCache.get(allianceId);
+    }
 }
