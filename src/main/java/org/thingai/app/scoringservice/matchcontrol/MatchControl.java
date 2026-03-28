@@ -2,6 +2,7 @@ package org.thingai.app.scoringservice.matchcontrol;
 
 import org.thingai.app.scoringservice.define.DisplayControlAction;
 import org.thingai.app.scoringservice.define.LiveBroadcastTopic;
+import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.define.MatchState;
 import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
@@ -94,8 +95,39 @@ public class MatchControl {
         broadcastMatchState(stateManager.getCurrentMatchId(), MatchState.COMPLETED, matchTimerService.getRemainingSeconds());
     }
 
-    public void overrideScore() {
+    public boolean overrideScore(String matchId, Score score) {
+        if (matchId == null || matchId.isBlank() || score == null) {
+            ILog.w(TAG, "overrideScore", "matchId and score are required");
+            return false;
+        }
 
+        if (!isMatchCompleted(matchId)) {
+            ILog.w(TAG, "overrideScore", "match not completed");
+            return false;
+        }
+
+        String allianceId = score.getAllianceId();
+        if (allianceId == null || allianceId.isBlank()) {
+            ILog.w(TAG, "overrideScore", "score missing allianceId");
+            return false;
+        }
+        if (!allianceId.startsWith(matchId + "_")) {
+            ILog.w(TAG, "overrideScore", "allianceId does not match matchId");
+            return false;
+        }
+
+        score.setState(ScoreState.SCORED);
+        stateManager.cacheScore(allianceId, score);
+
+        try {
+            ScoringService.scoreHandler().updateScore(score);
+        } catch (Exception e) {
+            ILog.e(TAG, "overrideScore", e.getMessage());
+            return false;
+        }
+
+        broadcastScoreUpdate(matchId);
+        return true;
     }
 
     // Display control methods
@@ -163,7 +195,7 @@ public class MatchControl {
             ILog.e(TAG, "broadcastMatchState", e.getMessage());
         }
 
-        BroadcastService.broadcast("/topic/" + LiveBroadcastTopic.LIVE_MATCH, payload, "MATCH_STATE");
+        BroadcastService.broadcast(LiveBroadcastTopic.LIVE_MATCH, payload, "MATCH_STATE");
     }
 
     private boolean areScoresReadyToCommit(String matchId) {
@@ -202,7 +234,42 @@ public class MatchControl {
         if (data != null) {
             payload.put("data", data);
         }
-        BroadcastService.broadcast("/topic/" + LiveBroadcastTopic.LIVE_DISPLAY_CONTROL, payload, "DISPLAY_CONTROL");
+        BroadcastService.broadcast(LiveBroadcastTopic.LIVE_DISPLAY_CONTROL, payload, "DISPLAY_CONTROL");
+    }
+
+    private void broadcastScoreUpdate(String matchId) {
+        if (matchId == null || matchId.isBlank()) {
+            return;
+        }
+        try {
+            MatchDetailDto matchDetail = LocalRepository.matchDao().getMatchDetailById(matchId);
+            if (matchDetail == null) {
+                return;
+            }
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("matchId", matchId);
+            payload.put("r", matchDetail.getRedScore());
+            payload.put("b", matchDetail.getBlueScore());
+
+            BroadcastService.broadcast(LiveBroadcastTopic.LIVE_SCORE_UPDATE_RED, payload, "SCORE_OVERRIDE");
+            BroadcastService.broadcast(LiveBroadcastTopic.LIVE_SCORE_UPDATE_BLUE, payload, "SCORE_OVERRIDE");
+        } catch (Exception e) {
+            ILog.e(TAG, "broadcastScoreUpdate", e.getMessage());
+        }
+    }
+
+    private boolean isMatchCompleted(String matchId) {
+        if (stateManager.getCurrentMatchState() == MatchState.COMPLETED) {
+            return true;
+        }
+        try {
+            Match match = LocalRepository.matchDao().getMatchById(matchId);
+            return match != null && match.getMatchStatus() == MatchState.COMPLETED;
+        } catch (Exception e) {
+            ILog.e(TAG, "isMatchCompleted", e.getMessage());
+            return false;
+        }
     }
 
     private String[] toTeamIds(AllianceTeam[] allianceTeams) {
