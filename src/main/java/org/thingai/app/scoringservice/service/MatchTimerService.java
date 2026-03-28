@@ -17,12 +17,13 @@ public class MatchTimerService {
 
     public MatchTimerService(int startSeconds) {
         this.startSeconds = startSeconds;
-
+        this.remainingSeconds = startSeconds;
     }
 
     public void startTimer(int totalSeconds) {
         stopTimer();
         this.remainingSeconds = totalSeconds;
+        this.isRunning = true;
         this.timerTask = scheduler.scheduleAtFixedRate(this::tick, 0, 1, TimeUnit.SECONDS);
     }
 
@@ -58,6 +59,10 @@ public class MatchTimerService {
         stopTimer();
         remainingSeconds = startSeconds;
         callback.onTimerUpdated(remainingSeconds);
+    }
+
+    public int getRemainingSeconds() {
+        return remainingSeconds;
     }
 
     public void setCallback(TimerCallback callback) {

@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Observable, map, forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import {
   MatchService,
   MockMatchService,
@@ -10,11 +10,10 @@ import {
 } from '../../core/services/match.service';
 import { environment } from '../../../environments/environment';
 import { MatchDetailDto } from '../../core/models/match.model';
-import { ScorekeeperService } from '../../core/services/scorekeeper.service';
 import { BroadcastService } from '../../core/services/broadcast.service';
-import { SyncService } from '../../core/services/sync.service';
 import { RankService } from '../../core/services/rank.service';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
+import { DisplayControlAction, MatchControlService, MatchControlState } from '../../core/services/match-control.service';
 
 type TabKey =
   | 'schedule'
@@ -85,63 +84,19 @@ export class MatchControl implements OnInit {
   manualRedTeams: string = '';
   manualBlueTeams: string = '';
 
-constructor(
+  constructor(
     private matchService: MatchService,
-    private scorekeeper: ScorekeeperService,
+    private matchControl: MatchControlService,
     private broadcastService: BroadcastService,
-    private syncService: SyncService,
     private rankService: RankService
   ) { }
 
   ngOnInit(): void {
     this.loadSchedule();
-    this.syncService.syncPlayingMatches().subscribe({
-      next: (matches) => {
-        console.log('Synced playing matches', matches);
-
-        if (matches && matches.length > 0) {
-          // Assume first match is active, second is loaded
-          this.active.set(matches[0]);
-          if (matches.length > 1) {
-            this.loaded.set(matches[1]);
-          } else {
-            this.loaded.set(null);
-          }
-        }
-      },
-      error: (e) => console.error('Failed to sync playing matches', e.message)
-    });
-    this.broadcastService.subscribeToTopic("/topic/display/field/*/timer").subscribe({
-      next: (msg) => {
-        console.log("Received timer update:", msg);
-        if (msg.payload && msg.payload.remainingSeconds !== undefined) {
-          const newValue = msg.payload.remainingSeconds;
-
-          // Debug logging for timer values
-          console.log(`Timer: previous=${this.previousTimerValue}, new=${newValue}`);
-
-          // Only play match end sound when the match timer (not countdown) reaches 0
-          // The match timer starts at 180+ seconds, countdown is 3 seconds
-          const wasCountdown = this.previousTimerValue !== null && this.previousTimerValue <= 3;
-          const isMatchTime = newValue > 3;
-
-          console.log(`Timer check: wasCountdown=${wasCountdown}, isMatchTime=${isMatchTime}`);
-
-          // If transitioning from countdown (0) to match time (180+), don't play sound
-          // Only play match end sound when actual match time reaches 0
-          if (this.previousTimerValue !== null &&
-              this.previousTimerValue > 0 &&
-              newValue === 0 &&
-              !wasCountdown) {
-            console.log("Triggering match end sound!");
-            this.playMatchEndSound();
-          }
-
-          this.previousTimerValue = newValue;
-          this.activeMatchTimer.set(newValue);
-        }
-      },
-      error: (e) => console.error("Failed to subscribe to timer updates:", e)
+    this.refreshControlState();
+    this.broadcastService.subscribeToTopic('/topic/live/match').subscribe({
+      next: (msg) => this.handleMatchControlBroadcast(msg),
+      error: (e) => console.error('Failed to subscribe to match updates:', e)
     });
   }
 
@@ -149,12 +104,76 @@ constructor(
     this.selectedTab.set(key);
   }
 
+  private refreshControlState() {
+    this.matchControl.getState().subscribe({
+      next: (state) => this.applyControlState(state),
+      error: (e) => console.error('Failed to load match control state', e)
+    });
+  }
+
+  private applyControlState(state: MatchControlState) {
+    const loadedMatch = this.findMatchById(state.loadedMatchId);
+    const activeMatch = this.findMatchById(state.currentMatchId);
+
+    this.loaded.set(loadedMatch);
+    this.active.set(activeMatch);
+    if (state.timerSecondsRemaining !== undefined && state.timerSecondsRemaining !== null) {
+      this.updateTimerFromPayload(state.timerSecondsRemaining);
+    }
+  }
+
+  private findMatchById(matchId: string | null | undefined): MatchDetailDto | null {
+    if (!matchId) {
+      return null;
+    }
+    return this.schedule().find(m => m.match.id === matchId) ?? null;
+  }
+
+  private handleMatchControlBroadcast(msg: any) {
+    if (!msg || !msg.payload) {
+      return;
+    }
+
+    const payload = msg.payload;
+    if (payload.timerSecondsRemaining !== undefined && payload.timerSecondsRemaining !== null) {
+      this.updateTimerFromPayload(payload.timerSecondsRemaining);
+    }
+
+    if (payload.matchId) {
+      const match = this.findMatchById(payload.matchId);
+      if (payload.state !== undefined && payload.state !== null) {
+        if (payload.state === 1) {
+          this.loaded.set(match);
+        } else if (payload.state >= 2) {
+          this.active.set(match);
+        }
+      }
+    }
+  }
+
+  private updateTimerFromPayload(newValue: number) {
+    const wasCountdown = this.previousTimerValue !== null && this.previousTimerValue <= 3;
+
+    if (this.previousTimerValue !== null &&
+        this.previousTimerValue > 0 &&
+        newValue === 0 &&
+        !wasCountdown) {
+      this.playMatchEndSound();
+    }
+
+    this.previousTimerValue = newValue;
+    this.activeMatchTimer.set(newValue);
+  }
+
   // ---- Data loading ----
   loadSchedule(matchType?: number) {
     const typeToLoad = matchType !== undefined ? matchType : this.viewMatchType;
     // Fetch matches WITH scores so we can edit them
     this.matchService.getMatches(typeToLoad, true).subscribe({
-      next: (list) => this.schedule.set(list),
+      next: (list) => {
+        this.schedule.set(list);
+        this.refreshControlState();
+      },
       error: (e) => console.error('Failed to load schedule', e)
     });
   }
@@ -165,14 +184,12 @@ constructor(
 
   // ---- Schedule row actions ----
   playMatch(match: MatchDetailDto) {
-    // Backend: set next match on the field
-    this.scorekeeper.setNextMatch(match.match.id).subscribe({
-      next: () => this.loaded.set(match),
-      error: (e) => {
-        console.error('Failed to set next match', e);
-        // Fallback for UI in case backend not ready
+    this.matchControl.loadMatch(match.match.id).subscribe({
+      next: () => {
         this.loaded.set(match);
-      }
+        this.refreshControlState();
+      },
+      error: (e) => console.error('Failed to load match', e)
     });
   }
 
@@ -219,7 +236,7 @@ constructor(
     if (m.redScore) {
       console.log('Submitting red score override for alliance ID:', m.redScore.id);
       requests.push(
-        this.scorekeeper.overrideScore(m.match.id + "_R", this.redScoreData).pipe(
+        this.matchControl.overrideScore(m.match.id + "_R", this.redScoreData).pipe(
           catchError(e => {
             console.error('Failed to update red score', e);
             return of({ error: true, alliance: 'red' });
@@ -232,7 +249,7 @@ constructor(
     if (m.blueScore) {
       console.log("Submitting blue score override");
       requests.push(
-        this.scorekeeper.overrideScore(m.match.id + "_B", this.blueScoreData).pipe(
+        this.matchControl.overrideScore(m.match.id + "_B", this.blueScoreData).pipe(
           catchError(e => {
             console.error('Failed to update blue score', e);
             return of({ error: true, alliance: 'blue' });
@@ -318,18 +335,23 @@ cancelEdit() {
     const current = this.loaded();
     const idx = current ? list.findIndex(m => m.match.id === current.match.id) : -1;
     const next = list[(idx + 1 + list.length) % list.length];
-    // Optimistic UI update, then backend (if any)
-    this.scorekeeper.setNextMatch(next.match.id).subscribe({
-      next: () => this.loaded.set(next),
+    this.matchControl.loadMatch(next.match.id).subscribe({
+      next: () => {
+        this.loaded.set(next);
+        this.refreshControlState();
+      },
       error: () => {
-        console.error('Failed to set next match');
+        console.error('Failed to load next match');
         alert('Failed to load next match');
       }
     });
   }
 
   showUpNext() {
-    this.scorekeeper.showUpNext().subscribe({
+    const loaded = this.loaded();
+    this.matchControl.displayAction(DisplayControlAction.SHOW_PREVIEW, {
+      matchId: loaded?.match?.id
+    }).subscribe({
       next: () => console.debug('Show up next command sent'),
       error: (e) => {
         console.error('Failed to show up next', e);
@@ -339,7 +361,10 @@ cancelEdit() {
   }
 
   showCurrentMatch() {
-    this.scorekeeper.showCurrentMatch().subscribe({
+    const active = this.active();
+    this.matchControl.displayAction(DisplayControlAction.SHOW_MATCH, {
+      matchId: active?.match?.id
+    }).subscribe({
       next: () => console.debug('Show current match command sent'),
       error: (e) => {
         console.error('Failed to show current match', e);
@@ -436,10 +461,11 @@ cancelEdit() {
       console.warn('No loaded match to activate.');
       return;
     }
-    this.scorekeeper.activateMatch().subscribe({
+    this.matchControl.activateMatch(toActivate.match.id).subscribe({
       next: () => {
         this.active.set(toActivate);
         this.loaded.set(null);
+        this.refreshControlState();
       },
       error: (e) => {
         console.error('Failed to activate match', e);
@@ -460,12 +486,13 @@ cancelEdit() {
     // Sound disabled - display scoring only
     // this.playMatchStartSound();
 
-    this.scorekeeper.startCurrentMatch().subscribe({
+    this.matchControl.startMatch().subscribe({
       next: () => {
         // Match is already active, no need to set again
         this.loaded.set(null); // Clear loaded match after starting
         this.previousTimerValue = null; // Reset timer tracking
         console.debug('Match timer started for active match');
+        this.refreshControlState();
       },
       error: (e) => {
         console.error('Failed to start current match', e);
@@ -503,13 +530,9 @@ cancelEdit() {
       return;
     }
 
-    this.scorekeeper.abortCurrentMatch().subscribe({
+    this.matchControl.abortMatch().subscribe({
       next: () => {
-        // Move match from active back to loaded
-        this.loaded.set(toAbort);
-        this.active.set(null);
-        this.activeMatchTimer.set(null);
-        this.previousTimerValue = null; // Reset timer tracking
+        this.refreshControlState();
         console.debug('Match aborted successfully');
       },
       error: (e) => {
@@ -520,10 +543,12 @@ cancelEdit() {
   }
 
   commitAndPostLastMatch() {
-    this.scorekeeper.commitFinalScore().subscribe({
+    this.matchControl.commitMatch().subscribe({
       next: () => {
         console.debug('Committed last match results')
         alert('Successfully committed last match results');
+        this.loadSchedule(this.viewMatchType);
+        this.refreshControlState();
       },
       error: (e) => {
         console.error('Failed to commit last match', e)
