@@ -23,25 +23,24 @@ export class ManageTeam implements OnInit{
 
   submitAddTeam() {
     if (this.newTeam.teamId && this.newTeam.teamName && this.newTeam.teamSchool && this.newTeam.teamRegion) {
-      this.teamService.addTeam(this.newTeam).subscribe({
-        next: () => {
-          this.teams.update(teams => [...teams, { ...this.newTeam }]);
+      const createdTeam: Team = { ...this.newTeam };
+      this.teamService.addTeam(createdTeam).subscribe({
+        next: (response) => {
+          const teamToAdd = response && response.teamId ? response : createdTeam;
+          this.teams.update(teams => [...teams, teamToAdd]);
           console.log('Team added successfully');
           alert('Team added successfully');
+          this.newTeam = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
+          const modal = document.getElementById('addTeamModal');
+          if (modal) {
+            (window as any).bootstrap.Modal.getInstance(modal)?.hide();
+          }
         },
         error: (error) => {
           console.error('Error adding team:', error);
           alert('Error adding team: ' + error.message);
         },
       });
-      // Reset the newTeam object
-      this.newTeam = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
-      // Hide the modal
-      const modal = document.getElementById('addTeamModal');
-      if (modal) {
-        // Bootstrap 5 modal instance
-        (window as any).bootstrap.Modal.getInstance(modal).hide();
-      }
     }
   }
 

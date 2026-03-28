@@ -238,7 +238,7 @@ export class ScoreTracking implements OnInit, OnDestroy {
     this.submitMessage.set('');
 
     const payload = this.buildScorePayload();
-    this.refereeService.submitFinalScore(this.color, this.allianceId, payload).subscribe({
+    this.refereeService.submitFinalScore(this.matchId, this.allianceId, payload).subscribe({
       next: (res) => {
         this.submitting.set(false);
         this.submitMessage.set('Score submitted successfully.');

@@ -11,12 +11,12 @@ public class DaoScore {
     }
 
     public Score insertScore(Score score) throws Exception {
-        dao.insert(score);
+        dao.insert(Score.class, score);
         return score;
     }
 
     public Score updateScore(Score score) throws Exception {
-        dao.insertOrUpdate(score);
+        dao.insertOrUpdate(Score.class, score);
         return score;
     }
 

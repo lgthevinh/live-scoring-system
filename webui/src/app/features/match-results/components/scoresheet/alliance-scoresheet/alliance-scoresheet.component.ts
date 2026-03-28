@@ -386,7 +386,7 @@ export class AllianceScoresheetComponent implements OnChanges {
 
     const allianceId = this.matchInfo.matchCode + (this.alliance === 'red' ? '_R' : '_B');
 
-    this.refereeService.submitFinalScore(this.alliance, allianceId, JSON.stringify(this.scoreData)).subscribe({
+    this.refereeService.submitFinalScore(this.matchInfo.matchCode, allianceId, this.scoreData).subscribe({
       next: (res) => {
         this.submitting = false;
         this.submitMessage = 'Score submitted successfully';

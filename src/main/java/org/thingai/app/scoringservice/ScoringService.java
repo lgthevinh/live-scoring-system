@@ -32,7 +32,7 @@ public class ScoringService extends Service {
     public ScoringService() {
         super();
         ILog.ENABLE_LOGGING = true;
-        ILog.logLevel = ILog.INFO;
+        ILog.logLevel = ILog.DEBUG;
     }
 
     public static MatchHandler matchHandler() {

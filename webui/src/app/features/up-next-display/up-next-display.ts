@@ -67,7 +67,7 @@ export class UpNextDisplay implements OnInit, OnDestroy {
 
     private fetchUpNextMatch(): void {
         this.syncService.getUpNextMatch().subscribe({
-            next: (match: MatchDetailDto) => {
+            next: (match: MatchDetailDto | null) => {
                 if (match) {
                     this.applyMatchData(match);
                 } else {
