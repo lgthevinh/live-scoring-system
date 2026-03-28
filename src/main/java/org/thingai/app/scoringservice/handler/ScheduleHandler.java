@@ -29,23 +29,23 @@ public class ScheduleHandler {
         String osName = System.getProperty("os.name").toLowerCase();
         Path binary = Paths.get("binary");
         if (osName.contains("win")) {
-            ILog.d("ScheduleHandler", "Detected Windows OS for MatchMakerService.");
-            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMakerService.exe");
+            ILog.d(TAG, "Detected Windows OS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker.exe");
         } else if (osName.contains("mac")) {
-            ILog.d("ScheduleHandler", "Detected macOS for MatchMakerService.");
+            ILog.d(TAG, "Detected macOS for MatchMakerService.");
             this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker_mac");
         } else {
-            ILog.d("ScheduleHandler", "Assuming Linux OS for MatchMakerService.");
-            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMakerService");
+            ILog.d(TAG, "Assuming Linux OS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker");
         }
 
         Path dataDir = Paths.get("data");
         if (!Files.exists(dataDir)) {
             try {
                 Files.createDirectories(dataDir);
-                ILog.d("ScheduleHandler", "Created data directory at: " + dataDir.toAbsolutePath());
+                ILog.d(TAG, "Created data directory at: " + dataDir.toAbsolutePath());
             } catch (Exception e) {
-                ILog.e("ScheduleHandler", "Error creating data directory: " + e.getMessage());
+                ILog.e(TAG, "Error creating data directory: " + e.getMessage());
             }
         }
 
@@ -54,12 +54,12 @@ public class ScheduleHandler {
             try {
                 Files.createFile(outPath);
             } catch (Exception e) {
-                ILog.e("ScheduleHandler", "Error creating match schedule output file: " + e.getMessage());
+                ILog.e(TAG, "Error creating match schedule output file: " + e.getMessage());
             }
         }
 
         String outDir = outPath.toAbsolutePath().toString();
-        ILog.d("ScheduleHandler", "Match schedule output path set to: " + outDir);
+        ILog.d(TAG, "Match schedule output path set to: " + outDir);
         this.matchMaker.setOutPath(outDir);
     }
 
@@ -71,7 +71,7 @@ public class ScheduleHandler {
      * - Keeps existing time generation (start time, duration, TimeBlocks).
      */
     public void generateSchedule(int rounds, String startTime, int matchDuration, int fieldCount, TimeBlock[] timeBlocks, RequestCallback<Void> callback) {
-        ILog.d("ScheduleHandler", "Generating match schedule V2 with rounds=" + rounds + ", start=" + startTime + ", duration=" + matchDuration + " min");
+        ILog.d(TAG, "Generating match schedule V2 with rounds=" + rounds + ", start=" + startTime + ", duration=" + matchDuration + " min");
         try {
             // 1) Load teams and reset schedule-related tables and caches
             Team[] allTeams = LocalRepository.teamDao().listTeams();
@@ -123,7 +123,7 @@ public class ScheduleHandler {
             List<ParsedMatch> parsedMatches = parseMatchMakerSchedule(lines);
             if (parsedMatches.isEmpty()) {
                 // Last defensive check: if we still don't see "Match Schedule", dump first few lines to logs
-                ILog.w("ScheduleHandler", "Schedule header not found. First lines: " + String.join(" | ", lines.subList(0, Math.min(5, lines.size()))));
+                ILog.w(TAG, "Schedule header not found. First lines: " + String.join(" | ", lines.subList(0, Math.min(5, lines.size()))));
                 callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "No matches parsed from schedule file. Ensure it contains a 'Match Schedule' section.");
                 return;
             }
@@ -150,7 +150,7 @@ public class ScheduleHandler {
                 }
 
                 if (pm.red.length < 2 || pm.blue.length < 2) {
-                    ILog.w("ScheduleHandler", "Skipping malformed match line: " + Arrays.toString(pm.red) + " vs " + Arrays.toString(pm.blue));
+                    ILog.w(TAG, "Skipping malformed match line: " + Arrays.toString(pm.red) + " vs " + Arrays.toString(pm.blue));
                     continue;
                 }
 
@@ -174,7 +174,7 @@ public class ScheduleHandler {
                     surrogateMap.put(teamId, pm.surrogateMap.getOrDefault(tIdx, false));
                 }
 
-                ILog.d("ScheduleHandler", Arrays.toString(redTeamIds) + " vs " + Arrays.toString(blueTeamIds) + " at " + currentTime.format(timeFormatter));
+                ILog.d(TAG, Arrays.toString(redTeamIds) + " vs " + Arrays.toString(blueTeamIds) + " at " + currentTime.format(timeFormatter));
 
                 // Create the match and scores
                 createMatchInternal(MatchType.QUALIFICATION, matchNumber, fieldNumber, currentTime.format(timeFormatter), redTeamIds, blueTeamIds, surrogateMap);
@@ -186,12 +186,13 @@ public class ScheduleHandler {
 
             callback.onSuccess(null, "Match schedule generated successfully by MatchMakerService (shuffled mapping) and times assigned.");
         } catch (Exception e) {
+            ILog.e(TAG, "generateSchedule error: " + e.getMessage());
             callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to generate match schedule: " + e.getMessage());
         }
     }
 
     public void generatePlayoffSchedule(int playoffType, int fieldCount, AllianceTeam[] allianceTeams, String startTime, int matchDuration, TimeBlock[] timeBlocks, RequestCallback<Void> callback) {
-        ILog.d("ScheduleHandler", "Generating playoff schedule with type=" + playoffType + ", start=" + startTime + ", duration=" + matchDuration + " min");
+        ILog.d(TAG, "Generating playoff schedule with type=" + playoffType + ", start=" + startTime + ", duration=" + matchDuration + " min");
         try {
             if (allianceTeams == null || allianceTeams.length == 0) {
                 callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Alliance teams are required to generate playoff schedule.");
@@ -319,7 +320,7 @@ public class ScheduleHandler {
                 int t4 = parseTeamIndex(m.group(5));
 
                 if (t1 == -1 || t2 == -1 || t3 == -1 || t4 == -1) {
-                    ILog.w("ScheduleHandler", "Failed to parse team indices from line: " + raw);
+                    ILog.w(TAG, "Failed to parse team indices from line: " + raw);
                     continue;
                 }
 
@@ -339,7 +340,7 @@ public class ScheduleHandler {
     }
 
     private int parseTeamIndex(String token) {
-        ILog.d("ScheduleHandler", "Parsing team index from token: " + token);
+        ILog.d(TAG, "Parsing team index from token: " + token);
         String digits = token.replace("*", "").trim(); // remove surrogate marker
         try {
             return Integer.parseInt(digits);
@@ -399,7 +400,7 @@ public class ScheduleHandler {
             team.setTeamId(teamId);
             team.setAllianceId(redAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
-            ILog.d("ScheduleHandler", "Inserting red alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
+            ILog.d(TAG, "Inserting red alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
             LocalRepository.allianceTeamDao().insertAllianceTeam(team);
         }
 
@@ -408,7 +409,7 @@ public class ScheduleHandler {
             team.setTeamId(teamId);
             team.setAllianceId(blueAllianceId);
             team.setSurrogate(surrogateMap.get(teamId));
-            ILog.d("ScheduleHandler", "Inserting blue alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
+            ILog.d(TAG, "Inserting blue alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
             LocalRepository.allianceTeamDao().insertAllianceTeam(team);
         }
 

@@ -1,8 +1,7 @@
-import {Component, OnInit, signal, WritableSignal, inject} from '@angular/core';
+import {Component, OnInit, signal, WritableSignal} from '@angular/core';
 import {Team} from '../../../core/models/team.model';
 import {FormsModule} from '@angular/forms';
 import {TeamService} from '../../../core/services/team.service';
-import {ToastService} from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-manage-team',
@@ -13,32 +12,33 @@ import {ToastService} from '../../../core/services/toast.service';
   styleUrl: './manage-team.css'
 })
 export class ManageTeam implements OnInit{
-  private teamService = inject(TeamService);
-  private toastService = inject(ToastService);
-
   teams: WritableSignal<Team[]> = signal([]);
   newTeam: Team = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
   editTeam: Team = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
   fileToUpload: File | null = null;
+  constructor(
+    private teamService: TeamService
+  ) {
+  }
 
   submitAddTeam() {
     if (this.newTeam.teamId && this.newTeam.teamName && this.newTeam.teamSchool && this.newTeam.teamRegion) {
-      this.teamService.addTeam(this.newTeam).subscribe({
-        next: () => {
-          this.teams.update(teams => [...teams, { ...this.newTeam }]);
-          this.toastService.show('Team added successfully', 'success');
-          // Reset the newTeam object
+      const createdTeam: Team = { ...this.newTeam };
+      this.teamService.addTeam(createdTeam).subscribe({
+        next: (response) => {
+          const teamToAdd = response && response.teamId ? response : createdTeam;
+          this.teams.update(teams => [...teams, teamToAdd]);
+          console.log('Team added successfully');
+          alert('Team added successfully');
           this.newTeam = { teamId: '', teamName: '', teamSchool: '', teamRegion: '' };
-          // Hide the modal
           const modal = document.getElementById('addTeamModal');
           if (modal) {
-            // Bootstrap 5 modal instance
-            (window as any).bootstrap.Modal.getInstance(modal).hide();
+            (window as any).bootstrap.Modal.getInstance(modal)?.hide();
           }
         },
         error: (error) => {
           console.error('Error adding team:', error);
-          this.toastService.show('Error adding team: ' + error.message, 'error');
+          alert('Error adding team: ' + error.message);
         },
       });
     }
@@ -51,140 +51,48 @@ export class ManageTeam implements OnInit{
 
   submitEditTeam() {
     const index = this.teams().findIndex(t => t.teamId === this.editTeam.teamId);
+    if (index !== -1) {
+      this.teams.update(teams => {
+        const updatedTeams = [...teams];
+        updatedTeams[index] = { ...this.editTeam };
+        return updatedTeams;
+      });
+    }
     this.teamService.updateTeam(this.editTeam).subscribe({
       next: () => {
-        if (index !== -1) {
-          this.teams.update(teams => {
-            const updatedTeams = [...teams];
-            updatedTeams[index] = { ...this.editTeam };
-            return updatedTeams;
-          });
-        }
-        this.toastService.show('Team updated successfully', 'success');
-        // Hide the modal (Bootstrap 5)
-        const modal = document.getElementById('editTeamModal');
-        if (modal) {
-          (window as any).bootstrap.Modal.getInstance(modal)?.hide();
-        }
+        console.log('Team updated successfully');
+        alert('Team updated successfully');
       },
       error: (error) => {
         console.error('Error updating team:', error);
-        this.toastService.show('Error updating team: ' + error.message, 'error');
+        alert('Error updating team: ' + error.message);
       },
     });
+    // Hide the modal (Bootstrap 5)
+    const modal = document.getElementById('editTeamModal');
+    if (modal) {
+      (window as any).bootstrap.Modal.getInstance(modal)?.hide();
+    }
   }
 
-  handleFileInput(event: Event) {
-    const input = event.target as HTMLInputElement;
-    this.fileToUpload = input.files && input.files.length > 0 ? input.files[0] : null;
+  handleFileInput(files: FileList | null) {
+    this.fileToUpload = files && files.length > 0 ? files[0] : null;
   }
 
   uploadTeamList() {
-    if (!this.fileToUpload) {
-      this.toastService.show('Please select a CSV or Excel file to import', 'info');
-      return;
-    }
 
-    const fileName = this.fileToUpload.name.toLowerCase();
-    if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx')) {
-      this.toastService.show('Please select a valid CSV or Excel (.xlsx) file', 'error');
-      return;
-    }
-
-    this.teamService.importTeams(this.fileToUpload).subscribe({
-      next: (response) => {
-        this.toastService.show(response.message || 'Teams imported successfully', 'success');
-        this.fileToUpload = null;
-        // Reload teams list
-        this.teamService.getTeams().subscribe({
-          next: (teams: Team[]) => {
-            this.teams.set(teams);
-          },
-          error: (error) => {
-            console.error('Error reloading teams:', error);
-          }
-        });
-      },
-      error: (error) => {
-        console.error('Error importing teams:', error);
-        this.toastService.show('Error importing teams: ' + (error.error?.error || error.message), 'error');
-      }
-    });
-  }
-
-  exportTeamList() {
-    this.teamService.exportTeams().subscribe({
-      next: (blob: Blob) => {
-        // Check if it's an error response by reading first few bytes
-        blob.text().then(text => {
-          if (text.trim().startsWith('{')) {
-            // It's an error JSON
-            try {
-              const errorData = JSON.parse(text);
-              this.toastService.show(errorData.error || 'Export failed', 'error');
-            } catch (e) {
-              this.toastService.show('Export failed: ' + text, 'error');
-            }
-          } else {
-            // It's the CSV data
-            const csvBlob = new Blob([text], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(csvBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `teams_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            this.toastService.show('Teams exported successfully', 'success');
-          }
-        });
-      },
-      error: (error) => {
-        console.error('Error exporting teams:', error);
-        this.toastService.show('Error exporting teams: ' + error.message, 'error');
-      }
-    });
-  }
-
-  downloadTemplate() {
-    const template = 'Team ID,Team Name,School,Region\n' +
-                     'T001,Team Alpha,High School A,North\n' +
-                     'T002,Team Beta,High School B,South\n';
-    const blob = new Blob([template], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'team_import_template.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    this.toastService.show('Template downloaded', 'success');
   }
 
   deleteTeam(teamId: string) {
-    // Store team for potential undo
-    const deletedTeam = this.teams().find(t => t.teamId === teamId);
-
     this.teamService.deleteTeam(teamId).subscribe({
       next: () => {
         this.teams.update(teams => teams.filter(t => t.teamId !== teamId));
-        this.toastService.show(`Team ${deletedTeam?.teamId || ''} deleted`, 'success', 15000, {
-          label: 'Undo',
-          onAction: () => {
-            if (deletedTeam) {
-              this.teamService.addTeam(deletedTeam).subscribe(() => {
-                this.teams.update(teams => [...teams, deletedTeam]);
-                this.toastService.show('Team restored', 'success');
-              });
-            }
-          }
-        });
+        console.log('Team deleted successfully');
+        alert('Team deleted successfully');
       },
       error: (error) => {
         console.error('Error deleting team:', error);
-        this.toastService.show('Error deleting team: ' + error.message, 'error');
+        alert('Error deleting team: ' + error.message);
       },
     });
   }
@@ -197,7 +105,6 @@ export class ManageTeam implements OnInit{
       },
       error: (error) => {
         console.error('Error loading teams:', error);
-        this.toastService.show('Error loading teams: ' + error.message, 'error');
       },
     });
   }

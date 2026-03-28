@@ -17,7 +17,7 @@ import static org.thingai.app.api.utils.ResponseEntityUtil.createErrorResponse;
 import static org.thingai.app.api.utils.ResponseEntityUtil.getObjectResponse;
 
 @RestController
-@RequestMapping("/api/v2/teams")
+@RequestMapping("/api/teams")
 public class TeamApi {
     private final ObjectMapper objectMapper = new ObjectMapper();
 

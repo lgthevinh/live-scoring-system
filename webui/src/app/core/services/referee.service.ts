@@ -4,19 +4,23 @@ import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class RefereeService {
-  private apiUrl = environment.apiBaseUrl + '/api/ref';
+  private apiUrl = environment.apiBaseUrl + '/api/scores';
 
   constructor(
     private http: HttpClient
   ) { }
 
-  submitFinalScore(color: string, allianceId: string, scoreData: any) {
-    console.log('Submitting final score:', color, allianceId, scoreData);
-    return this.http.post(`${this.apiUrl}/submit/${color}/${allianceId}/final-score`, scoreData);
+  submitFinalScore(matchId: string, allianceId: string, scoreData: any) {
+    console.log('Submitting final score:', matchId, allianceId, scoreData);
+    return this.http.post(`${this.apiUrl}/submit`, {
+      matchId,
+      allianceId,
+      score: scoreData
+    });
   }
 
   getScoreUiDefinitions() {
-    return this.http.get<any[]>(`${environment.apiBaseUrl}/api/score/ui-definitions`);
+    return this.http.get<any[]>(`${this.apiUrl}/define`);
   }
 
 }

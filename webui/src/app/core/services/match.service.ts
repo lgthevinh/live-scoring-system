@@ -49,7 +49,7 @@ export abstract class MatchService {
 })
 export class ProdMatchService extends MatchService {
   protected apiUrl = environment.apiBaseUrl + '/api/match';
-  protected scoreApiUrl = environment.apiBaseUrl + '/api/score';
+  protected scoreApiUrl = environment.apiBaseUrl + '/api/scores';
 
   constructor(private http: HttpClient) {
     super();
@@ -119,11 +119,35 @@ export class ProdMatchService extends MatchService {
   }
 
   override getScore(allianceId: string): Observable<Score> {
-    return this.http.get<Score>(`${this.scoreApiUrl}/alliance/${allianceId}`);
+    const matchId = this.extractMatchId(allianceId);
+    if (!matchId) {
+      throw new Error('Invalid allianceId');
+    }
+    return this.http.get<{ r: Score; b: Score }>(`${this.scoreApiUrl}/match/${matchId}`).pipe(
+      map(res => allianceId.endsWith('_R') ? res.r : res.b)
+    );
   }
 
   override submitScore(allianceId: string, scoreData: any): Observable<Score> {
-    return this.http.post<Score>(`${this.scoreApiUrl}/submit/${allianceId}`, scoreData);
+    const matchId = this.extractMatchId(allianceId);
+    if (!matchId) {
+      throw new Error('Invalid allianceId');
+    }
+    return this.http.post<Score>(`${this.scoreApiUrl}/submit`, {
+      matchId,
+      allianceId,
+      score: scoreData
+    });
+  }
+
+  private extractMatchId(allianceId: string): string | null {
+    if (!allianceId || allianceId.length < 3) {
+      return null;
+    }
+    if (allianceId.endsWith('_R') || allianceId.endsWith('_B')) {
+      return allianceId.substring(0, allianceId.length - 2);
+    }
+    return null;
   }
 }
 
@@ -132,7 +156,7 @@ export class ProdMatchService extends MatchService {
 })
 export class MockMatchService extends MatchService {
   protected apiUrl = environment.apiBaseUrl + '/api/match';
-  protected scoreApiUrl = environment.apiBaseUrl + '/api/score';
+  protected scoreApiUrl = environment.apiBaseUrl + '/api/scores';
 
   constructor() { super(); }
 

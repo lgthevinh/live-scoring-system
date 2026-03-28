@@ -9,6 +9,7 @@ import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.AllianceTeam;
 import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.app.scoringservice.entity.TimeBlock;
+import org.thingai.base.log.ILog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -267,11 +268,13 @@ public class MatchApi {
                 new RequestCallback<Void>() {
                     @Override
                     public void onSuccess(Void responseObject, String message) {
+                        ILog.d("MatchApi", "handleGenerateSChedule:onSuccess" + message);
                         future.complete(ResponseEntity.ok(Map.of("message", message)));
                     }
 
                     @Override
                     public void onFailure(int errorCode, String errorMessage) {
+                            ILog.d("MatchApi", "handleGenerateSChedule:onFailure" + errorMessage);
                         future.complete(createErrorResponse(errorCode, errorMessage));
                     }
                 }
