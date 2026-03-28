@@ -13,7 +13,7 @@ import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.RankingEntry;
 import org.thingai.app.scoringservice.entity.Score;
-import org.thingai.app.scoringservice.handler.ScoringHandler;
+import org.thingai.app.scoringservice.handler.ScoreHandler;
 import org.thingai.app.scoringservice.matchcontrol.StateManager;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.BroadcastService;
@@ -266,7 +266,7 @@ public class MatchControlApi {
 
     private ScoreBuildResult buildScoreFromOverride(OverrideRequest request) throws Exception {
         String allianceId = request.allianceId();
-        Score score = ScoringHandler.factoryScore();
+        Score score = ScoreHandler.factoryScore();
         score.setAllianceId(allianceId);
 
         String rawJson = "{}";

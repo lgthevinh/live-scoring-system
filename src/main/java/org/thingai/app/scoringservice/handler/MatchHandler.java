@@ -59,9 +59,9 @@ public class MatchHandler {
             insertAllianceTeams(redAllianceId, redTeamIds);
             insertAllianceTeams(blueAllianceId, blueTeamIds);
 
-            Score redScore = ScoringHandler.factoryScore();
+            Score redScore = ScoreHandler.factoryScore();
             redScore.setAllianceId(redAllianceId);
-            Score blueScore = ScoringHandler.factoryScore();
+            Score blueScore = ScoreHandler.factoryScore();
             blueScore.setAllianceId(blueAllianceId);
 
             LocalRepository.matchDao().insertMatch(match);

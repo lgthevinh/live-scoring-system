@@ -3,7 +3,7 @@ package org.thingai.app.scoringservice.matchcontrol;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.entity.Score;
-import org.thingai.app.scoringservice.handler.ScoringHandler;
+import org.thingai.app.scoringservice.handler.ScoreHandler;
 import org.thingai.base.log.ILog;
 
 import java.util.Map;
@@ -64,7 +64,7 @@ public class LiveScoreControl {
 
             Score score = stateManager.getCachedScore(allianceId);
             if (score == null) {
-                score = ScoringHandler.factoryScore();
+                score = ScoreHandler.factoryScore();
                 score.setAllianceId(allianceId);
             } else if (score.getAllianceId() == null || score.getAllianceId().isBlank()) {
                 score.setAllianceId(allianceId);
@@ -118,7 +118,7 @@ public class LiveScoreControl {
 
             Score score = stateManager.getCachedScore(allianceId);
             if (score == null) {
-                score = ScoringHandler.factoryScore();
+                score = ScoreHandler.factoryScore();
                 score.setAllianceId(allianceId);
             } else if (score.getAllianceId() == null || score.getAllianceId().isBlank()) {
                 score.setAllianceId(allianceId);

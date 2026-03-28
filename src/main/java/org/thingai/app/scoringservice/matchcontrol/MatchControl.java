@@ -3,9 +3,11 @@ package org.thingai.app.scoringservice.matchcontrol;
 import org.thingai.app.scoringservice.define.DisplayControlAction;
 import org.thingai.app.scoringservice.define.LiveBroadcastTopic;
 import org.thingai.app.scoringservice.define.MatchState;
+import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.AllianceTeam;
 import org.thingai.app.scoringservice.entity.Match;
+import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.BroadcastService;
 import org.thingai.app.scoringservice.service.MatchTimerService;
@@ -82,6 +84,10 @@ public class MatchControl {
 
     public void commitScore() {
         ILog.d(TAG, "commitScore", stateManager.getCurrentMatchId());
+        if (!areScoresReadyToCommit(stateManager.getCurrentMatchId())) {
+            ILog.w(TAG, "commitScore", "scores not ready to commit");
+            return;
+        }
         matchTimerService.stopTimer();
         stateManager.setCurrentMatchState(MatchState.COMPLETED);
         persistMatchState(stateManager.getCurrentMatchId(), MatchState.COMPLETED, true);
@@ -158,6 +164,36 @@ public class MatchControl {
         }
 
         BroadcastService.broadcast("/topic/" + LiveBroadcastTopic.LIVE_MATCH, payload, "MATCH_STATE");
+    }
+
+    private boolean areScoresReadyToCommit(String matchId) {
+        if (matchId == null || matchId.isBlank()) {
+            return false;
+        }
+        String redId = matchId + "_R";
+        String blueId = matchId + "_B";
+
+        Score redScore = stateManager.getCachedScore(redId);
+        Score blueScore = stateManager.getCachedScore(blueId);
+
+        if (redScore == null || blueScore == null) {
+            try {
+                MatchDetailDto matchDetail = LocalRepository.matchDao().getMatchDetailById(matchId);
+                if (redScore == null) {
+                    redScore = matchDetail != null ? matchDetail.getRedScore() : null;
+                }
+                if (blueScore == null) {
+                    blueScore = matchDetail != null ? matchDetail.getBlueScore() : null;
+                }
+            } catch (Exception e) {
+                ILog.e(TAG, "areScoresReadyToCommit", e.getMessage());
+            }
+        }
+
+        return redScore != null
+                && blueScore != null
+                && redScore.getState() == ScoreState.READY_TO_COMMIT
+                && blueScore.getState() == ScoreState.READY_TO_COMMIT;
     }
 
     private void broadcastDisplayAction(int action, Map<String, Object> data) {

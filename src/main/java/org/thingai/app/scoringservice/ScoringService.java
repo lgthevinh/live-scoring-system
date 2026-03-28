@@ -20,7 +20,7 @@ public class ScoringService extends Service {
     private static EventHandler eventHandler;
     private static AuthHandler authHandler;
     private static TeamHandler teamHandler;
-    private static ScoringHandler scoringHandler;
+    private static ScoreHandler scoreHandler;
     private static ScheduleHandler scheduleHandler;
     private static MatchHandler matchHandler;
     private static RankingHandler rankingHandler;
@@ -82,7 +82,7 @@ public class ScoringService extends Service {
         teamHandler = new TeamHandler();
         scheduleHandler = new ScheduleHandler(new MatchMakerService());
         matchHandler = new MatchHandler();
-        scoringHandler = new ScoringHandler();
+        scoreHandler = new ScoreHandler();
         rankingHandler = new RankingHandler();
 
         stateManager = new StateManager();
@@ -94,8 +94,8 @@ public class ScoringService extends Service {
         ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
     }
 
-    public static ScoringHandler scoreHandler() {
-        return scoringHandler;
+    public static ScoreHandler scoreHandler() {
+        return scoreHandler;
     }
 
     public static RankingHandler rankingHandler() {
@@ -115,7 +115,7 @@ public class ScoringService extends Service {
     }
 
     public void registerScoreClass(Class<? extends Score> scoreClass) {
-        ScoringHandler.setScoreClass(scoreClass);
+        ScoreHandler.setScoreClass(scoreClass);
     }
 
     public void registerRankingStrategy(IRankingStrategy rankingStrategy) {
