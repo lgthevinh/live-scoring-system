@@ -8,13 +8,13 @@ import org.thingai.base.log.ILog;
 
 import java.util.Map;
 
-public class LiveScoreControl {
+public class ScoreControl {
     private static final String TAG = "LiveScoreControl";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateManager stateManager;
 
-    public LiveScoreControl(StateManager stateManager) {
+    public ScoreControl(StateManager stateManager) {
         this.stateManager = stateManager;
     }
 

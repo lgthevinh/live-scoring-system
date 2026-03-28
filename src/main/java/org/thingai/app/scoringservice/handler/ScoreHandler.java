@@ -46,6 +46,21 @@ public class ScoreHandler {
         return score.getScoreDefinitions();
     }
 
+    public void updateScore(Score score) throws Exception {
+        ensureEventReady();
+        if (score == null || isBlank(score.getAllianceId())) {
+            throw new IllegalArgumentException("score and allianceId are required.");
+        }
+
+        String jsonData = score.getRawScoreData();
+        if (jsonData == null || jsonData.isBlank()) {
+            jsonData = objectMapper.writeValueAsString(score);
+        }
+
+        LocalRepository.eventFileStore().writeJsonFile(score.getAllianceId() + ".json", jsonData);
+        LocalRepository.scoreDao().updateScore(score);
+    }
+
     public Score[] getAllScores() throws Exception {
         ensureEventReady();
         return LocalRepository.scoreDao().listScores();

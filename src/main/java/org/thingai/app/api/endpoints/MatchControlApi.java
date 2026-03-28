@@ -162,7 +162,7 @@ public class MatchControlApi {
                 ScoringService.rankingHandler().getRankingStatus(new RequestCallback<RankingEntry[]>() {
                     @Override
                     public void onSuccess(RankingEntry[] responseObject, String statusMessage) {
-                        BroadcastService.broadcast("/topic/" + LiveBroadcastTopic.LIVE_DISPLAY_RANKING,
+                        BroadcastService.broadcast(LiveBroadcastTopic.LIVE_DISPLAY_RANKING,
                                 responseObject, "RANKING_UPDATE");
                         future.complete(ResponseEntity.ok(Map.of("message", "Match committed.", "matchId", matchId)));
                     }
@@ -200,6 +200,14 @@ public class MatchControlApi {
             return notFound("Score not found for alliance: " + allianceId);
         }
 
+        String matchId = request.matchId();
+        if (isBlank(matchId)) {
+            matchId = extractMatchId(allianceId);
+        }
+        if (isBlank(matchId)) {
+            return badRequest("matchId is required.");
+        }
+
         Score score;
         String rawScoreJson;
         try {
@@ -211,18 +219,15 @@ public class MatchControlApi {
                     .body(Map.of("error", "Invalid score override payload: " + e.getMessage()));
         }
 
-        try {
-            LocalRepository.scoreDao().updateScore(score);
-            if (rawScoreJson != null) {
-                LocalRepository.eventFileStore().writeJsonFile(allianceId + ".json", rawScoreJson);
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to persist score: " + e.getMessage()));
+        score.setRawScoreData(rawScoreJson);
+
+        boolean overridden = ScoringService.matchControl().overrideScore(matchId, score);
+        if (!overridden) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Override rejected. Match must be completed.", "matchId", matchId));
         }
 
-        broadcastScoreUpdate(allianceId);
-        return ResponseEntity.ok(Map.of("message", "Score overridden.", "allianceId", allianceId));
+        return ResponseEntity.ok(Map.of("message", "Score overridden.", "allianceId", allianceId, "matchId", matchId));
     }
 
     @PostMapping("/display")
@@ -235,33 +240,8 @@ public class MatchControlApi {
         if (request.data() != null) {
             payload.put("data", request.data());
         }
-        BroadcastService.broadcast("/topic/" + LiveBroadcastTopic.LIVE_DISPLAY_CONTROL, payload, "DISPLAY_CONTROL");
+        BroadcastService.broadcast(LiveBroadcastTopic.LIVE_DISPLAY_CONTROL, payload, "DISPLAY_CONTROL");
         return ResponseEntity.ok(Map.of("message", "Display action broadcast."));
-    }
-
-    private void broadcastScoreUpdate(String allianceId) {
-        String matchId = extractMatchId(allianceId);
-        if (isBlank(matchId)) {
-            return;
-        }
-
-        try {
-            MatchDetailDto detail = LocalRepository.matchDao().getMatchDetailById(matchId);
-            if (detail == null) {
-                return;
-            }
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("matchId", matchId);
-            payload.put("r", detail.getRedScore());
-            payload.put("b", detail.getBlueScore());
-
-            String topic = allianceId.endsWith("_R")
-                    ? LiveBroadcastTopic.LIVE_SCORE_UPDATE_RED
-                    : LiveBroadcastTopic.LIVE_SCORE_UPDATE_BLUE;
-            BroadcastService.broadcast("/topic/" + topic, payload, "SCORE_UPDATE");
-        } catch (Exception e) {
-            // Ignore broadcast failure
-        }
     }
 
     private ScoreBuildResult buildScoreFromOverride(OverrideRequest request) throws Exception {
@@ -347,7 +327,7 @@ public class MatchControlApi {
 
     private record LoadRequest(String matchId) {}
     private record ActivateRequest(String matchId) {}
-    private record OverrideRequest(String allianceId, Object scoreData, Integer penaltiesScore, Integer totalScore) {}
+    private record OverrideRequest(String allianceId, String matchId, Object scoreData, Integer penaltiesScore, Integer totalScore) {}
     private record DisplayRequest(int action, Object data) {}
     private record ScoreBuildResult(Score score, String rawJson) {}
 }
