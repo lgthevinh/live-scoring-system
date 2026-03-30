@@ -10,7 +10,7 @@ import {
 } from '../../core/services/match.service';
 import { environment } from '../../../environments/environment';
 import { MatchDetailDto } from '../../core/models/match.model';
-import { BroadcastService } from '../../core/services/broadcast.service';
+import { BroadcastEventsService } from '../../core/services/broadcast-events.service';
 import { RankService } from '../../core/services/rank.service';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
 import { DisplayControlAction, MatchControlService, MatchControlState } from '../../core/services/match-control.service';
@@ -87,15 +87,15 @@ export class MatchControl implements OnInit {
   constructor(
     private matchService: MatchService,
     private matchControl: MatchControlService,
-    private broadcastService: BroadcastService,
+    private broadcastEvents: BroadcastEventsService,
     private rankService: RankService
   ) { }
 
   ngOnInit(): void {
     this.loadSchedule();
     this.refreshControlState();
-    this.broadcastService.subscribeToTopic('/topic/live/match').subscribe({
-      next: (msg) => this.handleMatchControlBroadcast(msg),
+    this.broadcastEvents.matchState$().subscribe({
+      next: (event) => this.handleMatchControlBroadcast(event),
       error: (e) => console.error('Failed to subscribe to match updates:', e)
     });
   }
@@ -129,12 +129,11 @@ export class MatchControl implements OnInit {
     return this.schedule().find(m => m.match.id === matchId) ?? null;
   }
 
-  private handleMatchControlBroadcast(msg: any) {
-    if (!msg || !msg.payload) {
+  private handleMatchControlBroadcast(event: any) {
+    if (!event || !event.payload) {
       return;
     }
-
-    const payload = msg.payload;
+    const payload = event.payload;
     if (payload.timerSecondsRemaining !== undefined && payload.timerSecondsRemaining !== null) {
       this.updateTimerFromPayload(payload.timerSecondsRemaining);
     }

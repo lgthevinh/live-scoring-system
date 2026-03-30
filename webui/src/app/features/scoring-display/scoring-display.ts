@@ -2,6 +2,8 @@ import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/c
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {BroadcastService} from "../../core/services/broadcast.service";
+import { BroadcastEventsService } from '../../core/services/broadcast-events.service';
+import { Subscription } from 'rxjs';
 import {FieldDisplayCommand} from '../../core/define/FieldDisplayCommand';
 import {SyncService} from '../../core/services/sync.service';
 import {Team} from '../../core/models/team.model';
@@ -44,6 +46,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     controlsVisible: WritableSignal<boolean> = signal(true);
     private hideTimer: any = null;
     private tickTimer: any = null;
+    private matchStateSub: Subscription | null = null;
 
     // Audio playback
     private audioContext: AudioContext | null = null;
@@ -59,7 +62,8 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     constructor(
         private syncService: SyncService,
-        private broadcastService: BroadcastService
+        private broadcastService: BroadcastService,
+        private broadcastEvents: BroadcastEventsService
     ) { }
 
     // Track fullscreen changes
@@ -93,6 +97,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         })
 
         this.subscribeToFieldTopic(0);
+        this.subscribeToMatchState();
 
         // Preload sound file for mobile compatibility
         this.preloadSound();
@@ -132,6 +137,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         this.clearTick();
         this.clearHideTimer();
+        this.matchStateSub?.unsubscribe();
         document.removeEventListener('fullscreenchange', this.onFullscreenChange);
         document.removeEventListener('webkitfullscreenchange' as any, this.onFullscreenChange as any);
         document.removeEventListener('mozfullscreenchange' as any, this.onFullscreenChange as any);
@@ -298,24 +304,21 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         console.log('=== subscribeToFieldTopic called with fieldId:', fieldId, '===');
         if (fieldId === null || fieldId === undefined) return;
 
-        let timerTopic: string;
         let commandTopic: string;
         let scoreTopicRed: string;
         let scoreTopicBlue: string;
         let soundTopic: string;
 
         if (fieldId === 0) {
-            timerTopic = `/topic/display/field/*/timer`;
-            commandTopic = `/topic/display/field/*/command`;
-            scoreTopicRed = `/topic/live/field/*/score/red`;
-            scoreTopicBlue = `/topic/live/field/*/score/blue`;
-            soundTopic = `/topic/display/field/*/sound`;
+            commandTopic = `/display/field/*/command`;
+            scoreTopicRed = `/live/field/*/score/red`;
+            scoreTopicBlue = `/live/field/*/score/blue`;
+            soundTopic = `/display/field/*/sound`;
         } else {
-            timerTopic = `/topic/display/field/${fieldId}/timer`;
-            commandTopic = `/topic/display/field/${fieldId}/command`;
-            scoreTopicRed = `/topic/live/field/${fieldId}/score/red`;
-            scoreTopicBlue = `/topic/live/field/${fieldId}/score/blue`;
-            soundTopic = `/topic/display/field/${fieldId}/sound`;
+            commandTopic = `/display/field/${fieldId}/command`;
+            scoreTopicRed = `/live/field/${fieldId}/score/red`;
+            scoreTopicBlue = `/live/field/${fieldId}/score/blue`;
+            soundTopic = `/display/field/${fieldId}/sound`;
         }
 
         console.log('Subscribing to topics:', { timerTopic, commandTopic, scoreTopicRed, scoreTopicBlue, soundTopic });
@@ -354,7 +357,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
         // Also subscribe to the broadcast-all command topic for display commands from match-control
         if (fieldId !== 0) {
-            this.broadcastService.subscribeToTopic('/topic/display/field/0/command').subscribe({
+            this.broadcastService.subscribeToTopic('/display/field/0/command').subscribe({
                 next: (msg) => {
                     console.log("FieldDisplay received broadcast-all command:", msg);
                     if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
@@ -375,19 +378,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 }
             });
         }
-
-        this.broadcastService.subscribeToTopic(timerTopic).subscribe({
-            next: (msg) => {
-                console.log("FieldDisplay received timer message:", msg);
-                if (msg.payload && msg.payload.remainingSeconds !== undefined) {
-                    const newTime = msg.payload.remainingSeconds;
-                    this.timeLeft.set(newTime);
-                }
-            },
-            error: (err) => {
-                console.error("FieldDisplay timer message error:", err);
-            }
-        });
 
         // Subscribe to PLAY_SOUND command for synchronized sound playback
         this.broadcastService.subscribeToTopic(soundTopic).subscribe({
@@ -433,20 +423,29 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         if (fieldId === null || fieldId === undefined) return;
 
         if (fieldId === 0) {
-            this.broadcastService.unsubscribeFromTopic(`/topic/display/field/*/command`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/display/field/*/timer`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/display/field/*/sound`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/live/field/*/score`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/live/field/*/score/red`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/live/field/*/score/blue`);
+            this.broadcastService.unsubscribeFromTopic(`/display/field/*/command`);
+            this.broadcastService.unsubscribeFromTopic(`/display/field/*/sound`);
+            this.broadcastService.unsubscribeFromTopic(`/live/field/*/score`);
+            this.broadcastService.unsubscribeFromTopic(`/live/field/*/score/red`);
+            this.broadcastService.unsubscribeFromTopic(`/live/field/*/score/blue`);
             return;
         }
 
-        this.broadcastService.unsubscribeFromTopic(`/topic/display/field/${fieldId}/command`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/display/field/${fieldId}/timer`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/display/field/${fieldId}/sound`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/live/field/${fieldId}/score/red`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/live/field/${fieldId}/score/blue`);
+        this.broadcastService.unsubscribeFromTopic(`/display/field/${fieldId}/command`);
+        this.broadcastService.unsubscribeFromTopic(`/display/field/${fieldId}/sound`);
+        this.broadcastService.unsubscribeFromTopic(`/live/field/${fieldId}/score/red`);
+        this.broadcastService.unsubscribeFromTopic(`/live/field/${fieldId}/score/blue`);
+    }
+
+    private subscribeToMatchState() {
+        this.matchStateSub = this.broadcastEvents.matchState$().subscribe({
+            next: (event) => {
+                if (event?.payload && event.payload.timerSecondsRemaining !== undefined) {
+                    this.timeLeft.set(event.payload.timerSecondsRemaining);
+                }
+            },
+            error: (err) => console.error('FieldDisplay match state error:', err)
+        });
     }
 
     // ========== Up Next Helpers ==========
