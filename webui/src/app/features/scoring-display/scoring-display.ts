@@ -321,7 +321,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             soundTopic = `/display/field/${fieldId}/sound`;
         }
 
-        console.log('Subscribing to topics:', { timerTopic, commandTopic, scoreTopicRed, scoreTopicBlue, soundTopic });
+        console.log('Subscribing to topics:', { commandTopic, scoreTopicRed, scoreTopicBlue, soundTopic });
 
         this.broadcastService.subscribeToTopic(commandTopic).subscribe({
             next: (msg) => {
