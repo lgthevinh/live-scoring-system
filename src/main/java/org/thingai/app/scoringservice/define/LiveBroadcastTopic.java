@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.define;
 
 public class LiveBroadcastTopic {
-    public static final String BASE_TOPIC = "live/";
+    public static final String BASE_TOPIC = "/live/";
 
     public static final String LIVE_MATCH = BASE_TOPIC + "match";
     public static final String LIVE_SCORE_UPDATE_RED = BASE_TOPIC + "score/red";

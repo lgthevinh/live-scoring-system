@@ -20,7 +20,7 @@ public class BroadcastService {
     /**
      * Broadcast a message to a specific topic.
      *
-     * @param topic   The topic to broadcast to (e.g., "/topic/scores").
+     * @param topic   The topic to broadcast to (e.g., "/live/match").
      * @param message The message payload.
      */
     public static void broadcast(String topic, Object message, String messageType) {

@@ -93,7 +93,7 @@ export class UpNextDisplay implements OnInit, OnDestroy {
 
     private subscribeToUpdates(): void {
         // Subscribe to match available topic for real-time updates when next match is set
-        this.broadcastService.subscribeToTopic('/topic/match/available').subscribe({
+        this.broadcastService.subscribeToTopic('/match/available').subscribe({
             next: (msg) => {
                 console.log('UpNextDisplay received match available:', msg);
                 if (msg.payload) {
@@ -106,7 +106,7 @@ export class UpNextDisplay implements OnInit, OnDestroy {
         });
 
         // Subscribe to field display command for SHOW_UPNEXT commands
-        this.broadcastService.subscribeToTopic('/topic/display/field/*/command').subscribe({
+        this.broadcastService.subscribeToTopic('/display/field/*/command').subscribe({
             next: (msg) => {
                 if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
                     console.log('UpNextDisplay SHOW_UPNEXT command received:', msg);

@@ -16,7 +16,7 @@ export class BroadcastService implements OnDestroy {
   private subscriptions: Map<string, StompSubscription> = new Map();
 
   constructor() {
-    const brokerUrl: string = environment.production ? ('ws://' + window.location.host + '/ws') : ('ws://localhost/ws');
+    const brokerUrl: string = this.resolveBrokerUrl();
     this.client = new Client({
       brokerURL: brokerUrl,
       debug: (str) => { console.debug(new Date(), str); },
@@ -53,6 +53,17 @@ export class BroadcastService implements OnDestroy {
     }
 
     this.client.activate();
+  }
+
+  private resolveBrokerUrl(): string {
+    const apiBaseUrl = environment.apiBaseUrl?.trim();
+    if (apiBaseUrl) {
+      const normalized = apiBaseUrl.replace(/\/$/, '');
+      return normalized.replace(/^http/, 'ws') + '/ws';
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    return protocol + window.location.host + '/ws';
   }
 
   // Generic internal subscription logic
