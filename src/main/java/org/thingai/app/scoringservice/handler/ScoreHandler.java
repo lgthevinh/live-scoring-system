@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import org.thingai.app.scoringservice.dto.ScoreDetailDto;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.ScoreDefine;
@@ -18,7 +18,7 @@ public class ScoreHandler {
     private static final String TAG = "ScoringHandler";
     private static Class<? extends Score> scoreClass;
 
-    private final ObjectMapper objectMapper = new ObjectMapper(); // For converting DTO to JSON
+    private final Gson gson = new Gson(); // For converting DTO to JSON
 
     public ScoreHandler() {
 
@@ -54,7 +54,7 @@ public class ScoreHandler {
 
         String jsonData = score.getRawScoreData();
         if (jsonData == null || jsonData.isBlank()) {
-            jsonData = objectMapper.writeValueAsString(score);
+            jsonData = gson.toJson(score);
         }
 
         LocalRepository.eventFileStore().writeJsonFile(score.getAllianceId() + ".json", jsonData);

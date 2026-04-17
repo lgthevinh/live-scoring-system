@@ -13,7 +13,7 @@ public class DaoAuth {
 
     // AuthData CRUD
     public AuthData insertAuthData(AuthData authData) throws Exception {
-        dao.insert(authData);
+        dao.insertOrUpdate(authData);
         return authData;
     }
 
@@ -45,7 +45,7 @@ public class DaoAuth {
 
     // AccountRole CRUD
     public AccountRole insertAccountRole(AccountRole accountRole) throws Exception {
-        dao.insert(accountRole);
+        dao.insertOrUpdate(accountRole);
         return accountRole;
     }
 

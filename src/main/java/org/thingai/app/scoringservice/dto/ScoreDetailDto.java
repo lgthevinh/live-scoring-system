@@ -1,13 +1,13 @@
 package org.thingai.app.scoringservice.dto;
 
+import com.google.gson.Gson;
 import org.thingai.app.scoringservice.entity.Score;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.thingai.app.scoringservice.handler.ScoreHandler;
 
 import java.util.Map;
 
 public class ScoreDetailDto {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Gson GSON = new Gson();
     private Score baseScore;
     private Object detailScore;
 
@@ -44,7 +44,7 @@ public class ScoreDetailDto {
             return null;
         }
         try {
-            return OBJECT_MAPPER.readValue(score.getRawScoreData(), Map.class);
+            return GSON.fromJson(score.getRawScoreData(), Map.class);
         } catch (Exception e) {
             return null;
         }

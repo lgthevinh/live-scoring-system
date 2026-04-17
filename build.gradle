@@ -9,16 +9,21 @@ buildscript {
 
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.4'
-    id 'io.spring.dependency-management' version '1.1.7'
     id 'application'
     id 'distribution'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
     id "com.github.node-gradle.node" version "7.0.2" // Gradle-managed Node/npm
 }
 
 group = 'org.thingai.app.scoringsystem'
-version = '1.5'
+version = '2.0'
 description = 'Scoring System for Robotics Competitions'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
 
 application {
     mainClass = 'org.thingai.app.Main'
@@ -32,15 +37,14 @@ dependencies {
 
     implementation "org.xerial:sqlite-jdbc:3.43.2.0"
     implementation 'com.zaxxer:HikariCP:5.1.0'
-    implementation "org.slf4j:slf4j-api:2.0.9"
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    implementation 'org.slf4j:slf4j-simple:2.0.9'
     implementation 'com.google.code.gson:gson:2.13.2'
-    implementation 'org.springframework.boot:spring-boot-starter'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    implementation files('libs/applicationbase.jar')
-    implementation files('libs/edgeplatform.jar')
+    // Javalin 6 (embedded Jetty 11, WebSocket support included)
+    implementation 'io.javalin:javalin:6.3.0'
+
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     implementation 'com.formdev:flatlaf:3.2.5'
 }
@@ -56,16 +60,11 @@ sourceSets {
         }
         resources.srcDir 'src/app/resources'
 
-        // Do NOT reference configurations.implementation (non-resolvable).
-        // Option A: only main output (sufficient for Swing-only launcher):
         compileClasspath += sourceSets.main.output
         runtimeClasspath += output + sourceSets.main.output
-
-        // Option B: if launcher needs main’s external deps too, use resolvable classpaths:
-        // compileClasspath += sourceSets.main.output + configurations.getByName('compileClasspath')
-        // runtimeClasspath += output + sourceSets.main.output + configurations.getByName('runtimeClasspath')
     }
 }
+
 tasks.register('desktopJar', Jar) {
     group = 'build'
     description = 'Build the desktop launcher JAR'
@@ -80,11 +79,30 @@ tasks.register('desktopJar', Jar) {
     }
 }
 
+/* ==== Shadow (fat) Jar configuration ==== */
+tasks.named('shadowJar') {
+    archiveFileName = 'scoring-system.jar'
+    archiveClassifier.set('')
+    mergeServiceFiles()
+    manifest {
+        attributes(
+                'Main-Class': 'org.thingai.app.Main',
+                'Implementation-Title': 'Scoring System',
+                'Implementation-Version': (project.version ?: 'dev')
+        )
+    }
+}
+
+// Disable the plain jar so we only ship the shadow (fat) jar
+tasks.named('jar') {
+    enabled = false
+}
+
 /* include launcher and scripts in distribution */
 distributions {
     main {
         contents {
-            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
             from('binary') { into 'binary' }
             from('data') { into 'data' }
@@ -94,7 +112,7 @@ distributions {
     }
     windows {
         contents {
-            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
             from('binary') { into 'binary' }
             from('data') { into 'data' }
@@ -105,7 +123,7 @@ distributions {
     }
     mac {
         contents {
-            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
             from('binary') { into 'binary' }
             from('data') { into 'data' }
@@ -116,7 +134,7 @@ distributions {
     }
     linux {
         contents {
-            from({ tasks.named('bootJar').get().archiveFile }) { into 'app' }
+            from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
             from('binary') { into 'binary' }
             from('data') { into 'data' }
@@ -128,25 +146,25 @@ distributions {
 }
 
 ['distZip', 'windowsDistZip', 'macDistZip', 'linuxDistZip'].each { zipTask ->
-    tasks.named(zipTask) { dependsOn 'bootJar', 'desktopJar' }
+    tasks.named(zipTask) { dependsOn 'shadowJar', 'desktopJar' }
 }
 
 tasks.named('distZip') {
     group = 'distribution'
     description = 'Build generic distribution zip without bundled JRE'
-    dependsOn('bootJar', 'desktopJar')
+    dependsOn('shadowJar', 'desktopJar')
 }
 
 tasks.named('windowsDistZip') {
     group = 'distribution'
     description = 'Build Windows distribution zip with bundled JRE'
-    dependsOn('bootJar', 'desktopJar')
+    dependsOn('shadowJar', 'desktopJar')
 }
 
 tasks.named('macDistZip') {
     group = 'distribution'
     description = 'Build macOS distribution zip with bundled JRE'
-    dependsOn('bootJar', 'desktopJar')
+    dependsOn('shadowJar', 'desktopJar')
 }
 
 tasks.register('packageWindows') {
@@ -177,7 +195,6 @@ def skipWebuiBuild = project.findProperty('skipWebuiBuild') == 'true'
 node {
     version = '24.9.0'
     download = true
-    // Workaround for Windows path length issues if needed:
     workDir = file("${project.buildDir}/nodejs")
     npmWorkDir = file("${project.buildDir}/npm")
 }
@@ -194,7 +211,6 @@ tasks.register('npmBuild', NpmTask) {
 }
 
 tasks.register('copyWebUi', Copy) {
-    // Copy after an npm build
     enabled = hasWebUi && !skipWebuiBuild
     dependsOn 'npmBuild'
     from(webUiDistDir) { include '**/*' }
@@ -202,7 +218,6 @@ tasks.register('copyWebUi', Copy) {
 }
 
 tasks.register('copyWebUiIfPresent', Copy) {
-    // Fallback: if we skip build but dist exists, still package UI
     enabled = hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()
     from(webUiDistDir) { include '**/*' }
     into("${buildDir}/resources/main/static")
@@ -216,9 +231,7 @@ tasks.named('processResources') {
     }
 }
 
-/* ==== Boot Jar ==== */
-tasks.named('bootJar') {
-    archiveFileName = 'scoring-system.jar'
+tasks.named('shadowJar') {
     if (hasWebUi && !skipWebuiBuild) {
         dependsOn 'copyWebUi'
     } else if (hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()) {
@@ -226,8 +239,8 @@ tasks.named('bootJar') {
     }
 }
 
-// Ensure bootRun also copies the webui files
-tasks.named('bootRun') {
+// Ensure `./gradlew run` also copies the webui files
+tasks.named('run') {
     if (hasWebUi && !skipWebuiBuild) {
         dependsOn 'copyWebUi'
     } else if (hasWebUi && skipWebuiBuild && file(webUiDistDir).exists()) {
@@ -235,7 +248,7 @@ tasks.named('bootRun') {
     }
 }
 
-/* ==== Distribution ZIP (jar + bin + data + scripts) ==== */
+/* ==== Imports ==== */
 import com.github.gradle.node.npm.task.NpmInstallTask
 import com.github.gradle.node.npm.task.NpmTask
 import proguard.gradle.ProGuardTask
@@ -244,18 +257,13 @@ tasks.register('proguard', ProGuardTask) {
     group = 'build'
     description = 'Obfuscate the application classes using ProGuard'
 
-    // Configuration file
     configuration 'proguard-rules.pro'
 
-    // Input: Application classes (compiled output)
     injars sourceSets.main.output
 
-    // Output: Obfuscated Jar
     outjars layout.buildDirectory.file('libs/scoring-system-obfuscated.jar')
 
-    // Dependencies (not obfuscated, just for reference)
     libraryjars sourceSets.main.compileClasspath
-    
-    // Java 9+ modules
+
     libraryjars "${System.getProperty('java.home')}/jmods"
 }

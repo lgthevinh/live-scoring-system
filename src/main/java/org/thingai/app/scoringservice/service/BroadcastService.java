@@ -1,31 +1,35 @@
 package org.thingai.app.scoringservice.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
 import org.thingai.app.scoringservice.dto.BroadcastMessageDto;
 import org.thingai.base.log.ILog;
 
-@Service
+/**
+ * Placeholder broadcast service for the Javalin migration.
+ *
+ * <p>The STOMP/Spring WebSocket implementation was removed during the migration
+ * to Javalin + vanilla WebSocket. This stub keeps the static
+ * {@link #broadcast(String, Object, String)} signature so the existing call
+ * sites ({@code MatchControl}, {@code MatchControlApi}) still compile. It only
+ * logs the broadcast payload.
+ *
+ * <p>TODO (WS redesign): route {@code topic}/{@code messageType}/{@code message}
+ * to the vanilla WebSocket session registry once the topic model is designed.
+ */
 public class BroadcastService {
     private static final String TAG = "BroadcastService";
 
-    private static SimpMessagingTemplate messagingTemplate;
-
-    @Autowired
-    public BroadcastService(SimpMessagingTemplate messagingTemplate) {
-        BroadcastService.messagingTemplate = messagingTemplate;
+    private BroadcastService() {
     }
 
     /**
      * Broadcast a message to a specific topic.
      *
-     * @param topic   The topic to broadcast to (e.g., "/live/match").
-     * @param message The message payload.
+     * @param topic       The topic to broadcast to (e.g., "/live/match").
+     * @param message     The message payload.
+     * @param messageType A short type discriminator for consumers.
      */
     public static void broadcast(String topic, Object message, String messageType) {
-        ILog.d(TAG, topic, messageType);
-        BroadcastMessageDto broadcastMessage = new BroadcastMessageDto(messageType, message);
-        messagingTemplate.convertAndSend(topic, broadcastMessage);
+        BroadcastMessageDto payload = new BroadcastMessageDto(messageType, message);
+        ILog.d(TAG, "broadcast (stub)", topic, messageType, String.valueOf(payload));
     }
 }

@@ -11,7 +11,7 @@ public class DaoScore {
     }
 
     public Score insertScore(Score score) throws Exception {
-        dao.insert(Score.class, score);
+        dao.insertOrUpdate(Score.class, score);
         return score;
     }
 

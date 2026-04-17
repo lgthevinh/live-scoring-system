@@ -1,8 +1,9 @@
 package org.thingai.app.api.endpoints;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.google.gson.Gson;
+import io.javalin.Javalin;
+import io.javalin.http.Context;
+import org.thingai.app.api.utils.ResponseEntityUtil.PendingResponse;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.dto.MatchDetailDto;
@@ -16,17 +17,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static org.thingai.app.api.utils.ResponseEntityUtil.createErrorResponse;
-import static org.thingai.app.api.utils.ResponseEntityUtil.getObjectResponse;
+import static org.thingai.app.api.utils.ResponseEntityUtil.badRequest;
+import static org.thingai.app.api.utils.ResponseEntityUtil.errorResponse;
+import static org.thingai.app.api.utils.ResponseEntityUtil.writeFuture;
 
-@RestController
-@RequestMapping("/api/match")
-public class MatchApi {
+/**
+ * REST surface for matches and schedule generation
+ * (base path {@code /api/match}).
+ */
+public final class MatchApi {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Gson GSON = new Gson();
 
-    @PostMapping("/create")
-    public ResponseEntity<Object> createMatch(@RequestBody Map<String, Object> request) {
+    private MatchApi() {
+    }
+
+    public static void register(Javalin app) {
+        app.post("/api/match/create", MatchApi::createMatch);
+        app.get("/api/match", MatchApi::listMatches);
+        app.get("/api/match/{id}", MatchApi::getMatch);
+        app.get("/api/match/list/{matchType}", MatchApi::listMatchesByType);
+        app.get("/api/match/list/details/{matchType}", MatchApi::listMatchDetails);
+        app.put("/api/match/update", MatchApi::updateMatch);
+        app.delete("/api/match/delete/{id}", MatchApi::deleteMatch);
+        app.post("/api/match/schedule/generate", MatchApi::generateSchedule);
+        app.post("/api/match/schedule/generate/v2", MatchApi::generateSchedule);
+        app.post("/api/match/playoff/generate", MatchApi::generatePlayoffSchedule);
+        app.post("/api/match/schedule/generate/playoff", MatchApi::generatePlayoffSchedule);
+    }
+
+    private static void createMatch(Context ctx) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> request = ctx.bodyAsClass(Map.class);
+
         Integer matchType = parseInt(request == null ? null : request.get("matchType"));
         Integer matchNumber = parseInt(request == null ? null : request.get("matchNumber"));
         String matchStartTime = request == null ? null : (String) request.get("matchStartTime");
@@ -36,15 +59,15 @@ public class MatchApi {
         String[] blueTeamIds = parseStringArray(request == null ? null : request.get("blueTeamIds"));
 
         if (matchType == null || matchNumber == null || isBlank(matchStartTime)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "matchType, matchNumber, and matchStartTime are required."));
+            badRequest(ctx, "matchType, matchNumber, and matchStartTime are required.");
+            return;
         }
-
         if (redTeamIds.length == 0 || blueTeamIds.length == 0) {
-            return ResponseEntity.badRequest().body(Map.of("error", "redTeamIds and blueTeamIds are required."));
+            badRequest(ctx, "redTeamIds and blueTeamIds are required.");
+            return;
         }
 
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.matchHandler().createMatch(
                 matchType,
                 matchNumber,
@@ -55,153 +78,189 @@ public class MatchApi {
                 new RequestCallback<Match>() {
                     @Override
                     public void onSuccess(Match responseObject, String message) {
-                        future.complete(ResponseEntity.ok(Map.of("message", message, "matchId", responseObject.getId())));
+                        future.complete(PendingResponse.ok(Map.of("message", message, "matchId", responseObject.getId())));
                     }
 
                     @Override
                     public void onFailure(int errorCode, String errorMessage) {
-                        future.complete(createErrorResponse(errorCode, errorMessage));
+                        future.complete(errorResponse(errorCode, errorMessage));
                     }
                 }
         );
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Object> getMatch(@PathVariable String id) {
+    private static void getMatch(Context ctx) {
+        String id = ctx.pathParam("id");
         if (isBlank(id)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Match id is required."));
+            badRequest(ctx, "Match id is required.");
+            return;
         }
 
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.matchHandler().getMatch(id, new RequestCallback<Match>() {
             @Override
             public void onSuccess(Match responseObject, String message) {
-                future.complete(ResponseEntity.ok(responseObject));
+                future.complete(PendingResponse.ok(responseObject));
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(createErrorResponse(errorCode, errorMessage));
+                future.complete(errorResponse(errorCode, errorMessage));
             }
         });
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @GetMapping("")
-    public ResponseEntity<Object> listMatches() {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
+    private static void listMatches(Context ctx) {
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.matchHandler().listMatches(new RequestCallback<Match[]>() {
             @Override
             public void onSuccess(Match[] responseObject, String message) {
-                future.complete(ResponseEntity.ok(responseObject));
+                future.complete(PendingResponse.ok(responseObject));
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(createErrorResponse(errorCode, errorMessage));
+                future.complete(errorResponse(errorCode, errorMessage));
             }
         });
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @GetMapping("/list/{matchType}")
-    public ResponseEntity<Object> listMatchesByType(@PathVariable int matchType) {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+    private static void listMatchesByType(Context ctx) {
+        int matchType;
+        try {
+            matchType = Integer.parseInt(ctx.pathParam("matchType"));
+        } catch (NumberFormatException e) {
+            badRequest(ctx, "Invalid matchType.");
+            return;
+        }
 
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.matchHandler().listMatchesByType(matchType, new RequestCallback<Match[]>() {
             @Override
             public void onSuccess(Match[] responseObject, String message) {
-                future.complete(ResponseEntity.ok(responseObject));
+                future.complete(PendingResponse.ok(responseObject));
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(createErrorResponse(errorCode, errorMessage));
+                future.complete(errorResponse(errorCode, errorMessage));
             }
         });
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @GetMapping("/list/details/{matchType}")
-    public ResponseEntity<Object> listMatchDetails(@PathVariable int matchType, @RequestParam(required = false) boolean withScore) {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+    private static void listMatchDetails(Context ctx) {
+        int matchType;
+        try {
+            matchType = Integer.parseInt(ctx.pathParam("matchType"));
+        } catch (NumberFormatException e) {
+            badRequest(ctx, "Invalid matchType.");
+            return;
+        }
+        boolean withScore = Boolean.parseBoolean(ctx.queryParam("withScore"));
 
-        ScoringService.matchHandler().listMatchDetailsByType(matchType, withScore, new RequestCallback<MatchDetailDto[]>() {
-            @Override
-            public void onSuccess(MatchDetailDto[] responseObject, String message) {
-                future.complete(ResponseEntity.ok(responseObject));
-            }
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
+        ScoringService.matchHandler().listMatchDetailsByType(matchType, withScore,
+                new RequestCallback<MatchDetailDto[]>() {
+                    @Override
+                    public void onSuccess(MatchDetailDto[] responseObject, String message) {
+                        future.complete(PendingResponse.ok(responseObject));
+                    }
 
-            @Override
-            public void onFailure(int errorCode, String errorMessage) {
-                future.complete(createErrorResponse(errorCode, errorMessage));
-            }
-        });
-
-        return getObjectResponse(future);
+                    @Override
+                    public void onFailure(int errorCode, String errorMessage) {
+                        future.complete(errorResponse(errorCode, errorMessage));
+                    }
+                });
+        writeFuture(ctx, future);
     }
 
-    @PutMapping("/update")
-    public ResponseEntity<Object> updateMatch(@RequestBody Match match) {
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
+    private static void updateMatch(Context ctx) {
+        Match match = ctx.bodyAsClass(Match.class);
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.matchHandler().updateMatch(match, new RequestCallback<Match>() {
             @Override
             public void onSuccess(Match responseObject, String message) {
-                future.complete(ResponseEntity.ok(responseObject));
+                future.complete(PendingResponse.ok(responseObject));
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(createErrorResponse(errorCode, errorMessage));
+                future.complete(errorResponse(errorCode, errorMessage));
             }
         });
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Object> deleteMatch(@PathVariable String id) {
+    private static void deleteMatch(Context ctx) {
+        String id = ctx.pathParam("id");
         if (isBlank(id)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Match id is required."));
+            badRequest(ctx, "Match id is required.");
+            return;
         }
-
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.matchHandler().deleteMatch(id, new RequestCallback<Void>() {
             @Override
             public void onSuccess(Void responseObject, String message) {
-                future.complete(ResponseEntity.ok(Map.of("message", message)));
+                future.complete(PendingResponse.ok(Map.of("message", message)));
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(createErrorResponse(errorCode, errorMessage));
+                future.complete(errorResponse(errorCode, errorMessage));
             }
         });
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @PostMapping("/schedule/generate")
-    public ResponseEntity<Object> generateSchedule(@RequestBody Map<String, Object> request) {
-        return handleGenerateSchedule(request);
+    private static void generateSchedule(Context ctx) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> request = ctx.bodyAsClass(Map.class);
+
+        Integer rounds = parseInt(request == null ? null : request.get("rounds"));
+        Integer matchDuration = parseInt(request == null ? null : request.get("matchDuration"));
+        Integer fieldCount = parseInt(request == null ? null : request.get("fieldCount"));
+        String startTime = request == null ? null : (String) request.get("startTime");
+        TimeBlock[] timeBlocks = parseTimeBlocks(request == null ? null : request.get("timeBlocks"));
+
+        if (rounds == null || matchDuration == null || isBlank(startTime)) {
+            badRequest(ctx, "rounds, matchDuration, and startTime are required.");
+            return;
+        }
+
+        int resolvedFieldCount = fieldCount == null ? 1 : fieldCount;
+
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
+        ScoringService.scheduleHandler().generateSchedule(
+                rounds,
+                startTime,
+                matchDuration,
+                resolvedFieldCount,
+                timeBlocks,
+                new RequestCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void responseObject, String message) {
+                        ILog.d("MatchApi", "generateSchedule:onSuccess " + message);
+                        future.complete(PendingResponse.ok(Map.of("message", message)));
+                    }
+
+                    @Override
+                    public void onFailure(int errorCode, String errorMessage) {
+                        ILog.d("MatchApi", "generateSchedule:onFailure " + errorMessage);
+                        future.complete(errorResponse(errorCode, errorMessage));
+                    }
+                }
+        );
+        writeFuture(ctx, future);
     }
 
-    @PostMapping("/schedule/generate/v2")
-    public ResponseEntity<Object> generateScheduleV2(@RequestBody Map<String, Object> request) {
-        return handleGenerateSchedule(request);
-    }
+    private static void generatePlayoffSchedule(Context ctx) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> request = ctx.bodyAsClass(Map.class);
 
-    @PostMapping("/playoff/generate")
-    public ResponseEntity<Object> generatePlayoffSchedule(@RequestBody Map<String, Object> request) {
         Integer playoffType = parseInt(request == null ? null : request.get("playoffType"));
         Integer fieldCount = parseInt(request == null ? null : request.get("fieldCount"));
         Integer matchDuration = parseInt(request == null ? null : request.get("matchDuration"));
@@ -211,11 +270,11 @@ public class MatchApi {
         TimeBlock[] timeBlocks = parseTimeBlocks(request == null ? null : request.get("timeBlocks"));
 
         if (playoffType == null || matchDuration == null || fieldCount == null || isBlank(startTime)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "playoffType, fieldCount, matchDuration, and startTime are required."));
+            badRequest(ctx, "playoffType, fieldCount, matchDuration, and startTime are required.");
+            return;
         }
 
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.scheduleHandler().generatePlayoffSchedule(
                 playoffType,
                 fieldCount,
@@ -226,78 +285,40 @@ public class MatchApi {
                 new RequestCallback<Void>() {
                     @Override
                     public void onSuccess(Void responseObject, String message) {
-                        future.complete(ResponseEntity.ok(Map.of("message", message)));
+                        future.complete(PendingResponse.ok(Map.of("message", message)));
                     }
 
                     @Override
                     public void onFailure(int errorCode, String errorMessage) {
-                        future.complete(createErrorResponse(errorCode, errorMessage));
+                        future.complete(errorResponse(errorCode, errorMessage));
                     }
                 }
         );
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @PostMapping("/schedule/generate/playoff")
-    public ResponseEntity<Object> generatePlayoffScheduleV2(@RequestBody Map<String, Object> request) {
-        return generatePlayoffSchedule(request);
-    }
+    // --- helpers -------------------------------------------------------------
 
-    private ResponseEntity<Object> handleGenerateSchedule(Map<String, Object> request) {
-        Integer rounds = parseInt(request == null ? null : request.get("rounds"));
-        Integer matchDuration = parseInt(request == null ? null : request.get("matchDuration"));
-        Integer fieldCount = parseInt(request == null ? null : request.get("fieldCount"));
-        String startTime = request == null ? null : (String) request.get("startTime");
-        TimeBlock[] timeBlocks = parseTimeBlocks(request == null ? null : request.get("timeBlocks"));
-
-        if (rounds == null || matchDuration == null || isBlank(startTime)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "rounds, matchDuration, and startTime are required."));
-        }
-
-        int resolvedFieldCount = fieldCount == null ? 1 : fieldCount;
-
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
-
-        ScoringService.scheduleHandler().generateSchedule(
-                rounds,
-                startTime,
-                matchDuration,
-                resolvedFieldCount,
-                timeBlocks,
-                new RequestCallback<Void>() {
-                    @Override
-                    public void onSuccess(Void responseObject, String message) {
-                        ILog.d("MatchApi", "handleGenerateSChedule:onSuccess" + message);
-                        future.complete(ResponseEntity.ok(Map.of("message", message)));
-                    }
-
-                    @Override
-                    public void onFailure(int errorCode, String errorMessage) {
-                            ILog.d("MatchApi", "handleGenerateSChedule:onFailure" + errorMessage);
-                        future.complete(createErrorResponse(errorCode, errorMessage));
-                    }
-                }
-        );
-
-        return getObjectResponse(future);
-    }
-
-    private TimeBlock[] parseTimeBlocks(Object value) {
+    /**
+     * Convert a loosely-typed value (Map/List parsed by Gson from an
+     * {@code Object} field) into a strongly-typed array by re-serializing
+     * through JSON. Mirrors what {@code ObjectMapper.convertValue} did.
+     */
+    private static TimeBlock[] parseTimeBlocks(Object value) {
         if (value == null) {
             return new TimeBlock[0];
         }
-        return objectMapper.convertValue(value, TimeBlock[].class);
+        return GSON.fromJson(GSON.toJson(value), TimeBlock[].class);
     }
 
-    private AllianceTeam[] parseAllianceTeams(Object value) {
+    private static AllianceTeam[] parseAllianceTeams(Object value) {
         if (value == null) {
             return new AllianceTeam[0];
         }
-        return objectMapper.convertValue(value, AllianceTeam[].class);
+        return GSON.fromJson(GSON.toJson(value), AllianceTeam[].class);
     }
 
-    private String[] parseStringArray(Object value) {
+    private static String[] parseStringArray(Object value) {
         if (value == null) {
             return new String[0];
         }
@@ -327,10 +348,10 @@ public class MatchApi {
             }
             return cleaned.toArray(new String[0]);
         }
-        return objectMapper.convertValue(value, String[].class);
+        return GSON.fromJson(GSON.toJson(value), String[].class);
     }
 
-    private Integer parseInt(Object value) {
+    private static Integer parseInt(Object value) {
         if (value == null) {
             return null;
         }
@@ -350,7 +371,7 @@ public class MatchApi {
         return null;
     }
 
-    private boolean isBlank(String value) {
+    private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
 }
