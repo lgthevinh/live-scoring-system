@@ -44,7 +44,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     implementation files('libs/applicationbase.jar')
-    implementation files('libs/desktopplatform.jar')
+    implementation files('libs/edgeplatform.jar')
 
     implementation 'com.formdev:flatlaf:3.2.5'
 
