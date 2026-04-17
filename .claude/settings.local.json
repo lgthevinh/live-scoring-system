@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileJava -PskipWebuiBuild=true --no-daemon)",
+      "Bash(unzip -l libs/applicationbase.jar)"
+    ]
+  }
+}

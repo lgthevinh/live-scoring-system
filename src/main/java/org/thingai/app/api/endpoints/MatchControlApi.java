@@ -1,10 +1,10 @@
 package org.thingai.app.api.endpoints;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.google.gson.Gson;
+import io.javalin.Javalin;
+import io.javalin.http.Context;
+import io.javalin.http.HttpStatus;
+import org.thingai.app.api.utils.ResponseEntityUtil.PendingResponse;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.LiveBroadcastTopic;
@@ -22,18 +22,42 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static org.thingai.app.api.utils.ResponseEntityUtil.getObjectResponse;
+import static org.thingai.app.api.utils.ResponseEntityUtil.badRequest;
+import static org.thingai.app.api.utils.ResponseEntityUtil.conflict;
+import static org.thingai.app.api.utils.ResponseEntityUtil.internalError;
+import static org.thingai.app.api.utils.ResponseEntityUtil.notFound;
+import static org.thingai.app.api.utils.ResponseEntityUtil.writeFuture;
 
-@RestController
-@RequestMapping("/api/match-control")
-public class MatchControlApi {
-    private final ObjectMapper objectMapper = new ObjectMapper();
+/**
+ * REST surface for match lifecycle + display broadcasts
+ * (base path {@code /api/match-control}).
+ *
+ * <p>Handles load/activate/start/abort/commit transitions, score overrides on
+ * completed matches, and display-panel broadcast requests. Broadcasts are
+ * fanned out via {@link BroadcastService} which, during the Javalin migration,
+ * is a stub; the vanilla-WS router will pick them up in the next step.
+ */
+public final class MatchControlApi {
 
-    @GetMapping("/state")
-    public ResponseEntity<Object> getState() {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static final Gson GSON = new Gson();
+
+    private MatchControlApi() {
+    }
+
+    public static void register(Javalin app) {
+        app.get("/api/match-control/state", MatchControlApi::getState);
+        app.post("/api/match-control/load", MatchControlApi::loadMatch);
+        app.post("/api/match-control/activate", MatchControlApi::activateMatch);
+        app.post("/api/match-control/start", MatchControlApi::startMatch);
+        app.post("/api/match-control/abort", MatchControlApi::abortMatch);
+        app.post("/api/match-control/commit", MatchControlApi::commitMatch);
+        app.post("/api/match-control/override", MatchControlApi::overrideScore);
+        app.post("/api/match-control/display", MatchControlApi::controlDisplay);
+    }
+
+    private static void getState(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
 
         StateManager stateManager = ScoringService.stateManager();
@@ -42,120 +66,121 @@ public class MatchControlApi {
         response.put("currentMatchId", stateManager.getCurrentMatchId());
         response.put("state", stateManager.getCurrentMatchState());
         response.put("timerSecondsRemaining", ScoringService.matchControl().getRemainingSeconds());
-        return ResponseEntity.ok(response);
+        ctx.json(response);
     }
 
-    @PostMapping("/load")
-    public ResponseEntity<Object> loadMatch(@RequestBody LoadRequest request) {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static void loadMatch(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
+        LoadRequest request = ctx.bodyAsClass(LoadRequest.class);
         if (request == null || isBlank(request.matchId())) {
-            return badRequest("matchId is required.");
+            badRequest(ctx, "matchId is required.");
+            return;
         }
         if (!matchExists(request.matchId())) {
-            return notFound("Match not found: " + request.matchId());
+            notFound(ctx, "Match not found: " + request.matchId());
+            return;
         }
-
         ScoringService.matchControl().loadMatch(request.matchId());
-        return ResponseEntity.ok(Map.of("message", "Match loaded.", "matchId", request.matchId()));
+        ctx.json(Map.of("message", "Match loaded.", "matchId", request.matchId()));
     }
 
-    @PostMapping("/activate")
-    public ResponseEntity<Object> activateMatch(@RequestBody(required = false) ActivateRequest request) {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static void activateMatch(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
 
+        ActivateRequest request = ctx.body().isBlank() ? null : ctx.bodyAsClass(ActivateRequest.class);
         StateManager stateManager = ScoringService.stateManager();
         String matchId = request != null ? request.matchId() : null;
         if (isBlank(matchId)) {
             matchId = stateManager.getLoadedMatchId();
         }
         if (isBlank(matchId)) {
-            return badRequest("matchId is required (or load a match first).");
+            badRequest(ctx, "matchId is required (or load a match first).");
+            return;
         }
         if (!matchExists(matchId)) {
-            return notFound("Match not found: " + matchId);
+            notFound(ctx, "Match not found: " + matchId);
+            return;
         }
 
         ScoringService.matchControl().activeMatch(matchId);
-        return ResponseEntity.ok(Map.of("message", "Match activated.", "matchId", matchId));
+        ctx.json(Map.of("message", "Match activated.", "matchId", matchId));
     }
 
-    @PostMapping("/start")
-    public ResponseEntity<Object> startMatch() {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static void startMatch(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
 
         StateManager stateManager = ScoringService.stateManager();
         String matchId = stateManager.getCurrentMatchId();
         if (isBlank(matchId)) {
-            return badRequest("No active match to start.");
+            badRequest(ctx, "No active match to start.");
+            return;
         }
 
         int state = stateManager.getCurrentMatchState();
         if (state != MatchState.ACTIVE && state != MatchState.LOADED) {
-            return badRequest("Match must be ACTIVE or LOADED to start.");
+            badRequest(ctx, "Match must be ACTIVE or LOADED to start.");
+            return;
         }
 
         ScoringService.matchControl().startMatch();
-        return ResponseEntity.ok(Map.of("message", "Match started.", "matchId", matchId));
+        ctx.json(Map.of("message", "Match started.", "matchId", matchId));
     }
 
-    @PostMapping("/abort")
-    public ResponseEntity<Object> abortMatch() {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static void abortMatch(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
 
         StateManager stateManager = ScoringService.stateManager();
         if (isBlank(stateManager.getCurrentMatchId())) {
-            return badRequest("No active match to abort.");
+            badRequest(ctx, "No active match to abort.");
+            return;
         }
 
         ScoringService.matchControl().abortMatch();
-        return ResponseEntity.ok(Map.of("message", "Match aborted.", "matchId", stateManager.getCurrentMatchId()));
+        ctx.json(Map.of("message", "Match aborted.", "matchId", stateManager.getCurrentMatchId()));
     }
 
-    @PostMapping("/commit")
-    public ResponseEntity<Object> commitMatch() {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static void commitMatch(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
 
         StateManager stateManager = ScoringService.stateManager();
         String matchId = stateManager.getCurrentMatchId();
         if (isBlank(matchId)) {
-            return badRequest("No active match to commit.");
+            badRequest(ctx, "No active match to commit.");
+            return;
         }
 
         MatchDetailDto matchDetail;
         try {
             matchDetail = LocalRepository.matchDao().getMatchDetailById(matchId);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to load match details: " + e.getMessage()));
+            internalError(ctx, "Failed to load match details: " + e.getMessage());
+            return;
         }
 
         if (matchDetail == null || matchDetail.getRedScore() == null || matchDetail.getBlueScore() == null) {
-            return badRequest("Scores for current match are missing.");
+            badRequest(ctx, "Scores for current match are missing.");
+            return;
         }
 
         if (matchDetail.getRedScore().getState() != ScoreState.SCORED
                 || matchDetail.getBlueScore().getState() != ScoreState.SCORED) {
-            return badRequest("Both alliance scores must be in SCORED state before commit.");
+            badRequest(ctx, "Both alliance scores must be in SCORED state before commit.");
+            return;
         }
 
         ScoringService.matchControl().commitScore();
 
-        CompletableFuture<ResponseEntity<Object>> future = new CompletableFuture<>();
+        CompletableFuture<PendingResponse> future = new CompletableFuture<>();
         ScoringService.rankingHandler().updateRanking(matchId, new RequestCallback<Boolean>() {
             @Override
             public void onSuccess(Boolean responseObject, String message) {
@@ -164,40 +189,40 @@ public class MatchControlApi {
                     public void onSuccess(RankingEntry[] responseObject, String statusMessage) {
                         BroadcastService.broadcast(LiveBroadcastTopic.LIVE_DISPLAY_RANKING,
                                 responseObject, "RANKING_UPDATE");
-                        future.complete(ResponseEntity.ok(Map.of("message", "Match committed.", "matchId", matchId)));
+                        future.complete(PendingResponse.ok(Map.of("message", "Match committed.", "matchId", matchId)));
                     }
 
                     @Override
                     public void onFailure(int errorCode, String errorMessage) {
-                        future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(Map.of("error", errorMessage, "matchId", matchId)));
+                        future.complete(PendingResponse.status(HttpStatus.INTERNAL_SERVER_ERROR,
+                                Map.of("error", errorMessage, "matchId", matchId)));
                     }
                 });
             }
 
             @Override
             public void onFailure(int errorCode, String errorMessage) {
-                future.complete(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.of("error", errorMessage, "matchId", matchId)));
+                future.complete(PendingResponse.status(HttpStatus.INTERNAL_SERVER_ERROR,
+                        Map.of("error", errorMessage, "matchId", matchId)));
             }
         });
-
-        return getObjectResponse(future);
+        writeFuture(ctx, future);
     }
 
-    @PostMapping("/override")
-    public ResponseEntity<Object> overrideScore(@RequestBody OverrideRequest request) {
-        ResponseEntity<Object> readiness = ensureEventReady();
-        if (readiness != null) {
-            return readiness;
+    private static void overrideScore(Context ctx) {
+        if (!ensureEventReady(ctx)) {
+            return;
         }
+        OverrideRequest request = ctx.bodyAsClass(OverrideRequest.class);
         if (request == null || isBlank(request.allianceId())) {
-            return badRequest("allianceId is required.");
+            badRequest(ctx, "allianceId is required.");
+            return;
         }
 
         String allianceId = request.allianceId();
         if (!scoreExists(allianceId)) {
-            return notFound("Score not found for alliance: " + allianceId);
+            notFound(ctx, "Score not found for alliance: " + allianceId);
+            return;
         }
 
         String matchId = request.matchId();
@@ -205,7 +230,8 @@ public class MatchControlApi {
             matchId = extractMatchId(allianceId);
         }
         if (isBlank(matchId)) {
-            return badRequest("matchId is required.");
+            badRequest(ctx, "matchId is required.");
+            return;
         }
 
         Score score;
@@ -215,25 +241,28 @@ public class MatchControlApi {
             score = buildResult.score();
             rawScoreJson = buildResult.rawJson();
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Invalid score override payload: " + e.getMessage()));
+            ctx.status(HttpStatus.BAD_REQUEST)
+                    .json(Map.of("error", "Invalid score override payload: " + e.getMessage()));
+            return;
         }
 
         score.setRawScoreData(rawScoreJson);
 
         boolean overridden = ScoringService.matchControl().overrideScore(matchId, score);
         if (!overridden) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Override rejected. Match must be completed.", "matchId", matchId));
+            ctx.status(HttpStatus.CONFLICT)
+                    .json(Map.of("error", "Override rejected. Match must be completed.", "matchId", matchId));
+            return;
         }
 
-        return ResponseEntity.ok(Map.of("message", "Score overridden.", "allianceId", allianceId, "matchId", matchId));
+        ctx.json(Map.of("message", "Score overridden.", "allianceId", allianceId, "matchId", matchId));
     }
 
-    @PostMapping("/display")
-    public ResponseEntity<Object> controlDisplay(@RequestBody DisplayRequest request) {
+    private static void controlDisplay(Context ctx) {
+        DisplayRequest request = ctx.bodyAsClass(DisplayRequest.class);
         if (request == null) {
-            return badRequest("Display action is required.");
+            badRequest(ctx, "Display action is required.");
+            return;
         }
         Map<String, Object> payload = new HashMap<>();
         payload.put("action", request.action());
@@ -241,10 +270,12 @@ public class MatchControlApi {
             payload.put("data", request.data());
         }
         BroadcastService.broadcast(LiveBroadcastTopic.LIVE_DISPLAY_CONTROL, payload, "DISPLAY_CONTROL");
-        return ResponseEntity.ok(Map.of("message", "Display action broadcast."));
+        ctx.json(Map.of("message", "Display action broadcast."));
     }
 
-    private ScoreBuildResult buildScoreFromOverride(OverrideRequest request) throws Exception {
+    // --- helpers -------------------------------------------------------------
+
+    private static ScoreBuildResult buildScoreFromOverride(OverrideRequest request) throws Exception {
         String allianceId = request.allianceId();
         Score score = ScoreHandler.factoryScore();
         score.setAllianceId(allianceId);
@@ -269,25 +300,33 @@ public class MatchControlApi {
         return new ScoreBuildResult(score, rawJson);
     }
 
-    private String normalizeScoreData(Object scoreData) throws JsonProcessingException {
+    /**
+     * Normalize a loosely-typed score payload to a JSON string. Strings that
+     * already look like JSON are returned verbatim; anything else is
+     * re-serialized through Gson.
+     */
+    private static String normalizeScoreData(Object scoreData) {
         if (scoreData instanceof String scoreJson) {
             String trimmed = scoreJson.trim();
             if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
                 return trimmed;
             }
         }
-        return objectMapper.writeValueAsString(scoreData);
+        return GSON.toJson(scoreData);
     }
 
-    private ResponseEntity<Object> ensureEventReady() {
+    /**
+     * Guard that writes a 409 and returns false if no event database is loaded.
+     */
+    private static boolean ensureEventReady(Context ctx) {
         if (LocalRepository.matchDao() == null || LocalRepository.scoreDao() == null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "No active event is set."));
+            conflict(ctx, "No active event is set.");
+            return false;
         }
-        return null;
+        return true;
     }
 
-    private boolean matchExists(String matchId) {
+    private static boolean matchExists(String matchId) {
         try {
             return LocalRepository.matchDao().getMatchById(matchId) != null;
         } catch (Exception e) {
@@ -295,7 +334,7 @@ public class MatchControlApi {
         }
     }
 
-    private boolean scoreExists(String allianceId) {
+    private static boolean scoreExists(String allianceId) {
         try {
             return LocalRepository.scoreDao().getScoreById(allianceId) != null;
         } catch (Exception e) {
@@ -303,7 +342,8 @@ public class MatchControlApi {
         }
     }
 
-    private String extractMatchId(String allianceId) {
+    /** Alliance ids follow the convention {@code {matchId}_R} / {@code {matchId}_B}. */
+    private static String extractMatchId(String allianceId) {
         if (isBlank(allianceId) || allianceId.length() < 3) {
             return null;
         }
@@ -313,17 +353,11 @@ public class MatchControlApi {
         return null;
     }
 
-    private ResponseEntity<Object> badRequest(String message) {
-        return ResponseEntity.badRequest().body(Map.of("error", message));
-    }
-
-    private ResponseEntity<Object> notFound(String message) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", message));
-    }
-
-    private boolean isBlank(String value) {
+    private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
+
+    // --- DTOs ----------------------------------------------------------------
 
     private record LoadRequest(String matchId) {}
     private record ActivateRequest(String matchId) {}

@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.matchcontrol;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.ScoreHandler;
@@ -11,7 +11,7 @@ import java.util.Map;
 public class ScoreControl {
     private static final String TAG = "LiveScoreControl";
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Gson gson = new Gson();
     private final StateManager stateManager;
 
     public ScoreControl(StateManager stateManager) {
@@ -28,7 +28,7 @@ public class ScoreControl {
         }
 
         try {
-            Map<String, Object> root = objectMapper.readValue(jsonUpdate, Map.class);
+            Map<String, Object> root = gson.fromJson(jsonUpdate, Map.class);
             Object payloadObj = root.get("payload");
             Map<String, Object> payload = payloadObj instanceof Map
                     ? (Map<String, Object>) payloadObj
@@ -60,7 +60,7 @@ public class ScoreControl {
                 return;
             }
 
-            String stateJson = objectMapper.writeValueAsString(stateObj);
+            String stateJson = gson.toJson(stateObj);
 
             Score score = stateManager.getCachedScore(allianceId);
             if (score == null) {
@@ -91,7 +91,7 @@ public class ScoreControl {
         }
 
         try {
-            Map<String, Object> root = objectMapper.readValue(jsonBody, Map.class);
+            Map<String, Object> root = gson.fromJson(jsonBody, Map.class);
             Map<String, Object> payload = extractPayload(root);
 
             String matchId = getString(payload.get("matchId"));
@@ -114,7 +114,7 @@ public class ScoreControl {
                 return;
             }
 
-            String scoreJson = objectMapper.writeValueAsString(scoreObj);
+            String scoreJson = gson.toJson(scoreObj);
 
             Score score = stateManager.getCachedScore(allianceId);
             if (score == null) {

@@ -10,25 +10,25 @@ public class DaoEvent {
         this.dao = dao;
     }
 
-    public Event insertEvent(Event event) throws Exception {
-        dao.insert(event);
-        return event;
-    }
-
-    public Event updateEvent(Event event) throws Exception {
+    public Event insertEvent(Event event) {
         dao.insertOrUpdate(event);
         return event;
     }
 
-    public void deleteEvent(String eventUuid) throws Exception {
+    public Event updateEvent(Event event) {
+        dao.insertOrUpdate(event);
+        return event;
+    }
+
+    public void deleteEvent(String eventUuid) {
         dao.deleteByColumn(Event.class, "uuid", eventUuid);
     }
 
-    public Event[] listEvents() throws Exception {
+    public Event[] listEvents() {
         return dao.readAll(Event.class);
     }
 
-    public Event getEventById(String eventUuid) throws Exception {
+    public Event getEventById(String eventUuid) {
         Event[] events = dao.query(Event.class, new String[]{"uuid"}, new String[]{eventUuid});
         if (events != null && events.length > 0) {
             return events[0];
@@ -36,7 +36,7 @@ public class DaoEvent {
         return null;
     }
 
-    public Event getEventByEventCode(String eventCode) throws Exception {
+    public Event getEventByEventCode(String eventCode) {
         Event[] events = dao.query(Event.class, new String[]{"eventCode"}, new String[]{eventCode});
         if (events != null && events.length > 0) {
             return events[0];

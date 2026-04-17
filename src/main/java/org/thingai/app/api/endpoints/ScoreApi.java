@@ -1,22 +1,40 @@
 package org.thingai.app.api.endpoints;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import io.javalin.Javalin;
+import io.javalin.http.Context;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.dto.ScoreDetailDto;
 import org.thingai.app.scoringservice.entity.Score;
 
+import java.util.HashMap;
 import java.util.Map;
 
-@RestController
-@RequestMapping("/api/scores")
-public class ScoreApi {
+import static org.thingai.app.api.utils.ResponseEntityUtil.badRequest;
+import static org.thingai.app.api.utils.ResponseEntityUtil.conflict;
+import static org.thingai.app.api.utils.ResponseEntityUtil.internalError;
 
-    @GetMapping("/match/{matchId}")
-    public ResponseEntity<Object> getMatchScore(@PathVariable String matchId) {
+/**
+ * REST surface for score lookup, submission, and UI definitions
+ * (base path {@code /api/scores}).
+ */
+public final class ScoreApi {
+
+    private ScoreApi() {
+    }
+
+    public static void register(Javalin app) {
+        app.get("/api/scores", ScoreApi::getAllScores);
+        app.get("/api/scores/define", ScoreApi::getScoreUIDefinitions);
+        app.get("/api/scores/match/{matchId}", ScoreApi::getMatchScore);
+        app.get("/api/scores/match/{matchId}/detail", ScoreApi::getMatchScoreDetail);
+        app.post("/api/scores/submit", ScoreApi::submitScore);
+    }
+
+    private static void getMatchScore(Context ctx) {
+        String matchId = ctx.pathParam("matchId");
         if (matchId == null || matchId.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "matchId is required."));
+            badRequest(ctx, "matchId is required.");
+            return;
         }
         try {
             Score[] scores = ScoringService.scoreHandler().getScoresByMatchId(matchId);
@@ -25,74 +43,73 @@ public class ScoreApi {
             Score blueScore = scores.length > 1 ? scores[1] : null;
             Integer state = deriveScoreState(redScore, blueScore);
 
-            return ResponseEntity.ok(Map.of(
-                    "matchId", matchId,
-                    "r", redScore,
-                    "b", blueScore,
-                    "state", state
-            ));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("matchId", matchId);
+            payload.put("r", redScore);
+            payload.put("b", blueScore);
+            payload.put("state", state);
+            ctx.json(payload);
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            conflict(ctx, e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to load match score: " + e.getMessage()));
+            internalError(ctx, "Failed to load match score: " + e.getMessage());
         }
     }
 
-    @GetMapping
-    public ResponseEntity<Object> getAllScores() {
+    private static void getAllScores(Context ctx) {
         try {
-            return ResponseEntity.ok(ScoringService.scoreHandler().getAllScores());
+            ctx.json(ScoringService.scoreHandler().getAllScores());
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            conflict(ctx, e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to load scores: " + e.getMessage()));
+            internalError(ctx, "Failed to load scores: " + e.getMessage());
         }
     }
 
-    @GetMapping("/match/{matchId}/detail")
-    public ResponseEntity<Object> getMatchScoreDetail(@PathVariable String matchId) {
+    private static void getMatchScoreDetail(Context ctx) {
+        String matchId = ctx.pathParam("matchId");
         if (matchId == null || matchId.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "matchId is required."));
+            badRequest(ctx, "matchId is required.");
+            return;
         }
         try {
             ScoreDetailDto[] details = ScoringService.scoreHandler().getScoreDetailsByMatchId(matchId);
-            return ResponseEntity.ok(Map.of(
-                    "matchId", matchId,
-                    "r", details.length > 0 ? details[0] : null,
-                    "b", details.length > 1 ? details[1] : null
-            ));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("matchId", matchId);
+            payload.put("r", details.length > 0 ? details[0] : null);
+            payload.put("b", details.length > 1 ? details[1] : null);
+            ctx.json(payload);
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            conflict(ctx, e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to load score details: " + e.getMessage()));
+            internalError(ctx, "Failed to load score details: " + e.getMessage());
         }
     }
 
-    @PostMapping("/submit")
-    public ResponseEntity<Object> submitScore(@RequestBody String body) {
+    private static void submitScore(Context ctx) {
+        String body = ctx.body();
         if (body == null || body.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Score payload is required."));
+            badRequest(ctx, "Score payload is required.");
+            return;
         }
         if (ScoringService.liveScoreControl() == null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Scoring service not ready."));
+            conflict(ctx, "Scoring service not ready.");
+            return;
         }
 
         ScoringService.liveScoreControl().handleScoreSubmit(body);
-        return ResponseEntity.ok(Map.of("message", "Score submitted."));
+        ctx.json(Map.of("message", "Score submitted."));
     }
 
-    @GetMapping("/define")
-    public ResponseEntity<Object> getScoreUIDefinitions() {
+    private static void getScoreUIDefinitions(Context ctx) {
         if (ScoringService.scoreHandler() == null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Scoring service not ready."));
+            conflict(ctx, "Scoring service not ready.");
+            return;
         }
-        return ResponseEntity.ok(ScoringService.scoreHandler().getScoreDefinitions());
+        ctx.json(ScoringService.scoreHandler().getScoreDefinitions());
     }
 
-    private Integer deriveScoreState(Score redScore, Score blueScore) {
+    private static Integer deriveScoreState(Score redScore, Score blueScore) {
         Integer redState = redScore != null ? redScore.getState() : null;
         Integer blueState = blueScore != null ? blueScore.getState() : null;
 

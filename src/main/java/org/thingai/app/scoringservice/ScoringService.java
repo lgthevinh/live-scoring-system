@@ -30,7 +30,10 @@ public class ScoringService extends Service {
     private static ScoreControl liveScoreControl;
 
     public ScoringService() {
-        super();
+        super("Scoring System");
+        setAppDirName("scoring_system");
+        setVersion("2.0");
+
         ILog.ENABLE_LOGGING = true;
         ILog.logLevel = ILog.DEBUG;
     }
@@ -57,10 +60,10 @@ public class ScoringService extends Service {
 
     @Override
     protected void onServiceInit() {
-        new ILogImpl(appDir, true);
-        ILog.i(SERVICE_NAME, "Initializing ScoringService with app directory: " + appDir);
+        new ILogImpl(getAppDir(), true);
+        ILog.i(SERVICE_NAME, "Initializing ScoringService with app directory: " + getAppDir());
 
-        LocalRepository.initializeSystem(appDir + "/scoring_system.db");
+        LocalRepository.initializeSystem(getAppDir() + "/scoring_system.db");
 
         authHandler = new AuthHandler();
         eventHandler = new EventHandler(new EventHandlerCallback() {
@@ -89,9 +92,9 @@ public class ScoringService extends Service {
         matchControl = new MatchControl(stateManager);
         liveScoreControl = new ScoreControl(stateManager);
 
-        ILog.i(SERVICE_NAME, "ScoringService initialized. version: " + version);
-        ILog.i(SERVICE_NAME, "Database initialized at: " + appDir + "/scoring_system.db");
-        ILog.i(SERVICE_NAME, "File storage initialized at: " + appDir + "/files");
+        ILog.i(SERVICE_NAME, "ScoringService initialized. version: " + getVersion());
+        ILog.i(SERVICE_NAME, "Database initialized at: " + getAppDir() + "/scoring_system.db");
+        ILog.i(SERVICE_NAME, "File storage initialized at: " + getAppDir() + "/files");
     }
 
     public static ScoreHandler scoreHandler() {

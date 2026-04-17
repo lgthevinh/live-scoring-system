@@ -24,7 +24,7 @@ public class DaoMatch {
     }
 
     public Match insertMatch(Match match) throws Exception {
-        dao.insert(match);
+        dao.insertOrUpdate(match);
         return match;
     }
 

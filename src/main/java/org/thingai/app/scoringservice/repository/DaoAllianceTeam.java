@@ -11,7 +11,7 @@ public class DaoAllianceTeam {
     }
 
     public AllianceTeam insertAllianceTeam(AllianceTeam allianceTeam) throws Exception {
-        dao.insert(allianceTeam);
+        dao.insertOrUpdate(allianceTeam);
         return allianceTeam;
     }
 

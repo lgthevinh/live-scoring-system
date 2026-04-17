@@ -12,18 +12,18 @@ public class DaoTeam {
 
     public Team insertTeam(String teamId, String teamName, String teamSchool, String teamRegion) throws Exception {
         Team team = new Team(teamId, teamName, teamSchool, teamRegion);
-        dao.insert(team);
+        dao.insertOrUpdate(team);
         return team;
     }
 
     public Team insertTeam(Team team) throws Exception {
-        dao.insert(team);
+        dao.insertOrUpdate(team);
         return team;
     }
 
     public void insertTeams(Team[] teams) throws Exception {
         for (Team team : teams) {
-            dao.insert(team);
+            dao.insertOrUpdate(team);
         }
     }
 

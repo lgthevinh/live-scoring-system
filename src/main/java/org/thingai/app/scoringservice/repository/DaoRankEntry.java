@@ -11,7 +11,7 @@ public class DaoRankEntry {
     }
 
     public RankingEntry insertRankingEntry(RankingEntry entry) throws Exception {
-        dao.insert(entry);
+        dao.insertOrUpdate(entry);
         return entry;
     }
 
@@ -38,7 +38,7 @@ public class DaoRankEntry {
 
     public void insertRankingEntries(RankingEntry[] entries) throws Exception {
         for (RankingEntry entry : entries) {
-            dao.insert(entry);
+            dao.insertOrUpdate(entry);
         }
     }
 
