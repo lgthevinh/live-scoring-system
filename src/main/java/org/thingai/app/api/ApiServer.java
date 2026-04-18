@@ -13,6 +13,9 @@ import org.thingai.app.api.endpoints.RankApi;
 import org.thingai.app.api.endpoints.ScoreApi;
 import org.thingai.app.api.endpoints.SyncApi;
 import org.thingai.app.api.endpoints.TeamApi;
+import org.thingai.app.api.ws.LiveWs;
+import org.thingai.app.api.ws.RankingWs;
+import org.thingai.app.api.ws.RefereeWs;
 import org.thingai.base.log.ILog;
 
 import java.io.InputStream;
@@ -97,6 +100,13 @@ public final class ApiServer {
         EventApi.register(app);
         RankApi.register(app);
         SyncApi.register(app);
+
+        // WebSocket endpoints. Auth (for /ws/referee) is enforced inside the
+        // endpoint's onConnect via WsAuthFilter so close codes survive to
+        // the client; see WsAuthFilter for why this isn't a beforeUpgrade.
+        LiveWs.register(app);
+        RankingWs.register(app);
+        RefereeWs.register(app);
 
         return app;
     }
