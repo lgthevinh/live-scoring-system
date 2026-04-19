@@ -1,26 +1,30 @@
 import { Injectable } from '@angular/core';
-import { Observable, merge } from 'rxjs';
-import { filter, map } from 'rxjs/operators';
-import { BroadcastService } from './broadcast.service';
-import { BroadcastMessage } from '../models/broadcast.model';
+import { Observable, map } from 'rxjs';
+import { LiveWsService } from './live-ws.service';
+import { RankingWsService } from './ranking-ws.service';
+import {
+  DisplayControlPayload,
+  MatchStatePayload,
+  ScoreUpdatePayload,
+} from './ws-types';
 
-export const BroadcastTopics = {
-  liveMatch: '/live/match',
-  liveScoreRed: '/live/score/red',
-  liveScoreBlue: '/live/score/blue',
-  liveDisplayScore: '/live/display/score',
-  liveDisplayControl: '/live/display/control',
-  liveDisplayRanking: '/live/display/ranking'
-} as const;
-
-export type BroadcastTopic = typeof BroadcastTopics[keyof typeof BroadcastTopics];
+/**
+ * Legacy event-shaped surface, preserved so existing consumers
+ * (match-control, etc.) keep working after the STOMP → raw-WebSocket
+ * migration. New code should use {@link LiveWsService} /
+ * {@link RankingWsService} directly.
+ *
+ * <p>The old API exposed observables of {@code BroadcastEvent<T>} with
+ * {@code {type, payload}} shape. We re-wrap each typed stream here so
+ * callers that destructure {@code event.payload} don't need to change.
+ */
 
 export enum BroadcastEventType {
   MatchState = 'MATCH_STATE',
   ScoreUpdate = 'SCORE_UPDATE',
   ScoreOverride = 'SCORE_OVERRIDE',
   DisplayControl = 'DISPLAY_CONTROL',
-  RankingUpdate = 'RANKING_UPDATE'
+  RankingUpdate = 'RANKING_UPDATE',
 }
 
 export interface BroadcastEvent<T = any> {
@@ -28,62 +32,51 @@ export interface BroadcastEvent<T = any> {
   payload: T;
 }
 
-export interface MatchStatePayload {
-  matchId: string;
-  state: number;
-  timerSecondsRemaining?: number;
-  r?: string[];
-  b?: string[];
-}
-
-export interface ScoreUpdatePayload {
-  matchId: string;
-  r?: any;
-  b?: any;
-}
-
-export interface DisplayControlPayload {
-  action: number;
-  data?: any;
-}
+// Re-export payload shapes so files that imported these from the old module
+// path keep compiling.
+export type { MatchStatePayload, ScoreUpdatePayload, DisplayControlPayload };
 
 @Injectable({ providedIn: 'root' })
 export class BroadcastEventsService {
-  constructor(private broadcast: BroadcastService) {}
-
-  listen<T = any>(topic: BroadcastTopic, expectedType?: BroadcastEventType): Observable<BroadcastEvent<T>> {
-    const streams = [this.normalizeTopic(topic)].map(dest => this.broadcast.subscribeToTopic(dest));
-
-    return merge(...streams).pipe(
-      map((msg: BroadcastMessage) => ({ type: msg.type, payload: msg.payload } as BroadcastEvent<T>)),
-      filter(event => !expectedType || event.type === expectedType)
-    );
-  }
+  constructor(
+    private live: LiveWsService,
+    private ranking: RankingWsService,
+  ) {}
 
   matchState$(): Observable<BroadcastEvent<MatchStatePayload>> {
-    return this.listen<MatchStatePayload>(BroadcastTopics.liveMatch, BroadcastEventType.MatchState);
+    return this.live
+      .matchState$()
+      .pipe(map((payload) => ({ type: BroadcastEventType.MatchState, payload })));
   }
 
+  /**
+   * All score updates arrive on one stream in the new WS model (payload
+   * carries both alliances in {@code r}/{@code b}). We emit the same event
+   * to both {@link scoreRed$} and {@link scoreBlue$} so callers that had
+   * separate subscriptions keep working. Red/blue differentiation should
+   * be done by reading {@code payload.r} / {@code payload.b}.
+   */
   scoreRed$(): Observable<BroadcastEvent<ScoreUpdatePayload>> {
-    return this.listen<ScoreUpdatePayload>(BroadcastTopics.liveScoreRed);
+    return this.live
+      .scoreUpdate$()
+      .pipe(map((payload) => ({ type: BroadcastEventType.ScoreUpdate, payload })));
   }
 
   scoreBlue$(): Observable<BroadcastEvent<ScoreUpdatePayload>> {
-    return this.listen<ScoreUpdatePayload>(BroadcastTopics.liveScoreBlue);
+    return this.live
+      .scoreUpdate$()
+      .pipe(map((payload) => ({ type: BroadcastEventType.ScoreUpdate, payload })));
   }
 
   displayControl$(): Observable<BroadcastEvent<DisplayControlPayload>> {
-    return this.listen<DisplayControlPayload>(BroadcastTopics.liveDisplayControl, BroadcastEventType.DisplayControl);
+    return this.live
+      .displayControl$()
+      .pipe(map((payload) => ({ type: BroadcastEventType.DisplayControl, payload })));
   }
 
-  rankingUpdate$(): Observable<BroadcastEvent<any>> {
-    return this.listen(BroadcastTopics.liveDisplayRanking, BroadcastEventType.RankingUpdate);
-  }
-
-  private normalizeTopic(topic: string): string {
-    if (!topic.startsWith('/')) {
-      return `/${topic}`;
-    }
-    return topic;
+  rankingUpdate$(): Observable<BroadcastEvent<unknown>> {
+    return this.ranking
+      .rankingUpdate$<unknown>()
+      .pipe(map((payload) => ({ type: BroadcastEventType.RankingUpdate, payload })));
   }
 }

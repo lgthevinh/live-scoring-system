@@ -3,10 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { SyncService } from '../../../core/services/sync.service';
 import { MatchDetailDto } from '../../../core/models/match.model';
-import { BroadcastService } from '../../../core/services/broadcast.service';
+import { RefereeWsService } from '../../../core/services/referee-ws.service';
 import { RefereeService } from '../../../core/services/referee.service';
+import { WS_CLOSE } from '../../../core/services/ws-client';
 
 type CounterKey =
   | 'whiteBallsScored'
@@ -77,27 +79,69 @@ export class ScoreTracking implements OnInit, OnDestroy {
   selectedImbalance: WritableSignal<number> = signal(2);
 
   private sub: any;
+  private wsSubs: Subscription[] = [];
+  /** Banner shown when the WS closes with a fatal 4xxx code. */
+  wsError: WritableSignal<string | null> = signal(null);
 
   constructor(
     private route: ActivatedRoute,
     private sync: SyncService,
-    private broadcastService: BroadcastService,
+    private refereeWs: RefereeWsService,
     private refereeService: RefereeService,
     private location: Location
   ) { }
 
   ngOnInit(): void {
+    // Subscribe to WS streams BEFORE calling connect() -- the service
+    // routes frames through a service-owned subject so subscription order
+    // doesn't matter.
+    this.wsSubs.push(
+      this.refereeWs.scoreAck$().subscribe({
+        next: (ack) => console.debug('[referee] SCORE_ACK', ack),
+        error: (err) => console.error('[referee] scoreAck stream error', err)
+      })
+    );
+    this.wsSubs.push(
+      this.refereeWs.closeCode$.subscribe((code) => {
+        this.wsError.set(this.describeCloseCode(code));
+      })
+    );
+
     this.sub = this.route.paramMap.subscribe(params => {
       const colorParam = (params.get('color') || 'red').toLowerCase();
       this.color = (colorParam === 'blue' ? 'blue' : 'red');
       this.matchId = params.get('matchId') || '';
       this.allianceId = this.color === 'red' ? this.matchId + "_R" : this.matchId + "_B";
+
+      // Open the WS now that we know the route params. Server validates
+      // token + REFEREE role + match-exists; failures arrive on closeCode$.
+      if (this.matchId) {
+        this.refereeWs.connect(this.matchId, this.color === 'red' ? 'R' : 'B');
+      }
+
       this.fetchMatch();
     });
   }
 
   ngOnDestroy(): void {
     if (this.sub) this.sub.unsubscribe();
+    this.wsSubs.forEach(s => s.unsubscribe());
+    this.refereeWs.disconnect();
+  }
+
+  private describeCloseCode(code: number): string {
+    switch (code) {
+      case WS_CLOSE.UNAUTHORIZED:
+        return 'Authentication failed. Please log in again.';
+      case WS_CLOSE.FORBIDDEN:
+        return 'You need REFEREE permissions to score this match.';
+      case WS_CLOSE.NOT_FOUND:
+        return 'Match not found on the server.';
+      case WS_CLOSE.BAD_REQUEST:
+        return 'Invalid match or alliance.';
+      default:
+        return `Connection closed (code ${code}).`;
+    }
   }
 
   private fetchMatch() {
@@ -255,11 +299,19 @@ export class ScoreTracking implements OnInit, OnDestroy {
   }
 
   /**
-   * Handle score updates by broadcasting a full snapshot, so receivers can stay in sync.
+   * Handle score updates by sending a SCORE_DRAFT frame on the referee
+   * socket. Replaces the legacy STOMP
+   * {@code publishMessage('/app/live/score/update/{color}', ...)}.
+   *
+   * <p>The server extracts {@code state} from our envelope's payload and
+   * wraps it into the {@code {matchId, alliance, state}} shape that
+   * {@code ScoreControl.handleLiveScoreUpdate} still consumes.
    */
   onScoreUpdate(reason: UpdateReason, key: CounterKey, value: number) {
     const snapshot = this.buildFullSnapshot(reason, key, value);
-    this.broadcastService.publishMessage(`/app/live/score/update/${this.color}`, snapshot);
+    // Send just the `state` portion of the legacy snapshot; the server
+    // re-wraps it, so we don't need to duplicate matchId/alliance.
+    this.refereeWs.sendDraft(snapshot.payload.state);
     console.debug('[LIVE_SCORE_SNAPSHOT]', snapshot);
   }
 

@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.matchcontrol;
 
 import org.thingai.app.scoringservice.entity.Score;
-import org.thingai.base.cache.LRUCache;
+import org.thingai.platform.cache.LRUCache;
 
 import java.util.HashMap;
 
@@ -15,7 +15,7 @@ public class StateManager {
     private LRUCache<String, Score> scoresCache; // map score id, score object
 
     public StateManager() {
-        this.scoresCache = new LRUCache<>(10, new HashMap<>());
+        this.scoresCache = new LRUCache<>(10);
     }
 
     public String getCurrentMatchId() {

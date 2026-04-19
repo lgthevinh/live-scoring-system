@@ -5,7 +5,9 @@
       "Bash(unzip -l libs/applicationbase.jar)",
       "WebFetch(domain:javalin.io)",
       "WebSearch",
-      "Bash(./gradlew dependencies *)"
+      "Bash(./gradlew dependencies *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
     ]
   }
 }
