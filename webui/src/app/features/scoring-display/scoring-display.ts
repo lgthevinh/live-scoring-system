@@ -79,6 +79,53 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     outputDeviceId: WritableSignal<string> = signal('default');
     availableAudioDevices: WritableSignal<Array<{deviceId: string, label: string}>> = signal([]);
 
+    // -----------------------------------------------------------------
+    // Sound-playback UI state (STUBS).
+    //
+    // The template references {@code isSoundPlaying}, {@code audioLevels},
+    // {@code volume}, {@code stopMatchSound}, and {@code onVolumeChange}
+    // for a sound visualizer + volume slider. The actual playback is done
+    // via the AudioContext below; these are minimal signals to keep the
+    // template bound. {@code stopMatchSound} cancels playback by closing
+    // the AudioContext source if one is alive.
+    // -----------------------------------------------------------------
+    isSoundPlaying: WritableSignal<boolean> = signal(false);
+    /** 8 bars for the equalizer-style visualizer. */
+    audioLevels: WritableSignal<number[]> = signal([0, 0, 0, 0, 0, 0, 0, 0]);
+    /** Volume in 0..100 (HTML range input). */
+    volume: WritableSignal<number> = signal(80);
+
+    /** Stop currently-playing match sound. */
+    stopMatchSound(): void {
+        try {
+            if (this.html5Audio) {
+                this.html5Audio.pause();
+                this.html5Audio.currentTime = 0;
+            }
+            if (this.audioContext && this.audioContext.state === 'running') {
+                this.audioContext.suspend().catch(() => {});
+            }
+        } catch (e) {
+            console.warn('[ScoringDisplay] stopMatchSound failed:', e);
+        }
+        this.isSoundPlaying.set(false);
+    }
+
+    /** Volume slider handler. */
+    onVolumeChange(eventOrValue: Event | number): void {
+        let v: number;
+        if (eventOrValue instanceof Event) {
+            const el = eventOrValue.target as HTMLInputElement | null;
+            v = el ? parseInt(el.value, 10) : this.volume();
+        } else {
+            v = eventOrValue;
+        }
+        if (!Number.isFinite(v)) return;
+        const clamped = Math.max(0, Math.min(100, Math.floor(v)));
+        this.volume.set(clamped);
+        if (this.html5Audio) this.html5Audio.volume = clamped / 100;
+    }
+
     fieldBindValue: number = 0;
 
     constructor(

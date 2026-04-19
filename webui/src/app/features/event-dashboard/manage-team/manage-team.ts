@@ -75,12 +75,37 @@ export class ManageTeam implements OnInit{
     }
   }
 
-  handleFileInput(files: FileList | null) {
+  handleFileInput(eventOrFiles: Event | FileList | null) {
+    let files: FileList | null = null;
+    if (eventOrFiles instanceof Event) {
+      const input = eventOrFiles.target as HTMLInputElement | null;
+      files = input?.files ?? null;
+    } else {
+      files = eventOrFiles;
+    }
     this.fileToUpload = files && files.length > 0 ? files[0] : null;
   }
 
   uploadTeamList() {
 
+  }
+
+  /**
+   * STUB: Export the current team list as CSV. Wire to a real download
+   * once the export workflow is decided.
+   */
+  exportTeamList() {
+    console.warn('[ManageTeam] exportTeamList() not implemented yet');
+    alert('Export team list is not implemented yet.');
+  }
+
+  /**
+   * STUB: Download an empty CSV template the operator can fill in and
+   * re-upload. Wire to a real template asset when available.
+   */
+  downloadTemplate() {
+    console.warn('[ManageTeam] downloadTemplate() not implemented yet');
+    alert('Download team template is not implemented yet.');
   }
 
   deleteTeam(teamId: string) {

@@ -12,6 +12,8 @@ import { environment } from '../../../environments/environment';
 import { MatchDetailDto } from '../../core/models/match.model';
 import { BroadcastEventsService } from '../../core/services/broadcast-events.service';
 import { RankService } from '../../core/services/rank.service';
+import { ScoreSubmitBufferService, BufferedScoreSubmission } from '../../core/services/score-submit-buffer.service';
+import { TempScore } from '../../core/models/score.model';
 import { ScoresheetComponent } from '../match-results/components/scoresheet/scoresheet.component';
 import { DisplayControlAction, MatchControlService, MatchControlState } from '../../core/services/match-control.service';
 
@@ -88,8 +90,103 @@ export class MatchControl implements OnInit {
     private matchService: MatchService,
     private matchControl: MatchControlService,
     private broadcastEvents: BroadcastEventsService,
-    private rankService: RankService
+    private rankService: RankService,
+    public bufferService: ScoreSubmitBufferService
   ) { }
+
+  // -----------------------------------------------------------------
+  // Buffered-submission / temp-score / override-confirm modal stubs.
+  //
+  // The HTML template references a large family of modal-control state
+  // (showCommitModal, showOverrideConfirmModal, showTempScoreCommitModal,
+  // showTempScoreRejectModal) and the associated open/close/confirm
+  // handlers, plus signals that surface buffered submissions and
+  // pending temp scores per alliance. The real workflow has not been
+  // wired into the new Javalin backend yet (see
+  // {@link ScorekeeperService}, also a stub). These no-op handlers
+  // keep the template compilable so the rest of the page works.
+  // -----------------------------------------------------------------
+
+  // Modal visibility
+  showCommitModal: WritableSignal<boolean> = signal(false);
+  showOverrideConfirmModal: WritableSignal<boolean> = signal(false);
+  showTempScoreCommitModal: WritableSignal<boolean> = signal(false);
+  showTempScoreRejectModal: WritableSignal<boolean> = signal(false);
+
+  // Pending modal context
+  pendingOverrideAlliances: string[] = [];
+  pendingTempScoreId: string | null = null;
+  pendingTempScoreAlliance: 'red' | 'blue' | null = null;
+  tempScoreRejectReason: string = '';
+
+  // Backend-sourced temp scores (empty until backend is wired)
+  redTempScores: WritableSignal<TempScore[]> = signal([]);
+  blueTempScores: WritableSignal<TempScore[]> = signal([]);
+  hasTempScores(): boolean {
+    return this.redTempScores().length > 0 || this.blueTempScores().length > 0;
+  }
+  getTempScoreById(id: string | null, color: 'red' | 'blue'): TempScore | null {
+    if (!id) return null;
+    const list = color === 'red' ? this.redTempScores() : this.blueTempScores();
+    return list.find(t => t.tempScoreId === id) ?? null;
+  }
+
+  // Commit modal
+  openCommitModal(): void { this.showCommitModal.set(true); }
+  closeCommitModal(): void { this.showCommitModal.set(false); }
+
+  // Override-confirm modal
+  closeOverrideConfirmModal(): void {
+    this.showOverrideConfirmModal.set(false);
+    this.pendingOverrideAlliances = [];
+  }
+  confirmOverrideSave(): void {
+    console.warn('[MatchControl] confirmOverrideSave() not implemented yet');
+    this.closeOverrideConfirmModal();
+  }
+
+  // Temp-score commit modal
+  openTempScoreCommitModal(tempScoreId: string, alliance: 'red' | 'blue'): void {
+    this.pendingTempScoreId = tempScoreId;
+    this.pendingTempScoreAlliance = alliance;
+    this.showTempScoreCommitModal.set(true);
+  }
+  closeTempScoreCommitModal(): void {
+    this.showTempScoreCommitModal.set(false);
+    this.pendingTempScoreId = null;
+    this.pendingTempScoreAlliance = null;
+  }
+  confirmCommitTempScore(): void {
+    console.warn('[MatchControl] confirmCommitTempScore() not implemented yet');
+    this.closeTempScoreCommitModal();
+  }
+
+  // Temp-score reject modal
+  openTempScoreRejectModal(tempScoreId: string, alliance: 'red' | 'blue'): void {
+    this.pendingTempScoreId = tempScoreId;
+    this.pendingTempScoreAlliance = alliance;
+    this.tempScoreRejectReason = '';
+    this.showTempScoreRejectModal.set(true);
+  }
+  closeTempScoreRejectModal(): void {
+    this.showTempScoreRejectModal.set(false);
+    this.pendingTempScoreId = null;
+    this.pendingTempScoreAlliance = null;
+    this.tempScoreRejectReason = '';
+  }
+  confirmRejectTempScore(): void {
+    console.warn('[MatchControl] confirmRejectTempScore() not implemented yet');
+    this.closeTempScoreRejectModal();
+  }
+
+  // Buffered-submission actions
+  submitBufferedSubmission(id: string): void {
+    console.warn('[MatchControl] submitBufferedSubmission() not implemented yet');
+    this.bufferService.markAsSubmitted(id, 'scorekeeper');
+  }
+  removeFromBuffer(id: string): void {
+    this.bufferService.removeFromBuffer(id);
+  }
 
   ngOnInit(): void {
     this.loadSchedule();

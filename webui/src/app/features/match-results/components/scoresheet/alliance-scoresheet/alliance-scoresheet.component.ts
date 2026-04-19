@@ -270,6 +270,16 @@ export class AllianceScoresheetComponent implements OnChanges {
   @Input() alliance: 'red' | 'blue' = 'red';
   @Input() matchInfo: { matchCode: string, fieldNumber: number } | null = null;
   @Input() editable: boolean = false;
+  /**
+   * Optional pre-parsed score data passed in from the parent. Currently
+   * unused by the component logic (parsing happens from {@link score}
+   * in {@link ngOnChanges}) but kept as an input so the parent template
+   * binding compiles. Wire this through if the parent ever needs to
+   * inject scores that don't have a {@link Score#rawScoreData} string.
+   */
+  @Input() initialScoreData: any = null;
+  /** Optional match identifier (display only). */
+  @Input() matchId: string | null = null;
   @Output() scoreChange = new EventEmitter<any>();
 
   scoreData: any = {};
