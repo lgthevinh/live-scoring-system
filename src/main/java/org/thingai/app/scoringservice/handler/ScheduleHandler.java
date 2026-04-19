@@ -1,0 +1,437 @@
+package org.thingai.app.scoringservice.handler;
+
+import org.thingai.app.scoringservice.callback.RequestCallback;
+import org.thingai.app.scoringservice.define.ErrorCode;
+import org.thingai.app.scoringservice.define.MatchType;
+import org.thingai.app.scoringservice.entity.*;
+import org.thingai.app.scoringservice.repository.LocalRepository;
+import org.thingai.app.scoringservice.service.MatchMakerService;
+import org.thingai.base.log.ILog;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class ScheduleHandler {
+    private static final String TAG = "ScheduleHandler";
+
+    private final MatchMakerService matchMaker;
+
+    public ScheduleHandler(MatchMakerService matchMaker) {
+        this.matchMaker = matchMaker;
+
+        String osName = System.getProperty("os.name").toLowerCase();
+        Path binary = Paths.get("binary");
+        if (osName.contains("win")) {
+            ILog.d(TAG, "Detected Windows OS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker.exe");
+        } else if (osName.contains("mac")) {
+            ILog.d(TAG, "Detected macOS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker_mac");
+        } else {
+            ILog.d(TAG, "Assuming Linux OS for MatchMakerService.");
+            this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker");
+        }
+
+        Path dataDir = Paths.get("data");
+        if (!Files.exists(dataDir)) {
+            try {
+                Files.createDirectories(dataDir);
+                ILog.d(TAG, "Created data directory at: " + dataDir.toAbsolutePath());
+            } catch (Exception e) {
+                ILog.e(TAG, "Error creating data directory: " + e.getMessage());
+            }
+        }
+
+        Path outPath = dataDir.resolve("match_schedule.txt");
+        if (!Files.exists(outPath)) {
+            try {
+                Files.createFile(outPath);
+            } catch (Exception e) {
+                ILog.e(TAG, "Error creating match schedule output file: " + e.getMessage());
+            }
+        }
+
+        String outDir = outPath.toAbsolutePath().toString();
+        ILog.d(TAG, "Match schedule output path set to: " + outDir);
+        this.matchMaker.setOutPath(outDir);
+    }
+
+    /**
+     * V2 schedule generator:
+     * - Uses external MatchMakerService to produce a schedule file.
+     * - Parses "Match Schedule" lines into 2v2 team pairings.
+     * - Maps team numbers in the file as 1-based indices into a SHUFFLED team list from DAO.
+     * - Keeps existing time generation (start time, duration, TimeBlocks).
+     */
+    public void generateSchedule(int rounds, String startTime, int matchDuration, int fieldCount, TimeBlock[] timeBlocks, RequestCallback<Void> callback) {
+        ILog.d(TAG, "Generating match schedule V2 with rounds=" + rounds + ", start=" + startTime + ", duration=" + matchDuration + " min");
+        try {
+            // 1) Load teams and reset schedule-related tables and caches
+            Team[] allTeams = LocalRepository.teamDao().listTeams();
+
+            LocalRepository.matchDao().deleteAllMatch();
+            LocalRepository.allianceTeamDao().deleteAllAllianceTeams();
+            LocalRepository.scoreDao().deleteAllScores();
+
+            if (allTeams == null || allTeams.length < 4) {
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Cannot generate schedule with fewer than 4 teams.");
+                return;
+            }
+
+            // 2) Shuffle teams to form the 1..N mapping base (index 1 = shuffled[0])
+            shuffleArray(allTeams);
+            List<Team> shuffledTeams = Arrays.asList(allTeams);
+
+            // 3) Run external generator (2 teams per alliance)
+            int exitCode = matchMaker.generateMatchSchedule(rounds, shuffledTeams.size(), 2);
+            if (exitCode != 0) {
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "MatchMakerService.exe failed (exitCode=" + exitCode + "). Check matchmaker.log for details.");
+                return;
+            }
+
+            // Read generated schedule from output file
+            Path schedulePath = Paths.get(matchMaker.getOutPath()).toAbsolutePath().normalize();
+            if (Files.isDirectory(schedulePath)) {
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "OutPath is a directory. Please set MatchMakerService.outPath to the schedule file.");
+                return;
+            }
+
+            // Small retry to ensure file is fully materialized
+            List<String> lines = null;
+            final long deadline = System.currentTimeMillis() + 2000; // up to 2 s
+            while (System.currentTimeMillis() < deadline) {
+                if (Files.exists(schedulePath)) {
+                    try {
+                        lines = Files.readAllLines(schedulePath);
+                        if (!lines.isEmpty()) break;
+                    } catch (IOException ignored) {}
+                }
+                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+            }
+            if (lines == null || lines.isEmpty()) {
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "Schedule file not readable at: " + schedulePath);
+                return;
+            }
+
+            List<ParsedMatch> parsedMatches = parseMatchMakerSchedule(lines);
+            if (parsedMatches.isEmpty()) {
+                // Last defensive check: if we still don't see "Match Schedule", dump first few lines to logs
+                ILog.w(TAG, "Schedule header not found. First lines: " + String.join(" | ", lines.subList(0, Math.min(5, lines.size()))));
+                callback.onFailure(ErrorCode.DAO_RETRIEVE_FAILED, "No matches parsed from schedule file. Ensure it contains a 'Match Schedule' section.");
+                return;
+            }
+
+            // 5) Time keeping: same as V1 (apply TimeBlocks)
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+            LocalDateTime currentTime = LocalDateTime.parse(startTime, timeFormatter);
+
+            int matchNumber = 1;
+            for (ParsedMatch pm : parsedMatches) {
+                int fieldNumber = ((matchNumber - 1) % fieldCount) + 1;
+
+                // Respect time blocks by skipping breaks
+                if (timeBlocks != null) {
+                    for (TimeBlock block : timeBlocks) {
+                        LocalDateTime breakStart = LocalDateTime.parse(block.getStartTime(), timeFormatter);
+                        long breakDuration = Long.parseLong(block.getDuration());
+                        LocalDateTime breakEnd = breakStart.plusMinutes(breakDuration);
+
+                        if (!currentTime.isBefore(breakStart) && currentTime.isBefore(breakEnd)) {
+                            currentTime = breakEnd;
+                        }
+                    }
+                }
+
+                if (pm.red.length < 2 || pm.blue.length < 2) {
+                    ILog.w(TAG, "Skipping malformed match line: " + Arrays.toString(pm.red) + " vs " + Arrays.toString(pm.blue));
+                    continue;
+                }
+
+                // Map team numbers (1-based) -> shuffled team IDs
+                String[] redTeamIds = new String[] {
+                        mapTeamIndexToId(shuffledTeams, pm.red[0]),
+                        mapTeamIndexToId(shuffledTeams, pm.red[1])
+                };
+                String[] blueTeamIds = new String[] {
+                        mapTeamIndexToId(shuffledTeams, pm.blue[0]),
+                        mapTeamIndexToId(shuffledTeams, pm.blue[1])
+                };
+
+                HashMap<String, Boolean> surrogateMap = new HashMap<>();
+                for (int tIdx : pm.red) {
+                    String teamId = mapTeamIndexToId(shuffledTeams, tIdx);
+                    surrogateMap.put(teamId, pm.surrogateMap.getOrDefault(tIdx, false));
+                }
+                for (int tIdx : pm.blue) {
+                    String teamId = mapTeamIndexToId(shuffledTeams, tIdx);
+                    surrogateMap.put(teamId, pm.surrogateMap.getOrDefault(tIdx, false));
+                }
+
+                ILog.d(TAG, Arrays.toString(redTeamIds) + " vs " + Arrays.toString(blueTeamIds) + " at " + currentTime.format(timeFormatter));
+
+                // Create the match and scores
+                createMatchInternal(MatchType.QUALIFICATION, matchNumber, fieldNumber, currentTime.format(timeFormatter), redTeamIds, blueTeamIds, surrogateMap);
+
+                // Advance time for next match
+                currentTime = currentTime.plusMinutes(matchDuration);
+                matchNumber++;
+            }
+
+            callback.onSuccess(null, "Match schedule generated successfully by MatchMakerService (shuffled mapping) and times assigned.");
+        } catch (Exception e) {
+            ILog.e(TAG, "generateSchedule error: " + e.getMessage());
+            callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to generate match schedule: " + e.getMessage());
+        }
+    }
+
+    public void generatePlayoffSchedule(int playoffType, int fieldCount, AllianceTeam[] allianceTeams, String startTime, int matchDuration, TimeBlock[] timeBlocks, RequestCallback<Void> callback) {
+        ILog.d(TAG, "Generating playoff schedule with type=" + playoffType + ", start=" + startTime + ", duration=" + matchDuration + " min");
+        try {
+            if (allianceTeams == null || allianceTeams.length == 0) {
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Alliance teams are required to generate playoff schedule.");
+                return;
+            }
+
+            Map<String, List<String>> allianceMap = new HashMap<>();
+            for (AllianceTeam allianceTeam : allianceTeams) {
+                if (allianceTeam == null || allianceTeam.getAllianceId() == null || allianceTeam.getTeamId() == null) {
+                    continue;
+                }
+                allianceMap.computeIfAbsent(allianceTeam.getAllianceId(), key -> new ArrayList<>())
+                        .add(allianceTeam.getTeamId());
+            }
+
+            if (allianceMap.size() < 2) {
+                callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "At least two alliances are required.");
+                return;
+            }
+
+            List<String> allianceIds = new ArrayList<>(allianceMap.keySet());
+            allianceIds.sort((a, b) -> {
+                Integer ai = parseAllianceId(a);
+                Integer bi = parseAllianceId(b);
+                if (ai != null && bi != null) {
+                    return ai.compareTo(bi);
+                }
+                return a.compareToIgnoreCase(b);
+            });
+
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+            LocalDateTime currentTime = LocalDateTime.parse(startTime, timeFormatter);
+
+            int matchNumber = 1;
+            int total = allianceIds.size();
+            for (int i = 0; i < total / 2; i++) {
+                String highAlliance = allianceIds.get(i);
+                String lowAlliance = allianceIds.get(total - 1 - i);
+
+                int fieldNumberResolved = ((matchNumber - 1) % Math.max(fieldCount, 1)) + 1;
+
+                if (timeBlocks != null) {
+                    for (TimeBlock block : timeBlocks) {
+                        LocalDateTime breakStart = LocalDateTime.parse(block.getStartTime(), timeFormatter);
+                        long breakDuration = Long.parseLong(block.getDuration());
+                        LocalDateTime breakEnd = breakStart.plusMinutes(breakDuration);
+                        if (!currentTime.isBefore(breakStart) && currentTime.isBefore(breakEnd)) {
+                            currentTime = breakEnd;
+                        }
+                    }
+                }
+
+                String[] redTeamIds = allianceMap.getOrDefault(highAlliance, List.of()).toArray(new String[0]);
+                String[] blueTeamIds = allianceMap.getOrDefault(lowAlliance, List.of()).toArray(new String[0]);
+
+                if (redTeamIds.length == 0 || blueTeamIds.length == 0) {
+                    callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Alliance data is incomplete for playoff schedule.");
+                    return;
+                }
+
+                HashMap<String, Boolean> surrogateMap = new HashMap<>();
+                for (String teamId : redTeamIds) {
+                    surrogateMap.put(teamId, false);
+                }
+                for (String teamId : blueTeamIds) {
+                    surrogateMap.put(teamId, false);
+                }
+
+                createMatchInternal(playoffType, matchNumber, fieldNumberResolved, currentTime.format(timeFormatter), redTeamIds, blueTeamIds, surrogateMap);
+
+                currentTime = currentTime.plusMinutes(matchDuration);
+                matchNumber++;
+            }
+
+            callback.onSuccess(null, "Playoff schedule generated successfully.");
+        } catch (Exception e) {
+            callback.onFailure(ErrorCode.DAO_CREATE_FAILED, "Failed to generate playoff schedule: " + e.getMessage());
+        }
+    }
+
+    private Integer parseAllianceId(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Parse the "Match Schedule" section from the MatchMakerService .txt output.
+     * Expected lines like: "  1:    4     7     5     8 "
+     * Optional '*' after a team number denotes surrogate; ignored here.
+     */
+    private List<ParsedMatch> parseMatchMakerSchedule(List<String> lines) {
+        List<ParsedMatch> matches = new ArrayList<>();
+        boolean inSchedule = false;
+        Pattern linePattern = Pattern.compile("^\\s*(\\d+)\\s*:\\s*(\\d+\\*?)\\s+(\\d+\\*?)\\s+(\\d+\\*?)\\s+(\\d+\\*?).*$");
+
+        for (String raw : lines) {
+            String line = raw == null ? "" : raw.trim();
+
+            if (!inSchedule) {
+                if (line.equalsIgnoreCase("Match Schedule")) {
+                    inSchedule = true;
+                }
+                continue;
+            }
+
+            if (line.isEmpty() || line.startsWith("------")) {
+                continue;
+            }
+            if (line.toLowerCase().startsWith("schedule statistics")) {
+                break;
+            }
+
+            Matcher m = linePattern.matcher(raw);
+            if (m.matches()) {
+                HashMap<Integer, Boolean> surrogateMap = new HashMap<>();
+                int t1 = parseTeamIndex(m.group(2));
+                int t2 = parseTeamIndex(m.group(3));
+                int t3 = parseTeamIndex(m.group(4));
+                int t4 = parseTeamIndex(m.group(5));
+
+                if (t1 == -1 || t2 == -1 || t3 == -1 || t4 == -1) {
+                    ILog.w(TAG, "Failed to parse team indices from line: " + raw);
+                    continue;
+                }
+
+                if (m.group(2).endsWith("*")) surrogateMap.put(t1, true);
+                if (m.group(3).endsWith("*")) surrogateMap.put(t2, true);
+                if (m.group(4).endsWith("*")) surrogateMap.put(t3, true);
+                if (m.group(5).endsWith("*")) surrogateMap.put(t4, true);
+
+                ParsedMatch pm = new ParsedMatch();
+                pm.red = new int[]{t1, t2};
+                pm.blue = new int[]{t3, t4};
+                pm.surrogateMap = surrogateMap;
+                matches.add(pm);
+            }
+        }
+        return matches;
+    }
+
+    private int parseTeamIndex(String token) {
+        ILog.d(TAG, "Parsing team index from token: " + token);
+        String digits = token.replace("*", "").trim(); // remove surrogate marker
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private String mapTeamIndexToId(List<Team> shuffledTeams, int idx1Based) throws Exception {
+        if (idx1Based < 1 || idx1Based > shuffledTeams.size()) {
+            throw new Exception("Team index out of bounds in schedule: " + idx1Based);
+        }
+        return shuffledTeams.get(idx1Based - 1).getTeamId();
+    }
+
+    // Helper holder for parsed match
+    private static class ParsedMatch {
+        int[] red;
+        int[] blue;
+        HashMap<Integer, Boolean> surrogateMap;
+    }
+
+    private void createMatchInternal(int matchType, int matchNumber, int field, String matchStartTime, String[] redTeamIds, String[] blueTeamIds, HashMap<String, Boolean> surrogateMap) throws Exception {
+        // Handle duplicate team IDs
+        Set<String> uniqueReds = new HashSet<>(Arrays.asList(redTeamIds));
+        Set<String> uniqueBlues = new HashSet<>(Arrays.asList(blueTeamIds));
+        if (uniqueReds.size() < redTeamIds.length || uniqueBlues.size() < blueTeamIds.length) {
+            throw new Exception("Duplicate team IDs detected in match creation.");
+        }
+
+        Match match = new Match();
+        match.setMatchType(matchType);
+        match.setMatchNumber(matchNumber);
+        match.setMatchStartTime(matchStartTime);
+        match.setFieldNumber(field);
+
+        String matchPrefix = switch (matchType) {
+            case MatchType.QUALIFICATION -> "Q";
+            case MatchType.PLAYOFF -> "P";
+            case MatchType.SEMIFINAL -> "SF";
+            case MatchType.FINAL -> "F";
+            default -> "";
+        };
+
+        String matchCode = matchPrefix + matchNumber;
+        match.setMatchCode(matchCode);
+        match.setId(matchCode);
+
+        String blueAllianceId = matchCode + "_B";
+        String redAllianceId = matchCode + "_R";
+
+        LocalRepository.allianceTeamDao().deleteAllianceTeamsByAllianceId(redAllianceId);
+        LocalRepository.allianceTeamDao().deleteAllianceTeamsByAllianceId(blueAllianceId);
+
+        for (String teamId : uniqueReds) {
+            AllianceTeam team = new AllianceTeam();
+            team.setTeamId(teamId);
+            team.setAllianceId(redAllianceId);
+            team.setSurrogate(surrogateMap.get(teamId));
+            ILog.d(TAG, "Inserting red alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
+            LocalRepository.allianceTeamDao().insertAllianceTeam(team);
+        }
+
+        for (String teamId : uniqueBlues) {
+            AllianceTeam team = new AllianceTeam();
+            team.setTeamId(teamId);
+            team.setAllianceId(blueAllianceId);
+            team.setSurrogate(surrogateMap.get(teamId));
+            ILog.d(TAG, "Inserting blue alliance team: " + teamId + " surrogate=" + surrogateMap.get(teamId));
+            LocalRepository.allianceTeamDao().insertAllianceTeam(team);
+        }
+
+        Score redScore = ScoreHandler.factoryScore();
+        redScore.setAllianceId(redAllianceId);
+
+        Score blueScore = ScoreHandler.factoryScore();
+        blueScore.setAllianceId(blueAllianceId);
+
+        LocalRepository.matchDao().insertMatch(match);
+        LocalRepository.scoreDao().insertScore(redScore);
+        LocalRepository.scoreDao().insertScore(blueScore);
+    }
+
+    // Utility methods
+    private <T> void shuffleArray(T[] array) {
+        Random rand = new Random();
+        for (int i = array.length - 1; i > 0; i--) {
+            int index = rand.nextInt(i + 1);
+            T a = array[index];
+            array[index] = array[i];
+            array[i] = a;
+        }
+    }
+}

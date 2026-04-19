@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileJava -PskipWebuiBuild=true --no-daemon)",
+      "Bash(unzip -l libs/applicationbase.jar)",
+      "WebFetch(domain:javalin.io)",
+      "WebSearch",
+      "Bash(./gradlew dependencies *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

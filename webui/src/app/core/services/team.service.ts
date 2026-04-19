@@ -8,28 +8,28 @@ import {environment} from '../../../environments/environment';
   providedIn: 'root'
 })
 export class TeamService {
-  private apiUrl = environment.apiBaseUrl + '/api/team';
+  private apiUrl = environment.apiBaseUrl + '/api/teams';
 
   constructor(private http: HttpClient) { }
 
   getTeams(): Observable<Team[]> {
-    return this.http.get<Team[]>(`${this.apiUrl}/list`);
+    return this.http.get<Team[]>(this.apiUrl);
   }
 
   addTeam(team: Team): Observable<Team> {
-    return this.http.post<Team>(`${this.apiUrl}/create`, team);
+    return this.http.post<Team>(this.apiUrl, team);
   }
 
   updateTeam(team: Team): Observable<Team> {
-    return this.http.put<Team>(`${this.apiUrl}/update`, team);
+    return this.http.put<Team>(`${this.apiUrl}/${team.teamId}`, team);
   }
 
   deleteTeam(id: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/delete/${id}`);
+    return this.http.delete(`${this.apiUrl}/${id}`);
   }
 
   listTeams(): Observable<Team[]> {
-    return this.http.get<Team[]>(`${this.apiUrl}/list`);
+    return this.http.get<Team[]>(this.apiUrl);
   }
 
   exportTeams(): Observable<Blob> {

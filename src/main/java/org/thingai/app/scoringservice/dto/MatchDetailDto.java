@@ -1,51 +1,31 @@
 package org.thingai.app.scoringservice.dto;
 
-import org.thingai.app.scoringservice.entity.match.AllianceTeam;
-import org.thingai.app.scoringservice.entity.match.Match;
-import org.thingai.app.scoringservice.entity.score.Score;
-import org.thingai.app.scoringservice.entity.team.Team;
+import org.thingai.app.scoringservice.entity.AllianceTeam;
+import org.thingai.app.scoringservice.entity.Match;
+import org.thingai.app.scoringservice.entity.Score;
+import org.thingai.app.scoringservice.entity.Team;
 
-import java.util.HashMap;
+import java.util.Map;
 
 public class MatchDetailDto {
     private Match match;
+    private AllianceTeam[] redAllianceTeams;
+    private AllianceTeam[] blueAllianceTeams;
     private Team[] redTeams;
     private Team[] blueTeams;
     private Score redScore;
     private Score blueScore;
-    private String redTempScoreRawData;
-    private String blueTempScoreRawData;
-    private boolean hasRedTempScore;
-    private boolean hasBlueTempScore;
-
-    private HashMap<String, Boolean> surrogateMap;
+    private Map<String, Boolean> surrogateMap;
 
     public MatchDetailDto() {
     }
 
-    public MatchDetailDto(Match match, Team[] redTeams, Team[] blueTeams, HashMap<String, Boolean> surrogateMap) {
+    public MatchDetailDto(Match match, AllianceTeam[] redAllianceTeams, AllianceTeam[] blueAllianceTeams, Team[] redTeams, Team[] blueTeams) {
         this.match = match;
         this.redTeams = redTeams;
         this.blueTeams = blueTeams;
-        this.surrogateMap = surrogateMap;
     }
 
-    public MatchDetailDto(Match match, Team[] redTeams, Team[] blueTeams, Score redScore, Score blueScore, HashMap<String, Boolean> surrogateMap) {
-        this.match = match;
-        this.redTeams = redTeams;
-        this.blueTeams = blueTeams;
-        this.redScore = redScore;
-        this.blueScore = blueScore;
-        this.surrogateMap = surrogateMap;
-    }
-
-    public HashMap<String, Boolean> getSurrogateMap() {
-        return surrogateMap;
-    }
-
-    public void setSurrogateMap(HashMap<String, Boolean> surrogateMap) {
-        this.surrogateMap = surrogateMap;
-    }
 
     public Match getMatch() {
         return match;
@@ -87,35 +67,27 @@ public class MatchDetailDto {
         this.blueScore = blueScore;
     }
 
-    public String getRedTempScoreRawData() {
-        return redTempScoreRawData;
+    public AllianceTeam[] getRedAllianceTeams() {
+        return redAllianceTeams;
     }
 
-    public void setRedTempScoreRawData(String redTempScoreRawData) {
-        this.redTempScoreRawData = redTempScoreRawData;
+    public void setRedAllianceTeams(AllianceTeam[] redAllianceTeams) {
+        this.redAllianceTeams = redAllianceTeams;
     }
 
-    public String getBlueTempScoreRawData() {
-        return blueTempScoreRawData;
+    public AllianceTeam[] getBlueAllianceTeams() {
+        return blueAllianceTeams;
     }
 
-    public void setBlueTempScoreRawData(String blueTempScoreRawData) {
-        this.blueTempScoreRawData = blueTempScoreRawData;
+    public void setBlueAllianceTeams(AllianceTeam[] blueAllianceTeams) {
+        this.blueAllianceTeams = blueAllianceTeams;
     }
 
-    public boolean isHasRedTempScore() {
-        return hasRedTempScore;
+    public Map<String, Boolean> getSurrogateMap() {
+        return surrogateMap;
     }
 
-    public void setHasRedTempScore(boolean hasRedTempScore) {
-        this.hasRedTempScore = hasRedTempScore;
-    }
-
-    public boolean isHasBlueTempScore() {
-        return hasBlueTempScore;
-    }
-
-    public void setHasBlueTempScore(boolean hasBlueTempScore) {
-        this.hasBlueTempScore = hasBlueTempScore;
+    public void setSurrogateMap(Map<String, Boolean> surrogateMap) {
+        this.surrogateMap = surrogateMap;
     }
 }

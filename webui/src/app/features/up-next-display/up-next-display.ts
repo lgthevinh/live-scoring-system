@@ -1,12 +1,23 @@
 import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BroadcastService } from '../../core/services/broadcast.service';
-import { FieldDisplayCommand } from '../../core/define/FieldDisplayCommand';
+import { Subscription } from 'rxjs';
+import { LiveWsService } from '../../core/services/live-ws.service';
+import { DisplayControlAction } from '../../core/services/match-control.service';
 import { SyncService } from '../../core/services/sync.service';
 import { Team } from '../../core/models/team.model';
 import { MatchDetailDto } from '../../core/models/match.model';
 
+/**
+ * "Up next" preview screen. Initially fetches the next match via REST,
+ * then listens to {@code /ws/live} DISPLAY_CONTROL frames for SHOW_PREVIEW
+ * actions to refresh on demand from match-control.
+ *
+ * <p>The legacy implementation subscribed to two custom topics
+ * ({@code /match/available}, {@code /display/field/* /command}) that don't
+ * exist on the new backend; both were collapsed into the single global
+ * DISPLAY_CONTROL stream.
+ */
 @Component({
     selector: 'app-up-next-display',
     standalone: true,
@@ -15,7 +26,6 @@ import { MatchDetailDto } from '../../core/models/match.model';
     styleUrl: './up-next-display.css'
 })
 export class UpNextDisplay implements OnInit, OnDestroy {
-    // Match data
     matchCode: WritableSignal<string> = signal('');
     matchNumber: WritableSignal<number> = signal(0);
     fieldNumber: WritableSignal<number> = signal(0);
@@ -24,16 +34,16 @@ export class UpNextDisplay implements OnInit, OnDestroy {
     blueTeams: WritableSignal<Team[]> = signal([]);
     hasUpNext: WritableSignal<boolean> = signal(false);
 
-    // Fullscreen state
     isFullscreen: WritableSignal<boolean> = signal(false);
 
-    // Gear control fade
     controlsVisible: WritableSignal<boolean> = signal(true);
     private hideTimer: any = null;
 
+    private readonly subs: Subscription[] = [];
+
     constructor(
         private syncService: SyncService,
-        private broadcastService: BroadcastService
+        private liveWs: LiveWsService
     ) {}
 
     private onFullscreenChange = () => {
@@ -58,7 +68,7 @@ export class UpNextDisplay implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.clearHideTimer();
-        this.broadcastService.unsubscribeAll();
+        this.subs.forEach(s => s.unsubscribe());
         document.removeEventListener('fullscreenchange', this.onFullscreenChange);
         document.removeEventListener('webkitfullscreenchange' as any, this.onFullscreenChange as any);
         document.removeEventListener('mozfullscreenchange' as any, this.onFullscreenChange as any);
@@ -67,7 +77,7 @@ export class UpNextDisplay implements OnInit, OnDestroy {
 
     private fetchUpNextMatch(): void {
         this.syncService.getUpNextMatch().subscribe({
-            next: (match: MatchDetailDto) => {
+            next: (match: MatchDetailDto | null) => {
                 if (match) {
                     this.applyMatchData(match);
                 } else {
@@ -92,35 +102,40 @@ export class UpNextDisplay implements OnInit, OnDestroy {
     }
 
     private subscribeToUpdates(): void {
-        // Subscribe to match available topic for real-time updates when next match is set
-        this.broadcastService.subscribeToTopic('/topic/match/available').subscribe({
-            next: (msg) => {
-                console.log('UpNextDisplay received match available:', msg);
-                if (msg.payload) {
-                    this.applyMatchData(msg.payload as MatchDetailDto);
-                }
-            },
-            error: (err) => {
-                console.error('UpNextDisplay match available error:', err);
-            }
-        });
+        // Snapshot replay covers the case where match-control already
+        // pushed SHOW_PREVIEW before this screen connected.
+        this.subs.push(
+            this.liveWs.snapshot$().subscribe({
+                next: (snap) => {
+                    if (snap.lastDisplay && snap.lastDisplay.action === DisplayControlAction.SHOW_PREVIEW) {
+                        const data = snap.lastDisplay.data as MatchDetailDto | undefined;
+                        if (data) {
+                            this.applyMatchData(data);
+                        } else {
+                            this.fetchUpNextMatch();
+                        }
+                    }
+                },
+                error: (err) => console.error('UpNextDisplay snapshot error:', err)
+            })
+        );
 
-        // Subscribe to field display command for SHOW_UPNEXT commands
-        this.broadcastService.subscribeToTopic('/topic/display/field/*/command').subscribe({
-            next: (msg) => {
-                if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
-                    console.log('UpNextDisplay SHOW_UPNEXT command received:', msg);
-                    if (msg.payload) {
-                        this.applyMatchData(msg.payload as MatchDetailDto);
+        this.subs.push(
+            this.liveWs.displayControl$().subscribe({
+                next: (ctl) => {
+                    if (ctl.action !== DisplayControlAction.SHOW_PREVIEW) {
+                        return;
+                    }
+                    const data = ctl.data as MatchDetailDto | undefined;
+                    if (data) {
+                        this.applyMatchData(data);
                     } else {
                         this.fetchUpNextMatch();
                     }
-                }
-            },
-            error: (err) => {
-                console.error('UpNextDisplay command error:', err);
-            }
-        });
+                },
+                error: (err) => console.error('UpNextDisplay display control error:', err)
+            })
+        );
     }
 
     // ========== Fullscreen ==========
@@ -139,7 +154,6 @@ export class UpNextDisplay implements OnInit, OnDestroy {
             el.webkitRequestFullscreen?.bind(el) ||
             el.mozRequestFullScreen?.bind(el) ||
             el.msRequestFullscreen?.bind(el);
-
         if (req) {
             try {
                 const p = req();
@@ -159,7 +173,6 @@ export class UpNextDisplay implements OnInit, OnDestroy {
             anyDoc.webkitExitFullscreen?.bind(anyDoc) ||
             anyDoc.mozCancelFullScreen?.bind(anyDoc) ||
             anyDoc.msExitFullscreen?.bind(anyDoc);
-
         if (exit) {
             try {
                 const p = exit();

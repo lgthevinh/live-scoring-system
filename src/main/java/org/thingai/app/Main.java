@@ -1,68 +1,56 @@
 package org.thingai.app;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.env.Environment;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.support.ResourcePropertySource;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import eventimpl.fanroc.FanrocRankingStrategy;
+import eventimpl.fanroc.FanrocScore;
+import io.javalin.Javalin;
+import org.thingai.app.api.ApiServer;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.base.log.ILog;
-import org.thingai.app.fanroc.*;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-@SpringBootApplication
+/**
+ * Entry point. Builds the Javalin API, boots the scoring service, and
+ * registers the season-specific scoring/ranking strategies.
+ *
+ * <p>Historically this class was annotated {@code @SpringBootApplication};
+ * during the migration to Javalin the Spring container was removed. The
+ * lifecycle is now explicit:
+ * <ol>
+ *   <li>Construct and initialize {@link ScoringService} (databases, handlers).</li>
+ *   <li>Register the current season's scoring/ranking implementations.</li>
+ *   <li>Build the Javalin server and start it on the first available port.</li>
+ * </ol>
+ */
 public class Main {
 
-    private static final String DEFAULT_VERSION = "1.7.1";
+    private static final String TAG = "Main";
 
     public static void main(String[] args) {
+        // 1. Bring up the scoring domain (DB, handlers, state manager, etc.).
         ScoringService scoringService = new ScoringService();
-        scoringService.name = "Scoring System";
-        scoringService.appDirName = "scoring_system";
-        scoringService.version = DEFAULT_VERSION;
-
-        ILog.ENABLE_LOGGING = true;
-        ILog.logLevel = ILog.INFO;
-
-        // 1. Start Spring and get its application context
-        ConfigurableApplicationContext context = SpringApplication.run(Main.class, args);
-
-        // --- THIS IS THE BRIDGE ---
-        // 2. Get the working BroadcastController that Spring created.
-        SimpMessagingTemplate simpMessagingTemplate = context.getBean(SimpMessagingTemplate.class);
-
-        scoringService.setSimpMessagingTemplate(simpMessagingTemplate);
-        
-        // Register scoring classes BEFORE init so they're available when handlers are created
+        scoringService.init();
         scoringService.registerScoreClass(FanrocScore.class);
         scoringService.registerRankingStrategy(new FanrocRankingStrategy());
-        
-        scoringService.init();
-        ILog.i("Main", "Service v" + DEFAULT_VERSION + " running on URL:" + " http://" + getIpAddress() + ":" + getActualPort(context));
-    }
 
-    private static int getActualPort(ConfigurableApplicationContext context) {
-        try {
-            if (context instanceof ServletWebServerApplicationContext serverContext) {
-                return serverContext.getWebServer().getPort();
-            }
-        } catch (Exception e) {
-            ILog.e("Main", "Failed to get server port: " + e.getMessage());
-        }
-        return -1; // Port not available
+        // 2. Build and start the HTTP API.
+        Javalin app = ApiServer.build();
+        int port = ApiServer.choosePort();
+        app.start("0.0.0.0", port);
+
+        ILog.i(TAG, "Service running on URL: http://" + getIpAddress() + ":" + port);
+
+        // Graceful shutdown so Jetty releases the port on Ctrl+C.
+        Runtime.getRuntime().addShutdownHook(new Thread(app::stop, "javalin-shutdown"));
     }
 
     private static String getIpAddress() {
         try {
             return InetAddress.getLocalHost().getHostAddress();
         } catch (UnknownHostException e) {
-            ILog.e("Main", "Failed to get IP address: " + e.getMessage());
-            return "localhost"; // Fallback to localhost
+            ILog.e(TAG, "Failed to get IP address: " + e.getMessage());
+            return "localhost";
         }
     }
 }

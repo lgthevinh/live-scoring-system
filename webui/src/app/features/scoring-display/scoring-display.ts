@@ -1,12 +1,35 @@
 import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import {BroadcastService} from "../../core/services/broadcast.service";
-import {FieldDisplayCommand} from '../../core/define/FieldDisplayCommand';
-import {SyncService} from '../../core/services/sync.service';
-import {Team} from '../../core/models/team.model';
-import {MatchDetailDto} from '../../core/models/match.model';
+import { Subscription } from 'rxjs';
+import { LiveWsService } from '../../core/services/live-ws.service';
+import { DisplayControlAction } from '../../core/services/match-control.service';
+import { SyncService } from '../../core/services/sync.service';
+import { Team } from '../../core/models/team.model';
+import { MatchDetailDto } from '../../core/models/match.model';
+import {
+  DisplayControlPayload,
+  MatchStatePayload,
+  ScoreUpdatePayload,
+} from '../../core/services/ws-types';
 
+/**
+ * Field display screen. Consumes the unified {@code /ws/live} feed:
+ *
+ * <ul>
+ *   <li>{@code MATCH_STATE} &rarr; drive the timer and set team rosters.</li>
+ *   <li>{@code SCORE_UPDATE} &rarr; alliance totals (payload carries both
+ *       {@code r} and {@code b}).</li>
+ *   <li>{@code DISPLAY_CONTROL} &rarr; numeric action codes
+ *       (see {@link DisplayControlAction}). SHOW_PREVIEW switches to
+ *       "upnext" mode, SHOW_MATCH/UPDATE_MATCH back to "match" mode.</li>
+ * </ul>
+ *
+ * <p>Replaces the legacy per-field topic subscriptions. The backend no
+ * longer shards by field id &mdash; everyone watching a given scoring
+ * laptop gets the same stream. The field-bind selector is retained for
+ * the REST {@code getCurrentMatchField} call only.
+ */
 @Component({
     selector: 'app-field-display',
     standalone: true,
@@ -23,7 +46,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     timeLeft: WritableSignal<number> = signal(this.durationSec());
     running: WritableSignal<boolean> = signal(false);
 
-    // Teams and scores (placeholder values; wire to your services later)
+    // Teams and scores
     redTeams: WritableSignal<Team[]> = signal([]);
     blueTeams: WritableSignal<Team[]> = signal([]);
     redScore: WritableSignal<number> = signal(0);
@@ -45,44 +68,24 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     private hideTimer: any = null;
     private tickTimer: any = null;
 
+    private readonly subs: Subscription[] = [];
+
     // Audio playback
     private audioContext: AudioContext | null = null;
-    private soundPlayedForCurrentMatch: boolean = false;
     private preloadedAudioBuffer: AudioBuffer | null = null;
     private html5Audio: HTMLAudioElement | null = null;
-    private isPlayingStartSound: boolean = false;
-    private currentAudioSource: AudioBufferSourceNode | null = null;
-    private gainNode: GainNode | null = null;
-    private audioAnalyser: AnalyserNode | null = null;
-    soundEnabled: WritableSignal<boolean> = signal(false); // Sound disabled by default (requires user gesture)
-    isSoundPlaying: WritableSignal<boolean> = signal(false);
-    audioLevels: WritableSignal<number[]> = signal(new Array(16).fill(0));
-    showSoundPermissionPopup: WritableSignal<boolean> = signal(true); // Show popup by default
-    outputDeviceId: WritableSignal<string> = signal('default'); // Output device ID
+    soundEnabled: WritableSignal<boolean> = signal(false);
+    showSoundPermissionPopup: WritableSignal<boolean> = signal(true);
+    outputDeviceId: WritableSignal<string> = signal('default');
     availableAudioDevices: WritableSignal<Array<{deviceId: string, label: string}>> = signal([]);
-    volume: WritableSignal<number> = signal(100);
-
-    onVolumeChange(event: Event): void {
-        const input = event.target as HTMLInputElement;
-        const volPercent = parseFloat(input.value);
-        this.volume.set(volPercent);
-        const volAudio = volPercent / 100;
-        if (this.gainNode) {
-            this.gainNode.gain.value = volAudio;
-        }
-        if (this.html5Audio) {
-            this.html5Audio.volume = volAudio;
-        }
-    }
 
     fieldBindValue: number = 0;
 
     constructor(
         private syncService: SyncService,
-        private broadcastService: BroadcastService
+        private liveWs: LiveWsService
     ) { }
 
-    // Track fullscreen changes
     private onFullscreenChange = () => {
         const isFs =
             !!document.fullscreenElement ||
@@ -93,50 +96,28 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     };
 
     ngOnInit(): void {
+        console.log('=== ScoringDisplay ngOnInit ===');
+
         this.syncService.getCurrentMatchField(0).subscribe({
             next: (match) => {
-
                 if (match !== null) {
                     this.redTeams.set(match.redTeams);
                     this.blueTeams.set(match.blueTeams);
                     this.redScore.set(match.redScore?.totalScore || 0);
                     this.blueScore.set(match.blueScore?.totalScore || 0);
-                }},
+                }
+            },
             error: (err) => {
                 console.error("Error fetching current match field data:", err.message);
             }
-        })
+        });
 
-        this.subscribeToFieldTopic(0);
-
-        // Preload sound file for mobile compatibility
+        this.subscribeToLiveFeed();
         this.preloadSound();
+        this.showSoundPermissionPopupIfNeeded();
 
-        // Show sound permission popup automatically using vanilla JS (Bootstrap-compatible)
-        setTimeout(() => {
-            const modalElement = document.getElementById('soundPermissionModal');
-            if (modalElement) {
-                // Show the modal by adding Bootstrap classes
-                modalElement.classList.add('show');
-                modalElement.classList.add('d-block');
-                modalElement.style.display = 'block';
-                modalElement.setAttribute('aria-modal', 'true');
-                modalElement.setAttribute('role', 'dialog');
-
-                // Add backdrop
-                let backdrop = document.createElement('div');
-                backdrop.className = 'modal-backdrop fade show';
-                backdrop.id = 'soundPermissionBackdrop';
-                document.body.appendChild(backdrop);
-                document.body.classList.add('modal-open');
-                document.body.style.overflow = 'hidden';
-            }
-        }, 100);
-
-        // Notify that the field display is active
         this.resetHideTimer();
         document.addEventListener('fullscreenchange', this.onFullscreenChange);
-        // Safari/legacy vendor events (no-ops if unsupported)
         document.addEventListener('webkitfullscreenchange' as any, this.onFullscreenChange as any);
         document.addEventListener('mozfullscreenchange' as any, this.onFullscreenChange as any);
         document.addEventListener('MSFullscreenChange' as any, this.onFullscreenChange as any);
@@ -145,13 +126,14 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         this.clearTick();
         this.clearHideTimer();
+        this.subs.forEach(s => s.unsubscribe());
         document.removeEventListener('fullscreenchange', this.onFullscreenChange);
         document.removeEventListener('webkitfullscreenchange' as any, this.onFullscreenChange as any);
         document.removeEventListener('mozfullscreenchange' as any, this.onFullscreenChange as any);
         document.removeEventListener('MSFullscreenChange' as any, this.onFullscreenChange as any);
     }
 
-    // ========== Fullscreen Button ==========
+    // ========== Fullscreen ==========
     toggleFullscreen() {
         if (!this.isFullscreen()) {
             this.enterFullscreen();
@@ -161,16 +143,12 @@ export class ScoringDisplay implements OnInit, OnDestroy {
     }
 
     private enterFullscreen() {
-        // Prefer the whole document; swap to a specific element if you want only the canvas:
-        // const el = document.querySelector('.frame') as HTMLElement || document.documentElement;
         const el: any = document.documentElement;
-
         const req =
             el.requestFullscreen?.bind(el) ||
-            el.webkitRequestFullscreen?.bind(el) ||   // Safari
-            el.mozRequestFullScreen?.bind(el) ||      // Firefox old
-            el.msRequestFullscreen?.bind(el);         // IE/Edge old
-
+            el.webkitRequestFullscreen?.bind(el) ||
+            el.mozRequestFullScreen?.bind(el) ||
+            el.msRequestFullscreen?.bind(el);
         if (req) {
             try {
                 const p = req();
@@ -180,8 +158,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             } catch (e) {
                 console.warn('Fullscreen request threw:', e);
             }
-        } else {
-            console.warn('Fullscreen API not supported on this element/browser.');
         }
     }
 
@@ -189,10 +165,9 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         const anyDoc: any = document;
         const exit =
             document.exitFullscreen?.bind(document) ||
-            anyDoc.webkitExitFullscreen?.bind(anyDoc) ||  // Safari
-            anyDoc.mozCancelFullScreen?.bind(anyDoc) ||   // Firefox old
-            anyDoc.msExitFullscreen?.bind(anyDoc);        // IE/Edge old
-
+            anyDoc.webkitExitFullscreen?.bind(anyDoc) ||
+            anyDoc.mozCancelFullScreen?.bind(anyDoc) ||
+            anyDoc.msExitFullscreen?.bind(anyDoc);
         if (exit) {
             try {
                 const p = exit();
@@ -205,13 +180,13 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         }
     }
 
+    /**
+     * Field selector only drives which match we REST-fetch; the WS feed is
+     * global. Kept for backward compatibility with the existing UI.
+     */
     onFieldBindChange(event: Event) {
         const target = event.target as HTMLSelectElement;
         this.fieldBindValue = target.value ? parseInt(target.value, 10) : 0;
-
-        // Unsubscribe from all previous field topics
-        this.broadcastService.unsubscribeAll();
-        this.subscribeToFieldTopic(this.fieldBindValue!);
 
         this.syncService.getCurrentMatchField(this.fieldBindValue).subscribe({
             next: (match) => {
@@ -226,16 +201,11 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         });
     }
 
-    // ======================================
-
-    // Timer logic - instant start
+    // ========== Timer ==========
     start() {
         if (this.running()) return;
-
-        // Start main match timer immediately
         this.timeLeft.set(this.durationSec());
         this.running.set(true);
-
         this.clearTick();
         this.tickTimer = setInterval(() => {
             const t = this.timeLeft() - 1;
@@ -263,7 +233,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         if (!this.running()) this.timeLeft.set(total);
     }
 
-    // Formatting
     mmss(): string {
         const total = Math.max(0, this.timeLeft());
         const m = Math.floor(total / 60);
@@ -271,7 +240,7 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
-    // Controls fade/show
+    // ========== Controls fade/show ==========
     revealControls() {
         this.controlsVisible.set(true);
         this.resetHideTimer();
@@ -279,8 +248,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
 
     onAnyInteract() {
         this.revealControls();
-
-        // Auto-enable sound on first user interaction (browser requirement)
         if (!this.soundEnabled()) {
             this.enableSound();
         }
@@ -305,153 +272,114 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         }
     }
 
-    private subscribeToFieldTopic(fieldId: number) {
-        if (fieldId === null || fieldId === undefined) return;
+    // ========== WS feed ==========
 
-        let timerTopic: string;
-        let commandTopic: string;
-        let scoreTopicRed: string;
-        let scoreTopicBlue: string;
-        let soundTopic: string;
-
-        if (fieldId === 0) {
-            timerTopic = `/topic/display/field/*/timer`;
-            commandTopic = `/topic/display/field/*/command`;
-            scoreTopicRed = `/topic/live/field/*/score/red`;
-            scoreTopicBlue = `/topic/live/field/*/score/blue`;
-            soundTopic = `/topic/display/field/*/sound`;
-        } else {
-            timerTopic = `/topic/display/field/${fieldId}/timer`;
-            commandTopic = `/topic/display/field/${fieldId}/command`;
-            scoreTopicRed = `/topic/live/field/${fieldId}/score/red`;
-            scoreTopicBlue = `/topic/live/field/${fieldId}/score/blue`;
-            soundTopic = `/topic/display/field/${fieldId}/sound`;
-        }
-
-        this.broadcastService.subscribeToTopic(commandTopic).subscribe({
-            next: (msg) => {
-                if (msg.type === FieldDisplayCommand.SHOW_TIMER) {
-                    this.displayMode.set('match');
-
-                    this.redTeams.set(msg.payload.redTeams);
-                    this.blueTeams.set(msg.payload.blueTeams);
-
-                    this.redScore.set(0);
-                    this.blueScore.set(0);
-                } else if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
-                    this.applyUpNextData(msg.payload);
-                    this.displayMode.set('upnext');
-                } else if (msg.type === FieldDisplayCommand.SHOW_MATCH) {
-                    if (msg.payload) {
-                        this.redTeams.set(msg.payload.redTeams);
-                        this.blueTeams.set(msg.payload.blueTeams);
-                        this.redScore.set(msg.payload.redScore?.totalScore || 0);
-                        this.blueScore.set(msg.payload.blueScore?.totalScore || 0);
+    private subscribeToLiveFeed(): void {
+        // SNAPSHOT: replay of the last broadcast state so a reconnecting
+        // display immediately shows the right thing.
+        this.subs.push(
+            this.liveWs.snapshot$().subscribe({
+                next: (snap) => {
+                    if (snap.matchState) {
+                        this.applyMatchState(snap.matchState);
                     }
-                    this.displayMode.set('match');
-                }
-            },
-            error: (err) => {
-                console.error("FieldDisplay message error:", err);
-            }
-        });
-
-        // Also subscribe to the broadcast-all command topic for display commands from match-control
-        if (fieldId !== 0) {
-            this.broadcastService.subscribeToTopic('/topic/display/field/0/command').subscribe({
-                next: (msg) => {
-                    if (msg.type === FieldDisplayCommand.SHOW_UPNEXT) {
-                        this.applyUpNextData(msg.payload);
-                        this.displayMode.set('upnext');
-                    } else if (msg.type === FieldDisplayCommand.SHOW_MATCH) {
-                        if (msg.payload) {
-                            this.redTeams.set(msg.payload.redTeams);
-                            this.blueTeams.set(msg.payload.blueTeams);
-                            this.redScore.set(msg.payload.redScore?.totalScore || 0);
-                            this.blueScore.set(msg.payload.blueScore?.totalScore || 0);
-                        }
-                        this.displayMode.set('match');
+                    if (snap.lastScoreRed) {
+                        this.applyScore(snap.lastScoreRed);
+                    }
+                    if (snap.lastScoreBlue) {
+                        this.applyScore(snap.lastScoreBlue);
+                    }
+                    if (snap.lastDisplay) {
+                        this.applyDisplayAction(snap.lastDisplay);
                     }
                 },
-                error: (err) => {
-                    console.error("FieldDisplay broadcast-all command error:", err);
-                }
-            });
-        }
+                error: (err) => console.error('FieldDisplay snapshot error:', err)
+            })
+        );
 
-        this.broadcastService.subscribeToTopic(timerTopic).subscribe({
-            next: (msg) => {
-                if (msg.payload && msg.payload.remainingSeconds !== undefined) {
-                    const newTime = msg.payload.remainingSeconds;
-                    this.timeLeft.set(newTime);
-                }
-            },
-            error: (err) => {
-                console.error("FieldDisplay timer message error:", err);
-            }
-        });
+        this.subs.push(
+            this.liveWs.matchState$().subscribe({
+                next: (payload) => this.applyMatchState(payload),
+                error: (err) => console.error('FieldDisplay match state error:', err)
+            })
+        );
 
-        // Subscribe to PLAY_SOUND command for synchronized sound playback
-        this.broadcastService.subscribeToTopic(soundTopic).subscribe({
-            next: (msg) => {
-                // Handle STOP_SOUND command
-                if (msg.type === 'STOP_SOUND') {
-                    this.stopMatchSound();
-                    return;
-                }
-                // Auto-enable sound if not already enabled when receiving sound command
-                this.enableSound().then(() => {
-                    setTimeout(() => {
-                        this.playMatchStartSound();
-                    }, 100);
-                });
-            },
-            error: (err) => {
-                console.error("FieldDisplay sound message error:", err);
-            }
-        });
+        this.subs.push(
+            this.liveWs.scoreUpdate$().subscribe({
+                next: (payload) => this.applyScore(payload),
+                error: (err) => console.error('FieldDisplay score update error:', err)
+            })
+        );
 
-        this.broadcastService.subscribeToTopic(scoreTopicRed).subscribe({
-            next: (msg) => {
-                if (msg.payload) {
-                    this.redScore.set(msg.payload.totalScore);
-                }
-            },
-            error: (err) => {
-                console.error("FieldDisplay score message error:", err);
-            }
-        });
-
-        this.broadcastService.subscribeToTopic(scoreTopicBlue).subscribe({
-            next: (msg) => {
-                if (msg.payload) {
-                    this.blueScore.set(msg.payload.totalScore);
-                }
-            },
-            error: (err) => {
-                console.error("FieldDisplay score message error:", err);
-            }
-        });
+        this.subs.push(
+            this.liveWs.displayControl$().subscribe({
+                next: (payload) => this.applyDisplayAction(payload),
+                error: (err) => console.error('FieldDisplay display control error:', err)
+            })
+        );
     }
 
-    private unsubscribeFromFieldTopic(fieldId: number) {
-        if (fieldId === null || fieldId === undefined) return;
-
-        if (fieldId === 0) {
-            this.broadcastService.unsubscribeFromTopic(`/topic/display/field/*/command`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/display/field/*/timer`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/display/field/*/sound`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/live/field/*/score`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/live/field/*/score/red`);
-            this.broadcastService.unsubscribeFromTopic(`/topic/live/field/*/score/blue`);
-            return;
+    private applyMatchState(state: MatchStatePayload): void {
+        if (state.timerSecondsRemaining !== undefined && state.timerSecondsRemaining !== null) {
+            this.timeLeft.set(state.timerSecondsRemaining);
         }
+    }
 
-        this.broadcastService.unsubscribeFromTopic(`/topic/display/field/${fieldId}/command`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/display/field/${fieldId}/timer`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/display/field/${fieldId}/sound`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/live/field/${fieldId}/score/red`);
-        this.broadcastService.unsubscribeFromTopic(`/topic/live/field/${fieldId}/score/blue`);
+    private applyScore(score: ScoreUpdatePayload): void {
+        const red = (score.r as any)?.totalScore;
+        const blue = (score.b as any)?.totalScore;
+        if (typeof red === 'number') {
+            this.redScore.set(red);
+        }
+        if (typeof blue === 'number') {
+            this.blueScore.set(blue);
+        }
+    }
+
+    /**
+     * Handle the server's numeric DisplayControlAction. The legacy string
+     * codes (SHOW_TIMER, SHOW_UPNEXT, SHOW_MATCH) mapped loosely to
+     * SHOW_MATCH (1) / SHOW_PREVIEW (2); we collapse to the new enum.
+     */
+    private applyDisplayAction(ctl: DisplayControlPayload): void {
+        const data = ctl.data as MatchDetailDto | undefined;
+        switch (ctl.action) {
+            case DisplayControlAction.SHOW_MATCH:
+            case DisplayControlAction.UPDATE_MATCH:
+                if (data) {
+                    this.redTeams.set(data.redTeams || []);
+                    this.blueTeams.set(data.blueTeams || []);
+                    this.redScore.set(data.redScore?.totalScore || 0);
+                    this.blueScore.set(data.blueScore?.totalScore || 0);
+                }
+                this.displayMode.set('match');
+                break;
+            case DisplayControlAction.SHOW_PREVIEW:
+                if (data) {
+                    this.applyUpNextData(data);
+                }
+                this.displayMode.set('upnext');
+                break;
+            case DisplayControlAction.SHOW_BLANK:
+                this.displayMode.set('match');
+                this.redTeams.set([]);
+                this.blueTeams.set([]);
+                this.redScore.set(0);
+                this.blueScore.set(0);
+                break;
+            case DisplayControlAction.SHOW_RESULT:
+            case DisplayControlAction.SHOW_RANKING:
+                // No dedicated UI for these yet; leave current mode untouched.
+                break;
+            case DisplayControlAction.UPDATE_SCORE:
+                if (data) {
+                    this.redScore.set(data.redScore?.totalScore || 0);
+                    this.blueScore.set(data.blueScore?.totalScore || 0);
+                }
+                break;
+            default:
+                console.log('FieldDisplay: unhandled display action', ctl.action);
+        }
     }
 
     // ========== Up Next Helpers ==========
@@ -478,21 +406,36 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         }
     }
 
-    // Enable sound playback (required for mobile browsers)
-    enableSound(): Promise<void> {
-        this.soundEnabled.set(true);
+    // ========== Sound ==========
 
-        // Initialize AudioContext on user interaction
+    private showSoundPermissionPopupIfNeeded(): void {
+        setTimeout(() => {
+            const modalElement = document.getElementById('soundPermissionModal');
+            if (modalElement) {
+                modalElement.classList.add('show', 'd-block');
+                modalElement.style.display = 'block';
+                modalElement.setAttribute('aria-modal', 'true');
+                modalElement.setAttribute('role', 'dialog');
+
+                const backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop fade show';
+                backdrop.id = 'soundPermissionBackdrop';
+                document.body.appendChild(backdrop);
+                document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
+        }, 100);
+    }
+
+    enableSound(): void {
+        this.soundEnabled.set(true);
         if (!this.audioContext) {
             try {
                 this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-                // Set output device if not default
                 const deviceId = this.outputDeviceId();
                 const audioContext = this.audioContext as any;
                 if (typeof audioContext.setSinkId === 'function') {
-                    audioContext.setSinkId(deviceId).then(() => {
-                    }).catch((err: any) => {
+                    audioContext.setSinkId(deviceId).catch((err: any) => {
                         console.warn('Failed to set output device:', err);
                     });
                 }
@@ -500,94 +443,48 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 console.error('Failed to create AudioContext:', e);
             }
         }
-
-        // Resume AudioContext if suspended
         if (this.audioContext && this.audioContext.state === 'suspended') {
-            return this.audioContext.resume().then(() => {
-            }).catch(err => {
+            this.audioContext.resume().catch(err => {
                 console.error('Failed to resume AudioContext:', err);
             });
         }
-        return Promise.resolve();
     }
 
-    // Stop match sound playback
-    stopMatchSound(): void {
-        // Stop HTML5 Audio
-        if (this.html5Audio) {
-            this.html5Audio.pause();
-            this.html5Audio.currentTime = 0;
-        }
-        // Stop current AudioContext source
-        if (this.currentAudioSource) {
-            try {
-                this.currentAudioSource.stop();
-            } catch (e) {
-                // Ignore errors if already stopped
-            }
-            this.currentAudioSource = null;
-        }
-        this.isPlayingStartSound = false;
-        this.isSoundPlaying.set(false);
-    }
-
-    // Handle user response to sound permission popup
-    // Handle output device selection change
     onOutputDeviceChange(event: Event): void {
         const target = event.target as HTMLSelectElement;
         const deviceId = target.value;
         this.outputDeviceId.set(deviceId);
-
-        // Apply the device change to AudioContext if supported
         if (this.audioContext) {
             const audioContext = this.audioContext as any;
             if (typeof audioContext.setSinkId === 'function') {
-                audioContext.setSinkId(deviceId).then(() => {
-                }).catch((err: any) => {
+                audioContext.setSinkId(deviceId).catch((err: any) => {
                     console.error('Failed to change audio output device:', err);
                 });
-            } else {
-                console.warn('AudioContext.setSinkId() is not supported in this browser');
             }
         }
-
-        // Preload sound again with new device setting
         this.preloadSound();
     }
 
-    // Refresh available audio devices
     refreshAudioDevices(): void {
         if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-            console.warn('enumerateDevices() is not supported in this browser');
             return;
         }
-
-        // Request permission first (required for device labels)
         navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(() => {
-                return navigator.mediaDevices.enumerateDevices();
-            })
+            .then(() => navigator.mediaDevices.enumerateDevices())
             .then(devices => {
-                const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-
-                // Build device list with labels
-                const deviceList = audioOutputDevices.map(device => ({
-                    deviceId: device.deviceId,
-                    label: device.label || `Device ${device.deviceId.substring(0, 8)}`
+                const audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
+                const deviceList = audioOutputDevices.map(d => ({
+                    deviceId: d.deviceId,
+                    label: d.label || `Device ${d.deviceId.substring(0, 8)}`
                 }));
-
-                // Add default option
                 deviceList.unshift({ deviceId: 'default', label: 'System Default' });
-
                 this.availableAudioDevices.set(deviceList);
             })
             .catch(err => {
                 console.error('Error enumerating devices:', err);
-                // Still set default option
                 this.availableAudioDevices.set([{ deviceId: 'default', label: 'System Default' }]);
             });
     }
-
 
     onSoundPermissionResponse(enable: boolean): void {
         if (enable) {
@@ -596,8 +493,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             this.soundEnabled.set(false);
         }
         this.showSoundPermissionPopup.set(false);
-
-        // Hide the modal using vanilla JS
         const modalElement = document.getElementById('soundPermissionModal');
         if (modalElement) {
             modalElement.classList.remove('show', 'd-block');
@@ -605,8 +500,6 @@ export class ScoringDisplay implements OnInit, OnDestroy {
             modalElement.removeAttribute('aria-modal');
             modalElement.removeAttribute('role');
         }
-
-        // Remove backdrop
         const backdrop = document.getElementById('soundPermissionBackdrop');
         if (backdrop) {
             backdrop.remove();
@@ -615,26 +508,17 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         document.body.style.overflow = '';
     }
 
-    // Play match sound (public method for testing)
     playMatchSound(): void {
-        this.enableSound().then(() => {
-            this.playMatchStartSound();
-        });
+        if (!this.soundEnabled()) {
+            this.enableSound();
+        }
+        this.playMatchStartSound();
     }
 
-
-    // Preload sound file for better mobile compatibility
     private preloadSound(): void {
-        // Try HTML5 Audio first (better for mobile)
         this.html5Audio = new Audio('assets/MatchSoundEffect.m4a');
         this.html5Audio.preload = 'auto';
-        this.html5Audio.onended = () => {
-            this.isPlayingStartSound = false;
-            this.isSoundPlaying.set(false);
-        };
         this.html5Audio.load();
-
-        // Also try to preload with AudioContext for desktop
         try {
             this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             fetch('assets/MatchSoundEffect.m4a')
@@ -650,52 +534,30 @@ export class ScoringDisplay implements OnInit, OnDestroy {
         }
     }
 
-    // Audio playback for match start
     private playMatchStartSound(): void {
-        // Prevent playing if already playing
-        if (this.isPlayingStartSound) {
-            return;
-        }
-
-        // Only play sound if enabled
         if (!this.soundEnabled()) {
             return;
         }
-
-        this.isPlayingStartSound = true;
-        this.isSoundPlaying.set(true);
-
-        // If a specific device is selected, use AudioContext (HTML5 Audio doesn't support device selection)
         if (this.outputDeviceId() !== 'default') {
             this.playWithAudioContext();
             return;
         }
-
-        // Try HTML5 Audio first (better for mobile browsers, but uses system default)
         if (this.html5Audio) {
             try {
                 this.html5Audio.currentTime = 0;
                 const playPromise = this.html5Audio.play();
-
                 if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                        })
-                        .catch(err => {
-                            console.warn('HTML5 Audio play failed, trying AudioContext:', err);
-                            // Try to enable sound and retry with AudioContext
-                            this.enableSound();
-                            this.playWithAudioContext();
-                        });
+                    playPromise.catch(err => {
+                        console.warn('HTML5 Audio play failed, trying AudioContext:', err);
+                        this.enableSound();
+                        this.playWithAudioContext();
+                    });
                 }
                 return;
             } catch (e) {
                 console.warn('HTML5 Audio error:', e);
-                this.isSoundPlaying.set(false);
             }
         }
-
-        // Fallback to AudioContext
         this.playWithAudioContext();
     }
 
@@ -708,14 +570,10 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 return;
             }
         }
-
-        // Resume AudioContext if suspended (required for mobile)
         if (this.audioContext.state === 'suspended') {
-            this.audioContext.resume().then(() => {
-                this.playBuffer();
-            }).catch(err => {
-                console.error('Failed to resume AudioContext:', err);
-            });
+            this.audioContext.resume()
+                .then(() => this.playBuffer())
+                .catch(err => console.error('Failed to resume AudioContext:', err));
         } else {
             this.playBuffer();
         }
@@ -727,20 +585,11 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                 const source = this.audioContext.createBufferSource();
                 source.buffer = this.preloadedAudioBuffer;
                 source.connect(this.audioContext.destination);
-                this.currentAudioSource = source;
-                source.onended = () => {
-                    this.isPlayingStartSound = false;
-                    this.isSoundPlaying.set(false);
-                    this.currentAudioSource = null;
-                };
                 source.start(0);
             } catch (e) {
                 console.error('Failed to play with AudioContext:', e);
-                this.isPlayingStartSound = false;
-                this.isSoundPlaying.set(false);
             }
         } else {
-            // Fallback: fetch and play on demand
             fetch('assets/MatchSoundEffect.m4a')
                 .then(response => response.arrayBuffer())
                 .then(arrayBuffer => {
@@ -749,21 +598,11 @@ export class ScoringDisplay implements OnInit, OnDestroy {
                             const source = this.audioContext!.createBufferSource();
                             source.buffer = audioBuffer;
                             source.connect(this.audioContext!.destination);
-                            this.currentAudioSource = source;
-                            source.onended = () => {
-                                this.isPlayingStartSound = false;
-                                this.isSoundPlaying.set(false);
-                                this.currentAudioSource = null;
-                            };
                             source.start(0);
                         });
                     }
                 })
-                .catch(err => {
-                    console.error('Failed to load and play sound:', err);
-                    this.isPlayingStartSound = false;
-                    this.isSoundPlaying.set(false);
-                });
+                .catch(err => console.error('Failed to load and play sound:', err));
         }
     }
 }
