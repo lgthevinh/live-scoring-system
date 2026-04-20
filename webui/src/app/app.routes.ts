@@ -13,25 +13,36 @@ import { RedAlliance } from './features/referee/match-selection/red-alliance/red
 import { ScoreTracking } from './features/referee/score-tracking/score-tracking';
 import { MatchResults } from './features/match-results/match-results';
 import { Rankings } from './features/rankings/rankings';
+import { authGuard, roleGuard } from './core/guards/auth.guard';
+import { AccountRoleType } from './core/define/AccounRoleType';
 
 export const routes: Routes = [
-  { path: '', component: Home },
+  // Public routes: login screen, plus read-only pages for spectators,
+  // field displays, and unattended ranking boards. These must NOT require
+  // a token; the corresponding backend endpoints are whitelisted in
+  // AuthFilter's PUBLIC_READ_PREFIXES.
   { path: 'auth', component: Auth },
   { path: 'schedule', component: Schedule, data: { title: 'Qualification Schedule', matchType: 1 } },
   { path: 'rankings', component: Rankings },
   { path: 'playoffs', component: Schedule, data: { title: 'Playoff Schedule', matchType: 2 } },
   { path: 'results', component: MatchResults },
-  { path: 'event-dashboard', component: EventDashboard },
-  { path: 'event-dashboard/create-account', component: CreateAccount },
-  { path: 'event-dashboard/manage-team', component: ManageTeam },
-  { path: 'event-dashboard/generate-schedule', component: GenerateSchedule },
-
   { path: 'display', component: ScoringDisplay },
 
-  { path: 'ref/blue', component: BlueAlliance },
-  { path: 'ref/red', component: RedAlliance },
+  // Any logged-in user can see the home page.
+  { path: '', component: Home, canActivate: [authGuard] },
 
-  { path: 'ref/:color/:matchId', component: ScoreTracking },
+  // Referee score tracking. Scoring referees + head referees + scorekeepers
+  // + admins all pass the SCORING_REFEREE threshold.
+  { path: 'ref/blue', component: BlueAlliance, canActivate: [roleGuard(AccountRoleType.SCORING_REFEREE)] },
+  { path: 'ref/red', component: RedAlliance, canActivate: [roleGuard(AccountRoleType.SCORING_REFEREE)] },
+  { path: 'ref/:color/:matchId', component: ScoreTracking, canActivate: [roleGuard(AccountRoleType.SCORING_REFEREE)] },
 
-  { path: 'match-control', component: MatchControl }
+  // Match control — scorekeepers and up.
+  { path: 'match-control', component: MatchControl, canActivate: [roleGuard(AccountRoleType.SCOREKEEPER)] },
+
+  // Event administration — event admins only.
+  { path: 'event-dashboard', component: EventDashboard, canActivate: [roleGuard(AccountRoleType.EVENT_ADMIN)] },
+  { path: 'event-dashboard/create-account', component: CreateAccount, canActivate: [roleGuard(AccountRoleType.EVENT_ADMIN)] },
+  { path: 'event-dashboard/manage-team', component: ManageTeam, canActivate: [roleGuard(AccountRoleType.EVENT_ADMIN)] },
+  { path: 'event-dashboard/generate-schedule', component: GenerateSchedule, canActivate: [roleGuard(AccountRoleType.EVENT_ADMIN)] },
 ];

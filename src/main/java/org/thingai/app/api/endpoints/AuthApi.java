@@ -35,11 +35,30 @@ public final class AuthApi {
         app.post("/api/auth/login", AuthApi::login);
         app.post("/api/auth/refresh", AuthApi::refreshToken);
         app.get("/api/auth/local-ip", AuthApi::getLocalIp);
+        app.get("/api/auth/me", AuthApi::getMe);
         app.post("/api/auth/create-account", AuthApi::createAccount);
         app.get("/api/auth/users", AuthApi::getAllUsers);
         app.get("/api/auth/accounts", AuthApi::getAllAccounts);
         app.put("/api/auth/accounts/{username}", AuthApi::updateAccount);
         app.delete("/api/auth/accounts/{username}", AuthApi::deleteAccount);
+    }
+
+    /**
+     * Return the authenticated caller's identity + role. The token filter
+     * has already validated the bearer token and stashed these attributes
+     * on the request; we just echo them. Used by the Angular frontend to
+     * decide which menu sections / routes to expose.
+     */
+    private static void getMe(Context ctx) {
+        String username = ctx.attribute(AuthFilter.ATTR_USERNAME);
+        Integer role = ctx.attribute(AuthFilter.ATTR_ROLE);
+        if (username == null || role == null) {
+            // Shouldn't happen (filter populated both on success), but fail
+            // closed if it does.
+            ctx.status(HttpStatus.UNAUTHORIZED).json(Map.of("error", "Unauthenticated."));
+            return;
+        }
+        ctx.json(Map.of("username", username, "role", role));
     }
 
     private static void login(Context ctx) {

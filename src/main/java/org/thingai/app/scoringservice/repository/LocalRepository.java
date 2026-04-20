@@ -45,6 +45,12 @@ public class LocalRepository {
     /**
      * Opens the event database for the given event code, registers event-level
      * entities, and initializes event-level DAOs. Called each time an event is activated.
+     *
+     * <p>Note: {@link #daoAuth} is intentionally NOT rebound here.
+     * {@code auth_data} and {@code account_role} are system-level tables
+     * (registered in {@link #initializeSystem}); binding the auth DAO to
+     * the event DB would cause every login / role lookup to fail with
+     * {@code no such table: auth_data}.
      */
     public static void initializeEvent(String eventCode) {
         eventDatabase = new DaoSqlite(eventCode + ".db");
@@ -57,7 +63,6 @@ public class LocalRepository {
                 DbMapEntity.class
         });
         eventFileStore = new DaoFile("files/" + eventCode);
-        daoAuth = new DaoAuth(eventDatabase);
         daoTeam = new DaoTeam(eventDatabase);
         daoMatch = new DaoMatch(eventDatabase);
         daoAllianceTeam = new DaoAllianceTeam(eventDatabase);

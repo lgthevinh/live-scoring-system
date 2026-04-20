@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, WritableSignal } from '@angular/core';
+import { Component, OnInit, computed, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, forkJoin, of } from 'rxjs';
@@ -95,93 +95,77 @@ export class MatchControl implements OnInit {
   ) { }
 
   // -----------------------------------------------------------------
-  // Buffered-submission / temp-score / override-confirm modal stubs.
-  //
-  // The HTML template references a large family of modal-control state
-  // (showCommitModal, showOverrideConfirmModal, showTempScoreCommitModal,
-  // showTempScoreRejectModal) and the associated open/close/confirm
-  // handlers, plus signals that surface buffered submissions and
-  // pending temp scores per alliance. The real workflow has not been
-  // wired into the new Javalin backend yet (see
-  // {@link ScorekeeperService}, also a stub). These no-op handlers
-  // keep the template compilable so the rest of the page works.
+  // Modal state. One signal holds the active modal; the legacy
+  // show<Name>Modal() accessors derive from it so existing template
+  // bindings keep working without scattering booleans across the file.
+  // Backend wiring is still TODO — see {@link ScorekeeperService}.
   // -----------------------------------------------------------------
+  private activeModal = signal<'commit' | 'override' | 'tempCommit' | 'tempReject' | null>(null);
+  private modalContext = signal<{
+    tempScoreId?: string | null;
+    tempScoreAlliance?: 'red' | 'blue' | null;
+    overrideAlliances?: string[];
+    rejectReason?: string;
+  }>({});
 
-  // Modal visibility
-  showCommitModal: WritableSignal<boolean> = signal(false);
-  showOverrideConfirmModal: WritableSignal<boolean> = signal(false);
-  showTempScoreCommitModal: WritableSignal<boolean> = signal(false);
-  showTempScoreRejectModal: WritableSignal<boolean> = signal(false);
+  showCommitModal = computed(() => this.activeModal() === 'commit');
+  showOverrideConfirmModal = computed(() => this.activeModal() === 'override');
+  showTempScoreCommitModal = computed(() => this.activeModal() === 'tempCommit');
+  showTempScoreRejectModal = computed(() => this.activeModal() === 'tempReject');
 
-  // Pending modal context
-  pendingOverrideAlliances: string[] = [];
-  pendingTempScoreId: string | null = null;
-  pendingTempScoreAlliance: 'red' | 'blue' | null = null;
-  tempScoreRejectReason: string = '';
+  // Back-compat accessors used by the HTML template.
+  get pendingOverrideAlliances(): string[] { return this.modalContext().overrideAlliances ?? []; }
+  get pendingTempScoreId(): string | null { return this.modalContext().tempScoreId ?? null; }
+  get pendingTempScoreAlliance(): 'red' | 'blue' | null { return this.modalContext().tempScoreAlliance ?? null; }
+  get tempScoreRejectReason(): string { return this.modalContext().rejectReason ?? ''; }
+  set tempScoreRejectReason(v: string) {
+    this.modalContext.update(c => ({ ...c, rejectReason: v }));
+  }
 
-  // Backend-sourced temp scores (empty until backend is wired)
   redTempScores: WritableSignal<TempScore[]> = signal([]);
   blueTempScores: WritableSignal<TempScore[]> = signal([]);
-  hasTempScores(): boolean {
-    return this.redTempScores().length > 0 || this.blueTempScores().length > 0;
-  }
+  hasTempScores = computed(() => this.redTempScores().length > 0 || this.blueTempScores().length > 0);
   getTempScoreById(id: string | null, color: 'red' | 'blue'): TempScore | null {
     if (!id) return null;
     const list = color === 'red' ? this.redTempScores() : this.blueTempScores();
     return list.find(t => t.tempScoreId === id) ?? null;
   }
 
-  // Commit modal
-  openCommitModal(): void { this.showCommitModal.set(true); }
-  closeCommitModal(): void { this.showCommitModal.set(false); }
-
-  // Override-confirm modal
-  closeOverrideConfirmModal(): void {
-    this.showOverrideConfirmModal.set(false);
-    this.pendingOverrideAlliances = [];
+  private closeModal(): void {
+    this.activeModal.set(null);
+    this.modalContext.set({});
   }
+
+  openCommitModal(): void { this.activeModal.set('commit'); }
+  closeCommitModal(): void { this.closeModal(); }
+
+  closeOverrideConfirmModal(): void { this.closeModal(); }
   confirmOverrideSave(): void {
-    console.warn('[MatchControl] confirmOverrideSave() not implemented yet');
-    this.closeOverrideConfirmModal();
+    // Backend endpoint for override-save not implemented yet.
+    this.closeModal();
   }
 
-  // Temp-score commit modal
   openTempScoreCommitModal(tempScoreId: string, alliance: 'red' | 'blue'): void {
-    this.pendingTempScoreId = tempScoreId;
-    this.pendingTempScoreAlliance = alliance;
-    this.showTempScoreCommitModal.set(true);
+    this.modalContext.set({ tempScoreId, tempScoreAlliance: alliance });
+    this.activeModal.set('tempCommit');
   }
-  closeTempScoreCommitModal(): void {
-    this.showTempScoreCommitModal.set(false);
-    this.pendingTempScoreId = null;
-    this.pendingTempScoreAlliance = null;
-  }
+  closeTempScoreCommitModal(): void { this.closeModal(); }
   confirmCommitTempScore(): void {
-    console.warn('[MatchControl] confirmCommitTempScore() not implemented yet');
-    this.closeTempScoreCommitModal();
+    // Backend endpoint for commit not implemented yet.
+    this.closeModal();
   }
 
-  // Temp-score reject modal
   openTempScoreRejectModal(tempScoreId: string, alliance: 'red' | 'blue'): void {
-    this.pendingTempScoreId = tempScoreId;
-    this.pendingTempScoreAlliance = alliance;
-    this.tempScoreRejectReason = '';
-    this.showTempScoreRejectModal.set(true);
+    this.modalContext.set({ tempScoreId, tempScoreAlliance: alliance, rejectReason: '' });
+    this.activeModal.set('tempReject');
   }
-  closeTempScoreRejectModal(): void {
-    this.showTempScoreRejectModal.set(false);
-    this.pendingTempScoreId = null;
-    this.pendingTempScoreAlliance = null;
-    this.tempScoreRejectReason = '';
-  }
+  closeTempScoreRejectModal(): void { this.closeModal(); }
   confirmRejectTempScore(): void {
-    console.warn('[MatchControl] confirmRejectTempScore() not implemented yet');
-    this.closeTempScoreRejectModal();
+    // Backend endpoint for reject not implemented yet.
+    this.closeModal();
   }
 
-  // Buffered-submission actions
   submitBufferedSubmission(id: string): void {
-    console.warn('[MatchControl] submitBufferedSubmission() not implemented yet');
     this.bufferService.markAsSubmitted(id, 'scorekeeper');
   }
   removeFromBuffer(id: string): void {

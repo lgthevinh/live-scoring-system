@@ -18,9 +18,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.io.PrintStream;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -92,6 +90,10 @@ public class DesktopLauncher {
 
     // ---------- Rolling log buffer ----------
     private final Deque<String> logTail = new ArrayDeque<>();
+    /** Lines received since the last EDT flush. Drained in bursts. */
+    private final java.util.List<String> pendingFlush = new java.util.ArrayList<>();
+    private static final int LOG_FLUSH_INTERVAL_MS = 60;
+    private Timer logFlushTimer;
 
     public static void main(String[] args) {
         try {
@@ -499,9 +501,12 @@ public class DesktopLauncher {
 
     private void onExit() {
         setState(State.STOPPED, "Stopping server\u2026");
+        if (logFlushTimer != null) logFlushTimer.stop();
         new Thread(() -> {
             stopServer();
+            // Final drain so the closing log lines make it onto the screen.
             SwingUtilities.invokeLater(() -> {
+                flushLogBatch();
                 if (frame != null) frame.dispose();
                 System.exit(0);
             });
@@ -517,17 +522,41 @@ public class DesktopLauncher {
             logTail.addLast(line);
             while (logTail.size() > LOG_TAIL_MAX_LINES) logTail.removeFirst();
         }
-        SwingUtilities.invokeLater(() -> {
-            logArea.append(line + "\n");
-            int over = logArea.getLineCount() - LOG_TAIL_MAX_LINES;
-            if (over > 0) {
-                try {
-                    int end = logArea.getLineEndOffset(over - 1);
-                    logArea.replaceRange("", 0, end);
-                } catch (Exception ignored) {}
-            }
-            logArea.setCaretPosition(logArea.getDocument().getLength());
-        });
+        synchronized (pendingFlush) {
+            pendingFlush.add(line);
+        }
+        // Timer is created lazily on the EDT.
+        if (logFlushTimer == null) {
+            SwingUtilities.invokeLater(this::ensureLogFlushTimer);
+        }
+    }
+
+    /** Created on the EDT; fires every LOG_FLUSH_INTERVAL_MS to drain pendingFlush. */
+    private void ensureLogFlushTimer() {
+        if (logFlushTimer != null) return;
+        logFlushTimer = new Timer(LOG_FLUSH_INTERVAL_MS, e -> flushLogBatch());
+        logFlushTimer.setRepeats(true);
+        logFlushTimer.start();
+    }
+
+    private void flushLogBatch() {
+        String[] batch;
+        synchronized (pendingFlush) {
+            if (pendingFlush.isEmpty()) return;
+            batch = pendingFlush.toArray(new String[0]);
+            pendingFlush.clear();
+        }
+        StringBuilder sb = new StringBuilder(batch.length * 80);
+        for (String l : batch) sb.append(l).append('\n');
+        logArea.append(sb.toString());
+        int over = logArea.getLineCount() - LOG_TAIL_MAX_LINES;
+        if (over > 0) {
+            try {
+                int end = logArea.getLineEndOffset(over - 1);
+                logArea.replaceRange("", 0, end);
+            } catch (Exception ignored) {}
+        }
+        logArea.setCaretPosition(logArea.getDocument().getLength());
     }
 
     private void toggleLogsPanel() {
@@ -670,17 +699,5 @@ public class DesktopLauncher {
     private static final class HostPort {
         final String host; final int port;
         HostPort(String h, int p) { this.host = h; this.port = p; }
-    }
-
-    // Kept for backwards-compat callers that expect this static (e.g. tests).
-    @SuppressWarnings("unused")
-    private String resolveLocalIPv4() {
-        try { return InetAddress.getLocalHost().getHostAddress(); }
-        catch (Exception e) { return "127.0.0.1"; }
-    }
-
-    @SuppressWarnings("unused")
-    private static OutputStreamWriter utf8(FileOutputStream fos) {
-        return new OutputStreamWriter(fos, StandardCharsets.UTF_8);
     }
 }

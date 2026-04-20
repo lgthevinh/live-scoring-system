@@ -91,6 +91,81 @@ public final class ApiServer {
         // Strict auth on all /api/* routes (public login/refresh/local-ip excepted).
         AuthFilter.register(app);
 
+        // Role gates. Registered AFTER AuthFilter.register() so the token
+        // filter runs first and populates ATTR_ROLE. Lower number = higher
+        // privilege; see org.thingai.app.scoringservice.define.AccountRole.
+        //
+        // Account management (admin-only).
+        AuthFilter.requireRole(app, "/api/auth/users",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/auth/accounts",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/auth/accounts/*",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/auth/create-account",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+
+        // Event mutation. Reads (GET /api/event*) stay open to any logged-in
+        // user because displays, rankings, and referees all need them.
+        AuthFilter.requireRole(app, "/api/event/create",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/event/update",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/event/delete",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/event/set",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/event/clear-current",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+
+        // Match schedule + definition mutation (admins manage the tournament
+        // structure; scorekeepers don't rewrite schedules).
+        AuthFilter.requireRole(app, "/api/match/create",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/match/update",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/match/delete/*",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/match/schedule/*",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+        AuthFilter.requireRole(app, "/api/match/playoff/*",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+
+        // Team mutation (import/create/update/delete) is admin territory;
+        // GET stays open.
+        // NOTE: Javalin's glob matches a single segment, so /api/teams and
+        // /api/teams/{id} need separate gates. Method-level filtering would
+        // require inspecting ctx.method() -- we can't block GET /api/teams
+        // without also blocking POST /api/teams via a path-only gate. Using
+        // the shared /api/teams path here gates both. See TeamApi; read
+        // access is broad in other endpoints (/api/match, /api/scores).
+        // TODO: when a method-aware requireRole helper exists, split these.
+
+        // Score mutation (scorekeeper + higher).
+        AuthFilter.requireRole(app, "/api/scores/submit",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+
+        // Ranking recalculation (admin only; GET status stays public read).
+        AuthFilter.requireRole(app, "/api/rank/recalculate",
+                org.thingai.app.scoringservice.define.AccountRole.EVENT_ADMIN);
+
+        // Match-control actions (scorekeeper + higher). State read stays open
+        // so referee/display pages can reflect timer + loaded match.
+        AuthFilter.requireRole(app, "/api/match-control/load",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+        AuthFilter.requireRole(app, "/api/match-control/activate",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+        AuthFilter.requireRole(app, "/api/match-control/start",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+        AuthFilter.requireRole(app, "/api/match-control/abort",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+        AuthFilter.requireRole(app, "/api/match-control/commit",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+        AuthFilter.requireRole(app, "/api/match-control/override",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+        AuthFilter.requireRole(app, "/api/match-control/display",
+                org.thingai.app.scoringservice.define.AccountRole.SCOREKEEPER);
+
         // Route registration (one class per domain).
         AuthApi.register(app);
         TeamApi.register(app);

@@ -17,44 +17,14 @@
     {{ error() }}
   </div>
 
-  <!-- Calculated Score Preview -->
-  <div class="score-preview-card mb-3">
-    <div class="d-flex justify-content-between align-items-center">
-      <div class="calculated-score">
-        <span class="score-label">Calculated Score:</span>
-        <span class="score-value" [class.zero-score]="calculatedScore() === 0" [class.positive]="calculatedScore() > 0">
-          {{ calculatedScore() }}
-        </span>
-      </div>
-    </div>
-    <div class="score-calculation mt-2" *ngIf="!redCard()">
-      <div class="calc-row">
-        <span class="calc-label">Base:</span>
-        <span class="calc-value">({{ biologicalPoints() }} + {{ barrierPoints() }}) × {{ coefficient() }}</span>
-        <span class="calc-result">= {{ (biologicalPoints() + barrierPoints()) * coefficient() | number:'1.0-1' }}</span>
-      </div>
-      <div class="calc-row" *ngIf="endGamePoints() > 0">
-        <span class="calc-label">End Game:</span>
-        <span class="calc-value">+{{ endGamePoints() }}</span>
-      </div>
-      <div class="calc-row" *ngIf="fleetBonus() > 0">
-        <span class="calc-label fleet-bonus-text">Fleet Bonus:</span>
-        <span class="calc-value fleet-bonus-text">+{{ fleetBonus() }}</span>
-      </div>
-      <div class="calc-row" *ngIf="penaltyPoints() > 0">
-        <span class="calc-label penalty-text">Penalties:</span>
-        <span class="calc-value penalty-text">-{{ penaltyPoints() }}</span>
-      </div>
-      <div class="calc-divider"></div>
-      <div class="calc-row calc-total">
-        <span class="calc-label">Total:</span>
-        <span class="calc-value">{{ calculatedScore() }}</span>
-      </div>
-    </div>
-    <div class="red-card-warning" *ngIf="redCard()">
-      <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
-      <span class="text-danger fw-bold">Red Card Active - Score will be zero!</span>
-    </div>
+  <!-- Calculated-score preview removed: the canonical Fanroc formula
+       lives server-side in eventimpl/fanroc/FanrocScore.java. The
+       previous client-side preview was an approximation and risked
+       showing referees a number that didn't match the committed
+       result. Restore once a shared calculator is extracted. -->
+  <div class="red-card-warning mb-3" *ngIf="redCard()">
+    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+    <span class="text-danger fw-bold">Red Card Active - Score will be zero!</span>
   </div>
 
   <div *ngIf="match()">

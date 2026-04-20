@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, signal, WritableSignal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
@@ -77,46 +77,6 @@ export class ScoreTracking implements OnInit, OnDestroy {
 
   // Selected imbalance category
   selectedImbalance: WritableSignal<number> = signal(2);
-
-  // -----------------------------------------------------------------
-  // Score-preview computed signals (STUBS).
-  //
-  // The HTML template references a live preview of the score breakdown
-  // (biological / barrier / coefficient / end-game / fleet bonus /
-  // penalties / total). The real Fanroc formula lives server-side in
-  // FanrocScore. To unblock the build we expose simple approximations
-  // here; replace with the canonical formula once it is shared with
-  // the frontend (see eventimpl/fanroc/FanrocScore.java).
-  // -----------------------------------------------------------------
-  biologicalPoints = computed(() => {
-    const white = this.counters.whiteBallsScored();
-    const golden = this.counters.goldenBallsScored();
-    return white + golden * 3;
-  });
-  barrierPoints = computed(() => {
-    return (this.allianceBarrierPushed() ? 10 : 0)
-         + (this.opponentBarrierPushed() ? 10 : 0);
-  });
-  coefficient = computed(() => {
-    switch (this.selectedImbalance()) {
-      case 0: return 2.0;
-      case 1: return 1.5;
-      default: return 1.3;
-    }
-  });
-  endGamePoints = computed(() => {
-    return this.counters.partialParking() * 5
-         + this.counters.fullParking() * 10;
-  });
-  fleetBonus = computed(() => 0); // placeholder
-  penaltyPoints = computed(() => this.counters.penaltyCount() * 5);
-  calculatedScore = computed(() => {
-    if (this.redCard()) return 0;
-    const base = (this.biologicalPoints() + this.barrierPoints()) * this.coefficient();
-    return Math.max(0,
-      Math.round(base + this.endGamePoints() + this.fleetBonus() - this.penaltyPoints()),
-    );
-  });
 
   private sub: any;
   private wsSubs: Subscription[] = [];

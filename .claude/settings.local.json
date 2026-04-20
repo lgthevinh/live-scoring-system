@@ -10,7 +10,9 @@
       "Bash(npm run *)",
       "Bash(./gradlew compileJava -q)",
       "Bash(./gradlew compileJava)",
-      "Bash(npx ng *)"
+      "Bash(npx ng *)",
+      "Bash(cat)",
+      "Read(//tmp/**)"
     ]
   }
 }

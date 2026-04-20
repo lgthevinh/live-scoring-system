@@ -23,13 +23,15 @@
   </ng-container>
 
   <ng-container *ngIf="currentEvent$ | async">
-    <h3 class="fw-semibold">Referee Score Tracking</h3>
-    <ul>
-      <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/ref/red"><span class="text-danger">Red</span>
-          Alliance Score Tracking</a></li>
-      <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/ref/blue"><span class="text-primary">Blue</span>
-          Alliance Score Tracking</a></li>
-    </ul>
+    <ng-container *appRequireRole="roles.SCORING_REFEREE">
+      <h3 class="fw-semibold">Referee Score Tracking</h3>
+      <ul>
+        <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/ref/red"><span class="text-danger">Red</span>
+            Alliance Score Tracking</a></li>
+        <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/ref/blue"><span class="text-primary">Blue</span>
+            Alliance Score Tracking</a></li>
+      </ul>
+    </ng-container>
 
     <h3 class="fw-semibold">Display</h3>
     <ul>
@@ -43,9 +45,13 @@
     </ul>
   </ng-container>
 
-  <h3 class="fw-semibold">Event Administration</h3>
-  <ul>
-    <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/event-dashboard">Event dashboard</a></li>
-    <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/match-control">Match control page</a></li>
-  </ul>
+  <ng-container *appRequireRole="roles.SCOREKEEPER">
+    <h3 class="fw-semibold">Event Administration</h3>
+    <ul>
+      <li class="mt-3" *appRequireRole="roles.EVENT_ADMIN">
+        <a class="p-0 m-0 text-decoration-none" href="/event-dashboard">Event dashboard</a>
+      </li>
+      <li class="mt-3"><a class="p-0 m-0 text-decoration-none" href="/match-control">Match control page</a></li>
+    </ul>
+  </ng-container>
 </div>
