@@ -18,19 +18,19 @@ Download the latest release for your event from the
 
 ## Quick Start
 
-1. Extract the downloaded zip.
-2. Run `run.bat` (Windows) or `sh run.sh` (macOS/Linux).
+1. Install the downloaded package: `.exe` or `.msi` on Windows, `.deb` or `.rpm` on Linux.
+2. Start **Scoring System** from the Start menu or the application menu.
 3. Open `http://<host-ip>` in Google Chrome and log in as `local`.
 
 See the [User Guide](docs/user-guide.md) for hardware requirements, network setup, and how to run an event.
 
 ## Build from Source
 
-Requires JDK 17+.
+Requires JDK 17+ (packaging uses JDK 21, downloaded by Gradle if missing).
 
 ```bash
 ./gradlew run              # Build and start the server
-./gradlew packageWindows   # Build a distribution zip (also: packageMac, packageLinux)
+./gradlew jpackage         # Build installers for the current OS (Windows: exe, msi; Linux: deb, rpm)
 ```
 
 ## Documentation

@@ -1,0 +1,3 @@
+--linux-package-name scoring-system
+--linux-shortcut
+--linux-app-category Utility

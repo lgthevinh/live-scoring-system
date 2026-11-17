@@ -1,0 +1,8 @@
+--name "Scoring System"
+--vendor ThingAI
+--input build/jpackage/input
+--main-jar scoring-system.jar
+--main-class org.thingai.app.desktop.DesktopLauncher
+--add-modules java.base,java.compiler,java.desktop,java.instrument,java.management,java.naming,java.security.jgss,java.sql,jdk.unsupported,jdk.crypto.ec,jdk.zipfs
+--jlink-options "--strip-debug --no-header-files --no-man-pages"
+--dest build/jpackage/out

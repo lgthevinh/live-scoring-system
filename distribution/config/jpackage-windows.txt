@@ -1,0 +1,5 @@
+--win-menu
+--win-menu-group "Scoring System"
+--win-shortcut
+--win-dir-chooser
+--win-upgrade-uuid 2f309842-135c-4b5d-a48f-3648d3696456

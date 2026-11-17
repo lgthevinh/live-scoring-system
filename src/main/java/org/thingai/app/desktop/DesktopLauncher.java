@@ -35,8 +35,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Swing control window for the scoring server. Runs {@code app/scoring-system.jar} as a child process,
- * mirrors its output to {@code logs/}, and shows the server status, URL, data folder and live log.
+ * Swing control window for the scoring server. Runs its own jar as a child process in {@code ~/ScoringSystem},
+ * mirrors its output to {@code ~/ScoringSystem/logs/}, and shows the server status, URL, data folder and live log.
  */
 public class DesktopLauncher {
 
@@ -72,7 +72,7 @@ public class DesktopLauncher {
     private final AtomicBoolean stopping = new AtomicBoolean(false);
     private boolean darkMode = false;
 
-    private File baseDir;
+    private File workDir;
     private File logsDir;
     private File bootJar;
     private volatile File logFile;
@@ -322,7 +322,7 @@ public class DesktopLauncher {
 
     private void startServer() {
         try {
-            if (!bootJar.exists()) {
+            if (!bootJar.isFile()) {
                 setState(State.ERROR, "Server jar not found: " + bootJar.getAbsolutePath());
                 return;
             }
@@ -331,10 +331,13 @@ public class DesktopLauncher {
             logFile = new File(logsDir, "scoring-" + ts + ".log");
             SwingUtilities.invokeLater(() -> setPath(logPathLabel, logFile));
 
-            // Run the server on the same JVM that runs this launcher (the bundled JRE when started from run-desktop)
+            // Run the server on the runtime that runs this launcher (the jpackage-bundled one when installed).
+            // The working directory is the user's writable folder; MatchMaker ships next to the jar.
             String javaBin = Path.of(System.getProperty("java.home"), "bin", isWindows() ? "java.exe" : "java").toString();
-            ProcessBuilder pb = new ProcessBuilder(javaBin, "-jar", bootJar.getAbsolutePath());
-            pb.directory(baseDir);
+            ProcessBuilder pb = new ProcessBuilder(javaBin,
+                    "-Dmatchmaker.dir=" + bootJar.getParentFile().getAbsolutePath(),
+                    "-jar", bootJar.getAbsolutePath());
+            pb.directory(workDir);
             pb.redirectErrorStream(true);
             serverProcess = pb.start();
             // Don't leave an orphaned server if the launcher is killed (e.g. Ctrl+C in the terminal)
@@ -497,17 +500,14 @@ public class DesktopLauncher {
     // =====================================================================
 
     private void resolveLayoutPaths() {
+        workDir = new File(System.getProperty("user.home"), "ScoringSystem");
+        logsDir = new File(workDir, "logs");
+        // The launcher and the server ship in the same jar, so the server jar is this class's own jar
         try {
-            File jarDir = new File(DesktopLauncher.class.getProtectionDomain().getCodeSource().getLocation().toURI())
-                    .getParentFile();
-            baseDir = jarDir != null && jarDir.getName().equalsIgnoreCase("app")
-                    ? jarDir.getParentFile()
-                    : new File(System.getProperty("user.dir"));
+            bootJar = new File(DesktopLauncher.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         } catch (Exception e) {
-            baseDir = new File(System.getProperty("user.dir"));
+            bootJar = new File("scoring-system.jar");
         }
-        logsDir = new File(baseDir, "logs");
-        bootJar = new File(baseDir, "app/scoring-system.jar");
     }
 
     /** Shows a path with the home directory shortened to "~", full path in the tooltip. */

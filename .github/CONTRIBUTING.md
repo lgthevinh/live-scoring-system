@@ -20,7 +20,7 @@ live-scoring-system/
 │   │   ├── org/thingai/app/        # Application code
 │   │   │   ├── Main.java           # Entry point
 │   │   │   ├── api/                # Javalin HTTP endpoints and WebSocket handlers
-│   │   │   ├── desktop/            # Swing desktop launcher (run-desktop scripts)
+│   │   │   ├── desktop/            # Swing desktop launcher (installer entry point)
 │   │   │   └── scoringservice/     # Core scoring logic, handlers, entities, repositories
 │   │   └── eventimpl/              # Event-specific scoring and ranking rules (e.g. fanroc, demo)
 │   ├── main/resources/             # Static web resources (built web UI is copied here)
@@ -28,11 +28,9 @@ live-scoring-system/
 ├── webui/                          # Angular frontend
 ├── libs/                           # Internal jars (base-core, base-platform-jvm)
 ├── vendor/
-│   ├── jre/                        # Bundled JREs per platform (linux, macos, windows)
 │   └── binary/                     # MatchMaker executables for schedule generation
 ├── distribution/
-│   ├── scripts/                    # Run scripts copied into the distribution root
-│   └── config/                     # Packaging configs (launch4j)
+│   └── config/                     # jpackage argument files (common, windows, linux)
 ├── docs/
 │   ├── user-guide.md               # End-user guide
 │   └── images/                     # Images used by the docs
@@ -40,22 +38,23 @@ live-scoring-system/
 └── proguard-rules.pro              # ProGuard obfuscation rules
 ```
 
-The distribution zip has a flat layout: `app/`, `jre/`, `binary/` and the run scripts at its root. The app
-looks for `binary/` relative to its working directory, so keep that layout when changing packaging.
+Installers are built with jpackage, which bundles a trimmed Java runtime. The installed app starts
+`DesktopLauncher`, which runs the server from its own jar with `~/ScoringSystem` as the working directory (for
+`data/`, `files/` and `logs/`) and passes `-Dmatchmaker.dir` pointing to the MatchMaker binary next to the jar.
+jpackage can't cross-build, so build Windows installers on Windows (needs WiX 3.x) and Linux packages on Linux
+(needs `rpm-build` for rpm, `dpkg-deb` and `fakeroot` for deb).
 
 ## Getting Started
 
-Requirements: JDK 17+. Node.js is downloaded automatically by Gradle.
+Requirements: JDK 17+. Node.js and the JDK 21 used for packaging are downloaded automatically by Gradle.
 
 ```bash
 ./gradlew run                          # Build the web UI and start the server
 ./gradlew run -PskipWebuiBuild=true    # Start without rebuilding the web UI
 ./gradlew test                         # Run tests
 
-./gradlew packageWindows               # Windows zip with bundled JRE
-./gradlew packageMac                   # macOS zip with bundled JRE
-./gradlew packageLinux                 # Linux zip with bundled JRE
-./gradlew distZip                      # Zip without a JRE
+./gradlew jpackage                     # Installers for the current OS (Windows: exe, msi; Linux: deb, rpm)
+./gradlew jpackageMsi                  # A single type (also: jpackageExe, jpackageDeb, jpackageRpm)
 ```
 
 Frontend-only development:

@@ -13,7 +13,6 @@ buildscript {
 plugins {
     java
     application
-    distribution
     id("com.github.johnrengelman.shadow") version "8.1.1"
     id("com.github.node-gradle.node") version "7.0.2"
 }
@@ -69,35 +68,41 @@ tasks.shadowJar {
     }
 }
 
-/* ==== Distributions ==== */
-fun CopySpec.appContents() {
-    from(tasks.shadowJar) { into("app") }
-    from("vendor/binary") { into("binary") }
-    from("distribution/scripts") {
-        // Set explicitly so the scripts stay executable even when the zip is built on Windows
-        filesMatching("*.sh") { permissions { unix("rwxr-xr-x") } }
-    }
-    from("docs/user-guide.md")
+/* ==== Native packages (jpackage) ==== */
+// jpackage can't cross-build: Windows hosts produce exe/msi, Linux hosts deb/rpm
+val isWindows = System.getProperty("os.name").startsWith("Windows")
+val packageOs = if (isWindows) "windows" else "linux"
+val packageTypes = if (isWindows) listOf("exe", "msi") else listOf("deb", "rpm")
+val jpackageJdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+
+// jpackage input: the app jar plus this OS's MatchMaker binary, which ends up next to the jar
+val jpackageInput by tasks.registering(Sync::class) {
+    from(tasks.shadowJar)
+    from("vendor/binary") { include(if (isWindows) "MatchMaker.exe" else "MatchMaker") }
+    into(layout.buildDirectory.dir("jpackage/input"))
 }
 
-distributions {
-    main {
-        contents { appContents() }
-    }
-    // Platform zips bundle the matching JRE: distribution name to vendor/jre folder
-    mapOf("windows" to "windows", "mac" to "macos", "linux" to "linux").forEach { (name, jreDir) ->
-        create(name) {
-            contents {
-                appContents()
-                from("vendor/jre/$jreDir") { into("jre") }
-            }
+val jpackage by tasks.registering {
+    group = "distribution"
+    description = "Build native installers for the current OS (${packageTypes.joinToString()})"
+}
+
+packageTypes.forEach { type ->
+    val task = tasks.register<Exec>("jpackage${type.replaceFirstChar { it.uppercase() }}") {
+        dependsOn(jpackageInput)
+        args(
+            "@distribution/config/jpackage-common.txt",
+            "@distribution/config/jpackage-$packageOs.txt",
+            "--app-version", project.version,
+            "--type", type,
+        )
+        // Resolved at execution time so configuring the build doesn't provision JDK 21
+        doFirst {
+            executable = jpackageJdk.get().metadata.installationPath
+                .file(if (isWindows) "bin/jpackage.exe" else "bin/jpackage").asFile.path
         }
-        tasks.register("package${name.replaceFirstChar { it.uppercase() }}") {
-            group = "distribution"
-            description = "Build $name distribution zip with bundled JRE"
-            dependsOn("${name}DistZip")
-        }
     }
+    jpackage { dependsOn(task) }
 }
 
 /* ==== Frontend ==== */

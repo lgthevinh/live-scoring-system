@@ -73,18 +73,12 @@ software occasionally misinterprets server resources as ads.
 - Clear the browser cache.
 
 To run the Live Scoring System, follow these steps:
-1. Extract the downloaded ZIP file to a desired location on your computer.
-2. Navigate to the run file location, follow these folder path:
-```text
-{extracted_folder}
-    /vrc-scoring-system/
-        run.bat (for Windows)
-        run.sh (for macOS)
-```
-3. Execute the appropriate run file for your operating system:
-   - For Windows: Double-click on `run.bat`
-   - For macOS: Open a terminal, navigate to the folder, and run `sh run.sh`
-4. The Live Scoring System server will start, and you should see a message indicating that the server is running.
+1. Install the downloaded package:
+   - For Windows: run the `.exe` or `.msi` installer.
+   - For Linux: install the `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL) package.
+2. Start **Scoring System** from the Start menu (Windows) or the application menu (Linux).
+3. The launcher window opens and starts the server. When it shows **Running**, the server is ready.
+   Event data and logs are stored in the `ScoringSystem` folder in your home directory.
 ![Live Scoring System Running](images/run-system.jpg)
 
 Accessing the Live Scoring System by entering the host machine's IP address in the browser's address bar. For example:

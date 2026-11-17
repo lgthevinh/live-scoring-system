@@ -27,7 +27,8 @@ public class ScheduleHandler {
         this.matchMaker = matchMaker;
 
         String osName = System.getProperty("os.name").toLowerCase();
-        Path binary = Paths.get("binary");
+        // The desktop launcher passes the install folder; standalone runs look in ./binary
+        Path binary = Paths.get(System.getProperty("matchmaker.dir", "binary"));
         if (osName.contains("win")) {
             ILog.d(TAG, "Detected Windows OS for MatchMakerService.");
             this.matchMaker.setBinPath(binary.toAbsolutePath() + "/MatchMaker.exe");
