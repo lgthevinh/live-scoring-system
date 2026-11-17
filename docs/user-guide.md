@@ -1,6 +1,6 @@
-# Live Scoring System Software for Robotics Competitions
+# Live Scoring System — User Guide
 
-This repository contains the source code for a live scoring system designed for robotics competitions. The system allows real-time tracking and display of scores, team performance, and match statistics.
+This guide explains how to set up and run the Live Scoring System at a robotics competition. The system allows real-time tracking and display of scores, team performance, and match statistics.
 
 ## Setup Guide
 
@@ -18,7 +18,7 @@ To run the Live Scoring System effectively, the following hardware is recommende
 - Large monitors or projectors for displaying scores to the audience, preferably with HDMI and 27-inch or larger screens for better visibility.
 - For this software version, at least one display for each field of the event is recommended for on-field live scoring and timer.
 
-**Tables**:
+**Tablets**:
 - Android and iOS tablets are both compatible with the FTC-Live software. Recommended tablet specifications include:
   - Screen Size: 9 inches or larger
   - Operating System: Android 8.0+ or iOS 12.0+
@@ -50,8 +50,8 @@ The Live Scoring System in real-life could be operated flexibly in different arc
 
 **Operation Architecture**:
 
-Most commonly used cofiguration is as follows:
-![Operation Architecture](docs/image/operation-archtecture.jpg)
+Most commonly used configuration is as follows:
+![Operation Architecture](images/operation-architecture.jpg)
 
 1. **Scoring server laptop**: This laptop hosts the Live Scoring System application and manages all scoring data. It should be connected to the local network via Ethernet for stability.
 2. **Field display monitors**: These monitors are connected to the scoring server laptop and display real-time scores and match information to the audience.
@@ -60,7 +60,7 @@ Most commonly used cofiguration is as follows:
 
 ### Download the Live Scoring System Software
 You can download the latest version of the Live Scoring System software from the releases section of this repository:
-[Releases - Live Scoring System](https://github.com/lgthevinh/scoring-system/releases)
+[Releases - Live Scoring System](https://github.com/lgthevinh/live-scoring-system/releases)
 
 Be sure to download the version of the event you are organizing (e.g., FANROC, FARC, etc...). And read the release notes and download the latest stable version.
 
@@ -75,7 +75,7 @@ software occasionally misinterprets server resources as ads.
 To run the Live Scoring System, follow these steps:
 1. Extract the downloaded ZIP file to a desired location on your computer.
 2. Navigate to the run file location, follow these folder path:
-```aiignore
+```text
 {extracted_folder}
     /vrc-scoring-system/
         run.bat (for Windows)
@@ -85,7 +85,7 @@ To run the Live Scoring System, follow these steps:
    - For Windows: Double-click on `run.bat`
    - For macOS: Open a terminal, navigate to the folder, and run `sh run.sh`
 4. The Live Scoring System server will start, and you should see a message indicating that the server is running.
-![Live Scoring System Running](docs/image/run-system.jpg)
+![Live Scoring System Running](images/run-system.jpg)
 
 Accessing the Live Scoring System by entering the host machine's IP address in the browser's address bar. For example:
 ```http://{your_host_machine_ip}``` or the url provided in the terminal output.
@@ -97,7 +97,7 @@ After accessing the Live Scoring System URL, you will be prompted to log in. Use
 
 No password is required for local access.
 
-![Login Screen](docs/image/login-screen.jpg)
+![Login Screen](images/login-screen.jpg)
 
 ### User guide
 
@@ -107,7 +107,7 @@ After logging in, you will be directed to the main page, here you will follow th
 
 Navigate to the `Event dashboard` section to set up your event details, including teams, matches, and scoring rules.
 
-![Event Dashboard](docs/image/event-dashboard-screen.jpg)
+![Event Dashboard](images/event-dashboard-screen.jpg)
 
 In the Event Dashboard, you can:
 - Create and manage event information, and set active event for the system.
@@ -119,7 +119,7 @@ Set active the event for the system by clicking on the `Set Active` button.
 
 After setting up the event, navigate to the Main screen, here you can view the information of the schedule, ranking, result with other options
 
-![Main Screen](docs/image/main-page.jpg)
+![Main Screen](images/main-page.jpg)
 
 #### After the event
 

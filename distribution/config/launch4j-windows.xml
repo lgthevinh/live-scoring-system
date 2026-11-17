@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Paths are relative to this file. Run after ./gradlew shadowJar -->
 <launch4jConfig>
     <dontWrapJar>false</dontWrapJar>
     <headerType>console</headerType>
-    <jar>
-        /data/IdeaProjects/live-scoring-system/build/distributions/fanroc-scoring-system-v1.3-rc-windows/vrc-scoring-system-windows/app/scoring-system.jar
-    </jar>
-    <outfile>
-        /data/IdeaProjects/live-scoring-system/build/distributions/fanroc-scoring-system-v1.3-rc-windows/vrc-scoring-system-windows/scoring-system.exe
-    </outfile>
+    <jar>../../build/libs/scoring-system.jar</jar>
+    <outfile>../../build/launch4j/scoring-system.exe</outfile>
     <errTitle></errTitle>
     <cmdLine></cmdLine>
     <chdir>.</chdir>
@@ -19,11 +16,10 @@
     <manifest></manifest>
     <icon></icon>
     <classPath>
-        <mainClass>org.thingai.main.Main</mainClass>
-        <cp>lib/*</cp>
+        <mainClass>org.thingai.app.Main</mainClass>
     </classPath>
     <jre>
-        <path>../jre;%JAVA_HOME%;%PATH%</path>
+        <path>jre;%JAVA_HOME%;%PATH%</path>
         <requiresJdk>false</requiresJdk>
         <requires64Bit>true</requires64Bit>
         <minVersion>17</minVersion>

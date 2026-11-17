@@ -27,6 +27,7 @@ out/
 bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
+!vendor/jre/**/bin/
 
 ### NetBeans ###
 /nbproject/private/
@@ -58,9 +59,11 @@ src/main/resources/static/*.ico
 !src/main/resources/static/favicon.ico
 !src/main/resources/static/index.html
 
-build.gradle
 files/
+/data/
 /*.db
+/*.db-shm
+/*.db-wal
 
 ### MCP/AI Tool Config (sensitive) ###
 .mcp.json

@@ -104,43 +104,39 @@ distributions {
         contents {
             from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
-            from('binary') { into 'binary' }
-            from('data') { into 'data' }
-            from('scripts') { into '' }
-            from('README-en.md') { into '' }
+            from('vendor/binary') { into 'binary' }
+            from('distribution/scripts') { into '' }
+            from('docs/user-guide.md') { into '' }
         }
     }
     windows {
         contents {
             from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
-            from('binary') { into 'binary' }
-            from('data') { into 'data' }
-            from('scripts') { into '' }
-            from('README-en.md') { into '' }
-            from('jre/windows') { into 'jre' }
+            from('vendor/binary') { into 'binary' }
+            from('distribution/scripts') { into '' }
+            from('docs/user-guide.md') { into '' }
+            from('vendor/jre/windows') { into 'jre' }
         }
     }
     mac {
         contents {
             from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
-            from('binary') { into 'binary' }
-            from('data') { into 'data' }
-            from('scripts') { into '' }
-            from('README-en.md') { into '' }
-            from('jre/macos') { into 'jre' }
+            from('vendor/binary') { into 'binary' }
+            from('distribution/scripts') { into '' }
+            from('docs/user-guide.md') { into '' }
+            from('vendor/jre/macos') { into 'jre' }
         }
     }
     linux {
         contents {
             from({ tasks.named('shadowJar').get().archiveFile }) { into 'app' }
             from({ tasks.named('desktopJar').get().archiveFile }) { into 'app' }
-            from('binary') { into 'binary' }
-            from('data') { into 'data' }
-            from('scripts') { into '' }
-            from('README-en.md') { into '' }
-            from('jre/linux') { into 'jre' }
+            from('vendor/binary') { into 'binary' }
+            from('distribution/scripts') { into '' }
+            from('docs/user-guide.md') { into '' }
+            from('vendor/jre/linux') { into 'jre' }
         }
     }
 }
