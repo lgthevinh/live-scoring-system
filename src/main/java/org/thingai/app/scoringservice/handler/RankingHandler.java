@@ -10,8 +10,8 @@ import org.thingai.app.scoringservice.entity.RankingStat;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.strategy.IRankingStrategy;
-import org.thingai.base.dao.exceptions.DaoException;
-import org.thingai.base.log.ILog;
+import agp.base.dao.exceptions.DaoException;
+import agp.base.log.ILog;
 
 import java.util.HashMap;
 

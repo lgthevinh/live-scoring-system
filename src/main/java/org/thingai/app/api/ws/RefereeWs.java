@@ -11,7 +11,7 @@ import org.thingai.app.scoringservice.define.AccountRole;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.matchcontrol.StateManager;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.HashMap;
 import java.util.Map;

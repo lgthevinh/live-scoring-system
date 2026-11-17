@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import org.thingai.app.scoringservice.define.ScoreState;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.handler.ScoreHandler;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.Map;
 

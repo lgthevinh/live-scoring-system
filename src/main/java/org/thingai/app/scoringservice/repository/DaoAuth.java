@@ -2,7 +2,7 @@ package org.thingai.app.scoringservice.repository;
 
 import org.thingai.app.scoringservice.entity.AccountRole;
 import org.thingai.app.scoringservice.entity.AuthData;
-import org.thingai.base.dao.Dao;
+import agp.base.dao.Dao;
 
 public class DaoAuth {
     private final Dao dao;

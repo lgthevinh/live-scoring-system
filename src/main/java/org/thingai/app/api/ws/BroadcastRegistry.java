@@ -2,7 +2,7 @@ package org.thingai.app.api.ws;
 
 import com.google.gson.Gson;
 import io.javalin.websocket.WsContext;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;

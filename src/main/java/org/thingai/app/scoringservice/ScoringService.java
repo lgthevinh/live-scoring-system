@@ -10,9 +10,9 @@ import org.thingai.app.scoringservice.matchcontrol.StateManager;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.MatchMakerService;
 import org.thingai.app.scoringservice.strategy.IRankingStrategy;
-import org.thingai.base.Service;
-import org.thingai.base.log.ILog;
-import org.thingai.platform.log.ILogImpl;
+import agp.base.Service;
+import agp.base.log.ILog;
+import agp.base.platform.jvm.log.ILogImpl;
 
 public class ScoringService extends Service {
     private static final String SERVICE_NAME = "ScoringService";
@@ -35,7 +35,7 @@ public class ScoringService extends Service {
         setVersion("2.0");
 
         ILog.ENABLE_LOGGING = true;
-        ILog.logLevel = ILog.DEBUG;
+        ILog.LOG_LEVEL = ILog.DEBUG;
     }
 
     public static MatchHandler matchHandler() {

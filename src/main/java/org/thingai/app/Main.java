@@ -5,7 +5,7 @@ import eventimpl.fanroc.FanrocScore;
 import io.javalin.Javalin;
 import org.thingai.app.api.ApiServer;
 import org.thingai.app.scoringservice.ScoringService;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

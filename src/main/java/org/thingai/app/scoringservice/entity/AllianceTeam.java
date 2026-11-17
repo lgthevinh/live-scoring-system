@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.entity;
 
-import org.thingai.base.dao.annotations.DaoColumn;
-import org.thingai.base.dao.annotations.DaoTable;
+import agp.base.dao.annotations.DaoColumn;
+import agp.base.dao.annotations.DaoTable;
 
 /**
  * AllianceTeam entity represents the association between an alliance and a team.

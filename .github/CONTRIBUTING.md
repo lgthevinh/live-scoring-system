@@ -26,7 +26,7 @@ live-scoring-system/
 │   ├── desktop/java/               # Swing desktop launcher (built into scoring-launcher.jar)
 │   └── test/                       # Tests and test resources
 ├── webui/                          # Angular frontend
-├── libs/                           # Internal jars (applicationbase, edgeplatform)
+├── libs/                           # Internal jars (base-core, base-platform-jvm)
 ├── vendor/
 │   ├── jre/                        # Bundled JREs per platform (linux, macos, windows)
 │   └── binary/                     # MatchMaker executables for schedule generation

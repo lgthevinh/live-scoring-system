@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.entity;
 
-import org.thingai.base.dao.annotations.DaoColumn;
-import org.thingai.base.dao.annotations.DaoTable;
+import agp.base.dao.annotations.DaoColumn;
+import agp.base.dao.annotations.DaoTable;
 
 @DaoTable(name = "event")
 public class Event {

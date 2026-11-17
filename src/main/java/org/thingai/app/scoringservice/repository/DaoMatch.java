@@ -5,7 +5,7 @@ import org.thingai.app.scoringservice.entity.AllianceTeam;
 import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.Team;
-import org.thingai.base.dao.Dao;
+import agp.base.dao.Dao;
 
 import java.util.ArrayList;
 import java.util.List;

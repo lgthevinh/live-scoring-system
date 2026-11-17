@@ -12,7 +12,7 @@ import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.BroadcastService;
 import org.thingai.app.scoringservice.service.MatchTimerService;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;

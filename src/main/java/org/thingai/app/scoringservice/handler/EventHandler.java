@@ -6,8 +6,8 @@ import org.thingai.app.scoringservice.define.ErrorCode;
 import org.thingai.app.scoringservice.entity.DbMapEntity;
 import org.thingai.app.scoringservice.entity.Event;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.base.dao.exceptions.DaoException;
-import org.thingai.base.log.ILog;
+import agp.base.dao.exceptions.DaoException;
+import agp.base.log.ILog;
 
 import java.io.File;
 

@@ -1,6 +1,6 @@
 package org.thingai.app.scoringservice.service;
 
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;

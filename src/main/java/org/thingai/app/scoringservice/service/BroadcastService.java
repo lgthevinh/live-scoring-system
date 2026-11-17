@@ -4,7 +4,7 @@ import org.thingai.app.api.ws.BroadcastRegistry;
 import org.thingai.app.api.ws.WsEnvelope;
 import org.thingai.app.api.ws.WsMessageType;
 import org.thingai.app.scoringservice.define.LiveBroadcastTopic;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.Map;
 

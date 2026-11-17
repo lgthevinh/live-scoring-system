@@ -5,7 +5,7 @@ import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.define.LiveBroadcastTopic;
 import org.thingai.app.scoringservice.matchcontrol.StateManager;
 import org.thingai.app.scoringservice.service.BroadcastService;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.HashMap;
 import java.util.Map;

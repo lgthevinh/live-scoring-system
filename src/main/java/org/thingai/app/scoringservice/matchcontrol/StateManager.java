@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.matchcontrol;
 
 import org.thingai.app.scoringservice.entity.Score;
-import org.thingai.platform.cache.LRUCache;
+import agp.base.platform.jvm.cache.LRUCache;
 
 import java.util.HashMap;
 

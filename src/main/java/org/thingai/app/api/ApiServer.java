@@ -16,7 +16,7 @@ import org.thingai.app.api.endpoints.TeamApi;
 import org.thingai.app.api.ws.LiveWs;
 import org.thingai.app.api.ws.RankingWs;
 import org.thingai.app.api.ws.RefereeWs;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.io.InputStream;
 import java.lang.reflect.Type;

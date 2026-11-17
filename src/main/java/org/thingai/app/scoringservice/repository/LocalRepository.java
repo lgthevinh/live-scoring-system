@@ -9,9 +9,9 @@ import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.app.scoringservice.entity.RankingEntry;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.Team;
-import org.thingai.base.dao.Dao;
-import org.thingai.platform.dao.DaoFile;
-import org.thingai.platform.dao.DaoSqlite;
+import agp.base.dao.Dao;
+import agp.base.platform.jvm.dao.DaoFile;
+import agp.base.platform.jvm.dao.DaoSqlite;
 
 public class LocalRepository {
     private static Dao systemDatabase;

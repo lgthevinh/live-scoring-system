@@ -7,7 +7,7 @@ import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.entity.AccountRole;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

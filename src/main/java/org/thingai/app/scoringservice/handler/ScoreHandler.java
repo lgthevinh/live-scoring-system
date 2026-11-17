@@ -5,7 +5,7 @@ import org.thingai.app.scoringservice.dto.ScoreDetailDto;
 import org.thingai.app.scoringservice.entity.Score;
 import org.thingai.app.scoringservice.entity.ScoreDefine;
 import org.thingai.app.scoringservice.repository.LocalRepository;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.HashMap;
 

@@ -6,7 +6,7 @@ import org.thingai.app.scoringservice.define.MatchType;
 import org.thingai.app.scoringservice.entity.*;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.MatchMakerService;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.io.IOException;
 import java.nio.file.Files;

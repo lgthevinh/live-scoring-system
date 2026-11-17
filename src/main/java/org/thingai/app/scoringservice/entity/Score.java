@@ -2,8 +2,8 @@ package org.thingai.app.scoringservice.entity;
 
 import org.thingai.app.scoringservice.strategy.IScoreStrategy;
 import org.thingai.app.scoringservice.define.ScoreState;
-import org.thingai.base.dao.annotations.DaoColumn;
-import org.thingai.base.dao.annotations.DaoTable;
+import agp.base.dao.annotations.DaoColumn;
+import agp.base.dao.annotations.DaoTable;
 
 import java.util.HashMap;
 

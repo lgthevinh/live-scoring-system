@@ -10,7 +10,7 @@ import org.thingai.app.scoringservice.dto.MatchDetailDto;
 import org.thingai.app.scoringservice.entity.AllianceTeam;
 import org.thingai.app.scoringservice.entity.Match;
 import org.thingai.app.scoringservice.entity.TimeBlock;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.ArrayList;
 import java.util.List;

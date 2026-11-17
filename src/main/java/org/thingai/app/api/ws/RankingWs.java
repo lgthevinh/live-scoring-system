@@ -9,7 +9,7 @@ import org.thingai.app.scoringservice.entity.RankingEntry;
 import org.thingai.app.scoringservice.handler.RankingHandler;
 import org.thingai.app.scoringservice.repository.LocalRepository;
 import org.thingai.app.scoringservice.service.BroadcastService;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.util.HashMap;
 import java.util.Map;

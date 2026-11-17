@@ -4,7 +4,7 @@ import io.javalin.websocket.WsConnectContext;
 import org.thingai.app.scoringservice.ScoringService;
 import org.thingai.app.scoringservice.callback.RequestCallback;
 import org.thingai.app.scoringservice.define.AccountRole;
-import org.thingai.base.log.ILog;
+import agp.base.log.ILog;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

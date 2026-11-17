@@ -1,7 +1,7 @@
 package org.thingai.app.scoringservice.repository;
 
 import org.thingai.app.scoringservice.entity.Score;
-import org.thingai.base.dao.Dao;
+import agp.base.dao.Dao;
 
 public class DaoScore {
     private final Dao dao;
