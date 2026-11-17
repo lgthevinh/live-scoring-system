@@ -111,15 +111,11 @@ node {
     download = true
     workDir = layout.buildDirectory.dir("nodejs")
     npmWorkDir = layout.buildDirectory.dir("npm")
-}
-
-tasks.npmInstall {
-    workingDir = webUiDir
+    nodeProjectDir = webUiDir
 }
 
 val npmBuild by tasks.registering(NpmTask::class) {
     dependsOn(tasks.npmInstall)
-    workingDir = webUiDir
     args = listOf("run", "build")
 }
 
