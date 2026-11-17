@@ -11,7 +11,6 @@ match status, and rankings to referees, scorekeepers, teams, and spectators.
 - [Build from Source](#build-from-source)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
-- [Contact](#contact)
 
 ## Features
 
@@ -51,9 +50,3 @@ Requires JDK 17+.
 ## Contributing
 
 Contributions are welcome. Please read the [Contributing Guide](.github/CONTRIBUTING.md) before opening a pull request.
-
-## Contact
-
-- `everwellmax@gmail.com`: maintainer
-- `hirovn9395@gmail.com`: maintainer
-- `truongcongminhquan09@gmail.com`: FANROC event support
