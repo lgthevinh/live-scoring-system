@@ -5,20 +5,11 @@ match status, and rankings to referees, scorekeepers, teams, and spectators.
 
 ## Table of Contents
 
-- [Features](#features)
 - [Download](#download)
 - [Quick Start](#quick-start)
 - [Build from Source](#build-from-source)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
-
-## Features
-
-- Real-time scoring from referee tablets over WebSocket
-- Match control, timer, and live field displays
-- Event setup: teams, accounts, and match schedule generation
-- Rankings with event-specific scoring rules
-- Runs fully offline on a LAN, with bundled JRE distributions for Windows, macOS, and Linux
 
 ## Download
 
