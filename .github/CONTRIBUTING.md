@@ -20,10 +20,10 @@ live-scoring-system/
 │   │   ├── org/thingai/app/        # Application code
 │   │   │   ├── Main.java           # Entry point
 │   │   │   ├── api/                # Javalin HTTP endpoints and WebSocket handlers
+│   │   │   ├── desktop/            # Swing desktop launcher (run-desktop scripts)
 │   │   │   └── scoringservice/     # Core scoring logic, handlers, entities, repositories
 │   │   └── eventimpl/              # Event-specific scoring and ranking rules (e.g. fanroc, demo)
 │   ├── main/resources/             # Static web resources (built web UI is copied here)
-│   ├── desktop/java/               # Swing desktop launcher (built into scoring-launcher.jar)
 │   └── test/                       # Tests and test resources
 ├── webui/                          # Angular frontend
 ├── libs/                           # Internal jars (base-core, base-platform-jvm)

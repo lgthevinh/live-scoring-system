@@ -1,5 +1,4 @@
 import com.github.gradle.node.npm.task.NpmTask
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import proguard.gradle.ProGuardTask
 
 buildscript {
@@ -37,9 +36,6 @@ repositories {
     mavenCentral()
 }
 
-// Desktop launcher, built separately into scoring-launcher.jar (sources in src/desktop/java)
-val desktop by sourceSets.creating
-
 dependencies {
     implementation("org.xerial:sqlite-jdbc:3.43.2.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
@@ -48,8 +44,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.13.2")
     implementation("io.javalin:javalin:6.3.0")
     implementation(fileTree("libs") { include("*.jar") })
-
-    "desktopImplementation"("com.formdev:flatlaf:3.2.5")
+    implementation("com.formdev:flatlaf:3.2.5")
 }
 
 tasks.test {
@@ -74,27 +69,14 @@ tasks.shadowJar {
     }
 }
 
-val desktopJar by tasks.registering(ShadowJar::class) {
-    group = "build"
-    description = "Build the desktop launcher JAR"
-    archiveFileName = "scoring-launcher.jar"
-    from(desktop.output)
-    configurations = listOf(project.configurations["desktopRuntimeClasspath"])
-    manifest {
-        attributes(
-            "Main-Class" to "org.thingai.app.desktop.DesktopLauncher",
-            "Implementation-Title" to "Scoring System Desktop Launcher",
-            "Implementation-Version" to project.version,
-        )
-    }
-}
-
 /* ==== Distributions ==== */
 fun CopySpec.appContents() {
     from(tasks.shadowJar) { into("app") }
-    from(desktopJar) { into("app") }
     from("vendor/binary") { into("binary") }
-    from("distribution/scripts")
+    from("distribution/scripts") {
+        // Set explicitly so the scripts stay executable even when the zip is built on Windows
+        filesMatching("*.sh") { permissions { unix("rwxr-xr-x") } }
+    }
     from("docs/user-guide.md")
 }
 

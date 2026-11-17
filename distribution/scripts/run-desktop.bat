@@ -1,10 +1,12 @@
 @echo off
 setlocal
-set "BASE=%~dp0"
-rem Go to distribution root (this script is placed at root in dist)
-cd /d "%BASE%"
-set "JAVA=%JAVA_HOME%\bin\java.exe"
-if not exist "%JAVA%" set "JAVA=java"
+set "DIR=%~dp0"
+cd /d "%DIR%"
+
+REM Prefer the bundled JRE, then JAVA_HOME, then PATH
+set "JAVA=java"
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA=%JAVA_HOME%\bin\java.exe"
+if exist "%DIR%jre\bin\java.exe" set "JAVA=%DIR%jre\bin\java.exe"
+
 echo Using JAVA: %JAVA%
-%JAVA% -jar "app\scoring-launcher.jar"
-endlocal
+"%JAVA%" -cp "app\scoring-system.jar" org.thingai.app.desktop.DesktopLauncher
