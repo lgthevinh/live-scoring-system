@@ -33,7 +33,7 @@ import java.nio.charset.StandardCharsets;
  *   <li>Port selection (was {@code ServerPortConfig}).</li>
  *   <li>CORS setup (was {@code CorsConfig}).</li>
  *   <li>SPA fallback so deep links resolve to {@code index.html} (was {@code WebConfig}).</li>
- *   <li>Static resource serving from classpath {@code /static} (written by the {@code copyWebUi} Gradle task).</li>
+ *   <li>Static resource serving from classpath {@code /static} (bundled by the {@code processResources} Gradle task).</li>
  * </ul>
  */
 public final class ApiServer {

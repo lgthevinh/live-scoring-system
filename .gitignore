@@ -40,20 +40,8 @@ bin/
 /src/test/resources/test.db
 
 ### Angular/Web Build Artifacts ###
-# Build outputs
-src/main/resources/static/main-*.js
-src/main/resources/static/chunk-*.js
-src/main/resources/static/polyfills-*.js
-src/main/resources/static/runtime-*.js
-src/main/resources/static/scripts-*.js
-src/main/resources/static/styles-*.css
-src/main/resources/static/3rdpartylicenses.txt
-src/main/resources/static/prerendered-routes.json
-src/main/resources/static/browser/
-src/main/resources/static/webui/
-src/main/resources/static/*.ico
-!src/main/resources/static/favicon.ico
-!src/main/resources/static/index.html
+# The web UI is bundled into the jar by processResources; nothing belongs here
+src/main/resources/static/
 
 files/
 /data/

@@ -124,15 +124,12 @@ val npmBuild by tasks.registering(NpmTask::class) {
     args = listOf("run", "build")
 }
 
-// With -PskipWebuiBuild=true, copies the existing webui/dist build (if any) without rebuilding
-val copyWebUi by tasks.registering(Copy::class) {
-    if (!skipWebuiBuild) dependsOn(npmBuild)
-    from("webui/dist/webui/browser")
-    into(layout.buildDirectory.dir("resources/main/static"))
-}
-
+// Bundles the web UI into the jar's static/ folder. processResources must do the copy itself: it deletes files
+// in its output folder that it didn't produce, which wiped a separate copy task's output.
+// With -PskipWebuiBuild=true, bundles the existing webui/dist build (if any) without rebuilding.
 tasks.processResources {
-    if (hasWebUi) dependsOn(copyWebUi)
+    if (hasWebUi && !skipWebuiBuild) dependsOn(npmBuild)
+    from("webui/dist/webui/browser") { into("static") }
 }
 
 /* ==== Obfuscation ==== */
